@@ -1124,7 +1124,7 @@ match parameters with
 end.
 
 Axiom callFree__extcall_properties: forall TD ge m1 args m2 oret,
-  callMalloc TD m1 args = Some (oret, m2) ->
+  callFree TD m1 args = Some (oret, m2) ->
   extcall_other_sem TD typ_void [(typ_pointer (typ_int Size.Eight))] 
     ge args m1 E0 oret m2.
 

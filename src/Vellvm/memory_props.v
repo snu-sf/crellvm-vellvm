@@ -1538,33 +1538,36 @@ Proof.
         destruct H as [H | H]; auto.
 Qed.
 
-Lemma mstore_aux_preserves_mload_aux_inv: forall mc b1 ofs1 gvs0 b2 gvs1 Mem' Mem ofs2,
+Lemma mstore_aux_preserves_mload_aux_inv: forall mc b1 ofs1 gvs0 b2 mc' gvs1 Mem' Mem ofs2,
   mload_aux Mem' mc b1 ofs1 = ret gvs0 ->
-  mstore_aux Mem gvs1 b2 ofs2 = ret Mem' ->
+  mstore_aux Mem mc' gvs1 b2 ofs2 = ret Mem' ->
   exists gvs2 : GenericValue,
      mload_aux Mem mc b1 ofs1 = ret gvs2 /\
      (forall v m,
       In (v, m) gvs0 -> In (v, m) gvs2 \/
       (forall b0 ofs0, v = Vptr b0 ofs0 -> In (v, m) gvs1)).
 Proof.
-  induction gvs1 as [|[]]; simpl; intros.
-    inv H0. exists gvs0. split; auto.
+  induction mc'; destruct gvs1; intros Mem' Mem ofs2 Hload Hstore; inv Hstore.
+    exists gvs0. split; auto.
 
     inv_mbind'.
-    apply IHgvs1 in H2; auto.
-    destruct H2 as [gvs2 [J1 J2]].
+    destruct (AST.memory_chunk_eq a m); inv H0.
+    destruct (has_chunk_eq v m); inv H1.
+    inv_mbind'.
+    apply IHmc' in H1; auto.
+    destruct H1 as [gvs2 [J1 J2]].
     symmetry in HeqR.
     eapply store_preserves_mload_aux_inv in HeqR; eauto.
     destruct HeqR as [gvs3 [J3 J4]].
     exists gvs3.
     split; auto.
     intros.
-    apply J2 in H0.
-    destruct H0 as [H0 | H0]; subst;
+    apply J2 in H.
+    destruct H as [H | H]; subst;
       try solve [right; intros; subst; right; eauto].
-    apply J4 in H0.
-    destruct H0 as [H0 | H0]; subst; auto.
-      right. intros. apply H0 in H1. destruct H1; subst; auto.
+    apply J4 in H.
+    destruct H as [H | H]; subst; auto.
+      right. intros. apply H in H0. destruct H0; subst; left; auto.
 Qed.
 
 Ltac destruct_ldst :=
@@ -1572,12 +1575,12 @@ match goal with
 | H1 : mload _ _ _ _ _ = ret _,
   H2 : mstore _ _ _ _ _ _ = ret _ |- _ =>
   apply store_inv in H2;
-  destruct H2 as [b [ofs [J5 J4]]];
+  destruct H2 as [b [ofs [mc' [J6 [J5 J4]]]]];
   apply mload_inv in H1;
   destruct H1 as [b1 [ofs1 [m1 [mc [J1 [J2 J3]]]]]]; subst;
   unfold mload; simpl; rewrite J2;
-  symmetry in J5; apply GV2ptr_inv in J5;
-  destruct J5 as [b2 [ofs2 [m2 [J6 J7]]]]; subst; inv J7
+  symmetry in J6; apply GV2ptr_inv in J6;
+  destruct J6 as [b2 [ofs2 [m2 [J7 J8]]]]; subst; inv J8
 end.
 
 Lemma mstore_preserves_mload_inv: forall TD Mem' gptr ty al gvs0 Mem gvs1 t
@@ -1606,17 +1609,18 @@ Proof.
 Qed.
 
 Lemma mstore_aux_preserves_mload_aux: forall mc b1 ofs1 gvs0 b2
-  (Hneq: b1 <> b2) gvs1 Mem' Mem ofs2,
+  (Hneq: b1 <> b2) mc' gvs1 Mem' Mem ofs2,
   mload_aux Mem mc b1 ofs1 = ret gvs0 ->
-  mstore_aux Mem gvs1 b2 ofs2 = ret Mem' ->
+  mstore_aux Mem mc' gvs1 b2 ofs2 = ret Mem' ->
   mload_aux Mem' mc b1 ofs1 = ret gvs0.
 Proof.
-  induction gvs1 as [|[]]; simpl; intros.
-    inv H0. auto.
-
-    inv_mbind'.
-    apply IHgvs1 in H2; auto.
-    eapply store_preserves_mload; eauto.
+  induction mc'; destruct gvs1; intros Mem' Mem ofs2 Hload Hstore; inv Hstore; auto.
+  inv_mbind'.
+  destruct (AST.memory_chunk_eq a m); inv H0.
+    destruct (has_chunk_eq v m); inv H1.
+  inv_mbind'.
+  apply IHmc' in H1; auto.
+  eapply store_preserves_mload; eauto.
 Qed.
 
 Lemma mstore_preserves_mload: forall TD Mem' gptr ty al gvs0 Mem gv1 t
@@ -1653,19 +1657,22 @@ Proof.
 Qed.
 
 Lemma mstore_aux_preserves_mload_aux': forall mc b1 ofs1 b2
-  gvs1 gvs0 Mem' Mem ofs2,
+  mc' gvs1 gvs0 Mem' Mem ofs2,
   mload_aux Mem mc b1 ofs1 = ret gvs0 ->
-  mstore_aux Mem gvs1 b2 ofs2 = ret Mem' ->
+  mstore_aux Mem mc' gvs1 b2 ofs2 = ret Mem' ->
   exists gvs1, mload_aux Mem' mc b1 ofs1 = ret gvs1.
 Proof.
-  induction gvs1 as [|[]]; simpl; intros.
-    inv H0. eauto.
+  induction mc'; destruct gvs1; intros gvs0 Mem' Mem ofs2 Hload Hstore; inv Hstore.
+    eexists; eauto.
 
+    inv_mbind'.
+    destruct (AST.memory_chunk_eq a m); inv H0.
+    destruct (has_chunk_eq v m); inv H1.
     inv_mbind'.
     symmetry in HeqR.
     eapply store_preserves_mload' in HeqR; eauto.
     destruct HeqR as [gvs2 HeqR].
-    eapply IHgvs1 in H2; eauto.
+    eapply IHmc' in H1; eauto.
 Qed.
 
 Lemma mstore_preserves_mload': forall TD Mem' gptr ty al gvs0 Mem gv1 t
@@ -1680,48 +1687,49 @@ Qed.
 (* We assume alignment is correct. *)
 Axiom align_is_always_correct: forall m ofs, (align_chunk m | ofs).
 
-Lemma mstore_aux_ex: forall mb lo hi gv m ofs
-  (Hperm : Mem.range_perm m mb lo hi Freeable)
-  (Hle: lo <= ofs) (Hge: Z_of_nat (sizeGenericValue gv) + ofs <= hi),
-  exists m', mstore_aux m gv mb ofs = ret m'.
-Proof.
-  induction gv as [|[]]; simpl; intros.
-    eauto.
+(* Lemma mstore_aux_ex: forall mb lo hi mc gv m ofs *)
+(*   (Hperm : Mem.range_perm m mb lo hi Freeable) *)
+(*   (Hle: lo <= ofs) (Hge: Z_of_nat (sizeGenericValue gv) + ofs <= hi), *)
+(*   exists m', mstore_aux m mc gv mb ofs = ret m'. *)
+(* Proof. *)
+  (* induction gv as [|[]]; simpl; intros. *)
+  (*   eauto. *)
 
-    rewrite inj_plus in Hge.
-    rewrite <- size_chunk_conv in Hge.
-    assert ({ m2: mem | Mem.store m m0 mb ofs v = Some m2 }) as J.
-      apply Mem.valid_access_store.
-      split.
-        intros ofs1 H.
-        apply Mem.perm_implies with (p1:=Freeable); try constructor.
-        apply Hperm.
-        split.
-          omega.
-          omega.
+  (*   rewrite inj_plus in Hge. *)
+  (*   rewrite <- size_chunk_conv in Hge. *)
+  (*   assert ({ m2: mem | Mem.store m m0 mb ofs v = Some m2 }) as J. *)
+  (*     apply Mem.valid_access_store. *)
+  (*     split. *)
+  (*       intros ofs1 H. *)
+  (*       apply Mem.perm_implies with (p1:=Freeable); try constructor. *)
+  (*       apply Hperm. *)
+  (*       split. *)
+  (*         omega. *)
+  (*         omega. *)
 
-        apply align_is_always_correct.
-    destruct J as [m2 J].
-    fill_ctxhole.
-    apply IHgv.
-      intros ofs1 H.
-      eapply Mem.perm_store_1; eauto.
+  (*       apply align_is_always_correct. *)
+  (*   destruct J as [m2 J]. *)
+  (*   fill_ctxhole. *)
+  (*   apply IHgv. *)
+  (*     intros ofs1 H. *)
+  (*     eapply Mem.perm_store_1; eauto. *)
 
-      rewrite size_chunk_conv.
-      omega.
+  (*     rewrite size_chunk_conv. *)
+  (*     omega. *)
 
-      omega.
-Qed.
+  (*     omega. *)
+(* Qed. *)
 
-Lemma nextblock_mstore_aux: forall b gvs M ofs M',
-  mstore_aux M gvs b ofs = ret M' ->
+Lemma nextblock_mstore_aux: forall b mc gvs M ofs M',
+  mstore_aux M mc gvs b ofs = ret M' ->
   Mem.nextblock M = Mem.nextblock M'.
 Proof.
-  induction gvs as [|[]]; simpl; intros.
-    inv H. auto.
-
+  induction mc; destruct gvs; intros M ofs M' Hstore; inv Hstore; auto.
     inv_mbind'.
-    apply IHgvs in H1.
+    destruct (AST.memory_chunk_eq a m); inv H0.
+    destruct (has_chunk_eq v m); inv H1.
+    inv_mbind'.
+    apply IHmc in H1.
     symmetry in HeqR.
     apply Mem.nextblock_store in HeqR.
     rewrite <- HeqR. auto.
@@ -1733,8 +1741,8 @@ Lemma nextblock_mstore: forall TD M gv1 M' mp2 t align0,
 Proof.
   intros.
   apply store_inv in H.
-  destruct H as [blk' [ofs' [J1 J2]]].
-  apply nextblock_mstore_aux in J2; auto.
+  destruct H as [blk' [ofs' [mc [J1 [J2 J3]]]]].
+  apply nextblock_mstore_aux in J3; auto.
 Qed.
 
 Lemma mstore_preserves_wf_lc: forall TD M' M mp2 t gv1 align
@@ -1774,16 +1782,18 @@ Proof.
 Qed.
 
 Lemma mstore_aux_preserves_mload_inv_aux': forall mc b1 ofs1 gvs0 b2
-  (Hneq: b1 <> b2) gvs1 Mem' Mem ofs2,
+  (Hneq: b1 <> b2) mc' gvs1 Mem' Mem ofs2,
   mload_aux Mem' mc b1 ofs1 = ret gvs0 ->
-  mstore_aux Mem gvs1 b2 ofs2 = ret Mem' ->
+  mstore_aux Mem mc' gvs1 b2 ofs2 = ret Mem' ->
   mload_aux Mem mc b1 ofs1 = ret gvs0.
 Proof.
-  induction gvs1 as [|[]]; simpl; intros.
-    inv H0. auto.
+  induction mc'; destruct gvs1; intros Mem' Mem ofs2 Hload Hstore; inv Hstore; auto.
 
     inv_mbind'.
-    apply IHgvs1 in H2; auto.
+    destruct (AST.memory_chunk_eq a m); inv H0.
+    destruct (has_chunk_eq v m); inv H1.
+    inv_mbind'.
+    apply IHmc' in H1; auto.
     eapply store_preserves_mload_inv'; eauto.
 Qed.
 
@@ -1820,16 +1830,18 @@ Proof.
 Qed.
 
 Lemma mstore_aux_preserves_encode_decode_ident_aux: forall blk b 
-  (Hneq: blk <> b) mc ofs gv ofs' M M'
-  (Hst: mstore_aux M gv blk ofs' = Some M') 
+  (Hneq: blk <> b) mc ofs mc' gv ofs' M M'
+  (Hst: mstore_aux M mc' gv blk ofs' = Some M') 
   (Hid: encode_decode_ident_aux M mc b ofs),
   encode_decode_ident_aux M' mc b ofs.
 Proof.
-  induction gv as [|[]]; simpl; intros.
-    uniq_result. auto.
+  induction mc'; destruct gv; intros; inv Hst; auto.
 
     inv_mbind.
-    eapply IHgv; eauto.
+    destruct (AST.memory_chunk_eq a m); inv H0.
+    destruct (has_chunk_eq v m); inv H1.
+    inv_mbind.
+    eapply IHmc'; eauto.
       eapply store_preserves_encode_decode_ident_aux; eauto.
 Qed.
 
@@ -1851,25 +1863,28 @@ Proof.
       destruct R as [|]; tinv Hid
   end.
   apply store_inv in Hst.
-  destruct Hst as [blk' [ofs' [J4 J5]]].
+  destruct Hst as [blk' [ofs' [mc' [J4 [J5 J6]]]]].
   eapply mstore_aux_preserves_encode_decode_ident_aux; 
     eauto using no_alias_GV2ptr__neq_blk.
 Qed.
 
-Lemma mstore_preserves_load: forall b1 b2 ofs1 m gv M1 M2 ofs2
+Lemma mstore_preserves_load: forall b1 b2 ofs1 m mc gv M1 M2 ofs2
   (Hneq: b1 <> b2 \/ ofs1 + size_chunk m <= ofs2)
-  (Hst: mstore_aux M1 gv b2 ofs2 = ret M2),
+  (Hst: mstore_aux M1 mc gv b2 ofs2 = ret M2),
   Mem.load m M1 b1 ofs1 = Mem.load m M2 b1 ofs1.
 Proof.
-  induction gv as [|[]]; simpl; intros; auto.
-    uniq_result. auto.
+  induction mc; destruct gv; intros; inv Hst; auto.
 
-    inv_mbind'. symmetry_ctx.
+    inv_mbind'.
+    destruct (AST.memory_chunk_eq a m0); inv H0.
+    destruct (has_chunk_eq v m0); inv H1.
+    inv_mbind'.
+    symmetry_ctx.
     transitivity (Mem.load m m1 b1 ofs1).
       eapply Mem.load_store_other in HeqR; eauto.
       destruct Hneq; auto.
 
-      apply IHgv in H0; auto.
+      apply IHmc in H1; auto.
       destruct Hneq; auto.
       right.
       assert (J:=size_chunk_pos m0). omega.
@@ -1882,11 +1897,11 @@ Lemma mstore_mload_same: forall td Mem mp2 typ1 gv1 align1 Mem'
 Proof.
   intros.
   apply genericvalues.LLVMgv.store_inv in H.
-  destruct H as [b0 [ofs0 [J1 J4]]].
+  destruct H as [b0 [ofs0 [mc0 [J1 [J4 J5]]]]].
   unfold mload.
   unfold gv_chunks_match_typ in Hmatch.
-  inv_mbind. fill_ctxhole.
-  clear - Hmatch J4.
+  inv_mbind. inv J4. fill_ctxhole.
+  clear - Hmatch J5.
   generalize dependent Mem.
   generalize dependent Mem'.
   generalize (Int.signed 31 ofs0). clear ofs0.
@@ -1895,7 +1910,11 @@ Proof.
   generalize dependent gv1.
   unfold gv_has_chunk.
   induction 1; simpl; intros; auto.
-    inv_mbind. inv Hchk. inv H. simpl. symmetry_ctx.
+    inv_mbind.
+    destruct (AST.memory_chunk_eq y m); inv J5.
+    destruct (has_chunk_eq v m); inv H1.
+    inv_mbind.
+    inv Hchk. inv H. simpl. symmetry_ctx.
     assert (Mem.load m Mem' b0 z = Some v) as Hld.
       eapply Mem.load_store_exact_same in HeqR; eauto.
       rewrite <- HeqR.
@@ -1907,15 +1926,17 @@ Proof.
     repeat fill_ctxhole.  auto.
 Qed.
 
-Lemma bounds_mstore_aux: forall b gvs M ofs M',
-  mstore_aux M gvs b ofs = ret M' ->
+Lemma bounds_mstore_aux: forall b mc gvs M ofs M',
+  mstore_aux M mc gvs b ofs = ret M' ->
   forall b', Mem.bounds M b' = Mem.bounds M' b'.
 Proof.
-  induction gvs as [|[]]; simpl; intros.
-    inv H. auto.
+  induction mc; destruct gvs; intros M ofs M' Hstore b'; inv Hstore; auto.
 
     inv_mbind'.
-    eapply IHgvs in H1; eauto.
+    destruct (AST.memory_chunk_eq a m); inv H0.
+    destruct (has_chunk_eq v m); inv H1.
+    inv_mbind'.
+    eapply IHmc in H1; eauto.
     symmetry in HeqR.
     eapply Mem.bounds_store in HeqR; eauto.
     rewrite <- HeqR. eauto.
@@ -1927,21 +1948,23 @@ Lemma bounds_mstore: forall TD M gv1 M' mp2 t align0,
 Proof.
   intros.
   apply store_inv in H.
-  destruct H as [blk' [ofs' [J1 J2]]].
-  eapply bounds_mstore_aux in J2; eauto.
+  destruct H as [blk' [ofs' [mc' [J1 [J2 J3]]]]].
+  eapply bounds_mstore_aux in J3; eauto.
 Qed.
 
-Lemma mstore_aux_preserves_range_perm: forall b lo hi p gv blk M ofs M' 
+Lemma mstore_aux_preserves_range_perm: forall b lo hi p mc gv blk M ofs M' 
   (Hperm: Mem.range_perm M b lo hi p)
-  (Hst: mstore_aux M gv blk ofs = Some M'),
+  (Hst: mstore_aux M mc gv blk ofs = Some M'),
   Mem.range_perm M' b lo hi p.
 Proof.
-  induction gv as [|[]]; simpl; intros.
-    inv Hst. auto.
+  induction mc; destruct gv; simpl; intros; inv Hst; auto.
 
     inv_mbind.
-    eapply IHgv in H0; eauto.
-    intros ofs1 H1. apply Hperm in H1.
+    destruct (AST.memory_chunk_eq a m); inv H0.
+    destruct (has_chunk_eq v m); inv H1.
+    inv_mbind.
+    eapply IHmc in H1; eauto.
+    intros ofs1 H2. apply Hperm in H2.
     eapply Mem.perm_store_1; eauto.
 Qed.
 
@@ -1952,25 +1975,25 @@ Lemma mstore_preserves_range_perm: forall td b lo hi p gv t gv0 al M M'
 Proof.
   intros.
   apply mstore_inversion in Hst.
-  destruct Hst as [b1 [ofs1 [m1 [J1 J2]]]]; subst.
+  destruct Hst as [b1 [ofs1 [mc1 [m1 [J1 [J2 J3]]]]]]; subst.
   eapply mstore_aux_preserves_range_perm; eauto.
 Qed.
 
-Lemma malloc_preserves_range_perm: forall TD b lo hi p tsz gn align0 M M' mb
-  (Hperm: Mem.range_perm M b lo hi p)
-  (Hmlc: malloc TD M tsz gn align0 = ret (M', mb)),
-  Mem.range_perm M' b lo hi p.
-Proof.
-  intros.
-  apply malloc_inv in Hmlc.
-  destruct Hmlc as [n [J1 [J2 J3]]].
-  intros ofs H. apply Hperm in H.
-  eapply Mem.perm_alloc_1; eauto.
-Qed.
+(* Lemma malloc_preserves_range_perm: forall TD b lo hi p tsz gn align0 M M' mb *)
+(*   (Hperm: Mem.range_perm M b lo hi p) *)
+(*   (Hmlc: malloc TD M tsz gn align0 = ret (M', mb)), *)
+(*   Mem.range_perm M' b lo hi p. *)
+(* Proof. *)
+(*   intros. *)
+(*   apply malloc_inv in Hmlc. *)
+(*   destruct Hmlc as [n [J1 [J2 J3]]]. *)
+(*   intros ofs H. apply Hperm in H. *)
+(*   eapply Mem.perm_alloc_1; eauto. *)
+(* Qed. *)
 
 Lemma mload_aux_mstore_aux_same: forall b0 mc Mem gv1 ofs0 Mem'
   (Hid: encode_decode_ident_aux Mem mc b0 ofs0),
-  mstore_aux Mem gv1 b0 ofs0 = ret Mem' ->
+  mstore_aux Mem mc gv1 b0 ofs0 = ret Mem' ->
   mload_aux Mem mc b0 ofs0 = ret gv1 ->
   Mem = Mem'.
 Proof.
@@ -1978,7 +2001,8 @@ Proof.
     inv H0. inv H. auto.
 
     inv_mbind'.
-    simpl in *.
+    destruct (AST.memory_chunk_eq a a); inv H.
+    destruct (has_chunk_eq v a); inv H1.
     inv_mbind'. destruct Hid as [Hid1 Hid2].
     unfold encode_decode_ident_prop in Hid1.
     eapply Mem.load_store_same' with (m2:=m) in Hid1; eauto. subst.
@@ -1986,16 +2010,18 @@ Proof.
 Qed.
 
 Lemma mstore_aux_mem_contents_outside: 
-  forall mb ofs2 gv1 ofs1 M M' (Hst: mstore_aux M gv1 mb ofs1 = ret M')
+  forall mb ofs2 mc1 gv1 ofs1 M M' (Hst: mstore_aux M mc1 gv1 mb ofs1 = ret M')
   (Hlt: ofs1 >= ofs2),
   forall i0 : Z, i0 < ofs2 ->
     Mem.mem_contents M mb i0 = Mem.mem_contents M' mb i0.
 Proof.
-  induction gv1 as [|[]]; simpl; intros.
-    uniq_result. auto.
+  induction mc1; destruct gv1; intros; inv Hst; auto.
 
     inv_mbind. 
-    erewrite <- IHgv1 with (M:=m0)(ofs1:=ofs1 + size_chunk m)(M':=M'); eauto.
+    destruct (AST.memory_chunk_eq a m); inv H1.
+    destruct (has_chunk_eq v m); inv H2.
+    inv_mbind. 
+    erewrite <- IHmc1 with (M:=m0)(ofs1:=ofs1 + size_chunk m)(M':=M'); eauto.
       symmetry in HeqR.
       apply Mem.store_mem_contents in HeqR.
       rewrite HeqR.
@@ -2007,17 +2033,20 @@ Proof.
 Qed.
 
 Lemma promotable_mstore_aux_preserves_encode_decode_ident:
-  forall mb gv1 ofs mc M M'
-  (Hsplit: snd (split gv1) = mc) (Hst : mstore_aux M gv1 mb ofs = ret M'),
+  forall mb mc1 gv1 ofs mc M M'
+  (Hsplit: snd (split gv1) = mc) (Hst : mstore_aux M mc1 gv1 mb ofs = ret M'),
   encode_decode_ident_aux M' mc mb ofs.
 Proof.
-  induction gv1 as [|[]]; intros; subst; simpl in *; auto.
+  induction mc1; destruct gv1; intros; inv Hst; simpl in *; auto.
+    inv_mbind.
+    destruct (AST.memory_chunk_eq a m); inv H0.
+    destruct (has_chunk_eq v m); inv H1.
     inv_mbind.
     remember (split gv1) as R.
     destruct R. simpl.
-    assert (J:=H0).
-    eapply IHgv1 in H0; eauto.
-    simpl in H0.
+    assert (J:=H1).
+    eapply IHmc1 in H1; eauto.
+    rewrite <- HeqR0 in H1; simpl in H1.
     split; auto.
       unfold encode_decode_ident_prop.
       intros.
@@ -2119,9 +2148,11 @@ match goal with
   apply mload_inv in H;
   destruct H as [b [ofs [m [mc [J1 [J2 J3]]]]]]; subst;
   apply malloc_inv in Hal;
-  destruct Hal as [n [J4 [J5 J6]]];
   unfold mload; simpl; rewrite J2
 end.
+(*   apply malloc_inv in Hal; *)
+(*   destruct Hal as [n [J4 [J5 J6]]]; *)
+(*   unfold mload; simpl; rewrite J2 *)
 
 Lemma malloc_preserves_mload_inv': forall TD M M' mb align0 gn tsz
   (Hal : malloc TD M tsz gn align0 = ret (M', mb))
@@ -2132,6 +2163,7 @@ Lemma malloc_preserves_mload_inv': forall TD M M' mb align0 gn tsz
     gvs1 = mcs2uninits mc) /\ ~ no_alias_with_blk gptr mb.
 Proof.
   intros. destruct_allocld.
+  unfold malloc in Hal.
   eapply alloc_preserves_mload_aux_inv' in J3; eauto.
   destruct J3 as [[J3 J7]|[J3 J7]]; subst; auto.
     right. split; try tauto. intros. inv H. auto.
@@ -2165,9 +2197,11 @@ Lemma nextblock_malloc: forall TD M tsz gn M' align0 mb,
 Proof.
   intros.
   apply malloc_inv in H.
-  destruct H as [n [J1 [J2 J3]]].
-  apply Mem.nextblock_alloc in J3.
-  rewrite J3. omega.
+  apply Mem.nextblock_alloc in H.
+  rewrite H. omega.
+  (* destruct H as [n [J1 [J2 J3]]]. *)
+  (* apply Mem.nextblock_alloc in J3. *)
+  (* rewrite J3. omega. *)
 Qed.
 
 Lemma malloc_result: forall TD M tsz gn M' align0 mb,
@@ -2176,8 +2210,9 @@ Lemma malloc_result: forall TD M tsz gn M' align0 mb,
 Proof.
   intros.
   apply malloc_inv in H.
-  destruct H as [n [J1 [J2 J3]]].
-  apply Mem.alloc_result in J3; auto.
+  apply Mem.alloc_result in H; auto.
+  (* destruct H as [n [J1 [J2 J3]]]. *)
+  (* apply Mem.alloc_result in J3; auto. *)
 Qed.
 
 Lemma alloc_preserves_mload_aux: forall M M' mb lo hi b
@@ -2254,21 +2289,21 @@ Proof.
   omega.
 Qed.
 
-Lemma bounds_malloc: forall TD M tsz gn M' align0 mb
-  (H: malloc TD M tsz gn align0 = ret (M', mb)),
-  exists n,
-    GV2int TD Size.ThirtyTwo gn = Some n /\
-    forall b' : Values.block,
-       Mem.bounds M' b' =
-       (if eq_block b' mb then (0, Size.to_Z tsz * n) else Mem.bounds M b').
-Proof.
-  intros.
-  apply malloc_inv in H.
-  destruct H as [n [J1 [J2 J3]]].
-  exists n.
-  split; auto.
-    eapply Mem.bounds_alloc; eauto.
-Qed.
+(* Lemma bounds_malloc: forall TD M tsz gn M' align0 mb *)
+(*   (H: malloc TD M tsz gn align0 = ret (M', mb)), *)
+(*   exists n, *)
+(*     GV2int TD Size.ThirtyTwo gn = Some n /\ *)
+(*     forall b' : Values.block, *)
+(*        Mem.bounds M' b' = *)
+(*        (if eq_block b' mb then (0, Size.to_Z tsz * n) else Mem.bounds M b'). *)
+(* Proof. *)
+(*   intros. *)
+(*   apply malloc_inv in H. *)
+(*   destruct H as [n [J1 [J2 J3]]]. *)
+(*   exists n. *)
+(*   split; auto. *)
+(*     eapply Mem.bounds_alloc; eauto. *)
+(* Qed. *)
 
 (* go to Coqlib.v ?*)
 Lemma z_mult_n__ge__z: forall (tsz : sz) (n : Z)
@@ -2286,19 +2321,19 @@ Proof.
   apply Zmult_ge_compat; omega.
 Qed.
 
-Lemma malloc_preserves_range_perm_2: forall TD tsz gn align0 M M' mb
-  (Hmlc: malloc TD M tsz gn align0 = ret (M', mb)),
-  Mem.range_perm M' mb 0 (Z_of_nat tsz) Freeable.
-Proof.
-  intros.
-  apply malloc_inv in Hmlc.
-  destruct Hmlc as [n [J1 [J2 J3]]].
-  intros ofs H.
-  destruct H.
-  apply z_mult_n__ge__z in J2.
-  eapply Mem.perm_alloc_2; eauto.
-    omega.
-Qed.
+(* Lemma malloc_preserves_range_perm_2: forall TD tsz gn align0 M M' mb *)
+(*   (Hmlc: malloc TD M tsz gn align0 = ret (M', mb)), *)
+(*   Mem.range_perm M' mb 0 (Z_of_nat tsz) Freeable. *)
+(* Proof. *)
+(*   intros. *)
+(*   apply malloc_inv in Hmlc. *)
+(*   destruct Hmlc as [n [J1 [J2 J3]]]. *)
+(*   intros ofs H. *)
+(*   destruct H. *)
+(*   apply z_mult_n__ge__z in J2. *)
+(*   eapply Mem.perm_alloc_2; eauto. *)
+(*     omega. *)
+(* Qed. *)
 
 (* The current design of malloc does not check alignment! It must ensure that 
    mload is successful at the allocated address. To do so, malloc must ensure 
@@ -2402,7 +2437,7 @@ Proof.
       destruct R as [|]; tinv Hid
   end.
   apply malloc_inv in Hal.
-  destruct Hal as [n [J1 [J2 J3]]].
+  (* destruct Hal as [n [J1 [J2 J3]]]. *)
   rewrite simpl_blk2GV in HeqR. inv HeqR.
   assert (update (Mem.nextblock M)
                  (fun ofs => Undef)
@@ -3163,3 +3198,10 @@ Qed.
 End MemProps.
 
 
+(* 
+*** Local Variables: ***
+*** coq-prog-name: "coqtop"  ***
+*** coq-prog-args: ("-emacs-U" "-impredicative-set") ***
+*** coq-load-path: ("../../../../release/theory/metatheory_8.3/" "../../../../release/vol/src3.0/Vellvm/" "../../../../release/vol/src3.0/Vellvm/compcert/" "../../../../release/vol/src3.0/Vellvm/monads/" "../../../../release/vol/src3.0/Vellvm/ott/" "../../../../release/vol/src3.0/Vellvm/Dominators/" "../../../../release/vol/src3.0/Vellvm/GraphBasics/" "../../../../release/vol/src3.0/Transforms/")  ***
+*** End: ***
+ *)

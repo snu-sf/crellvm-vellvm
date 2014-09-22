@@ -1200,19 +1200,15 @@ end.
 
 Definition malloc (TD:TargetData) (M:mem) (bsz:sz) (gn:GenericValue) (al:align)
   : option (mem * mblock)%type :=
-match GV2int TD Size.ThirtyTwo gn with
-| Some n =>
-    if (Coqlib.zlt 0 ((Size.to_Z bsz) * n)) then
-      Some (Mem.alloc M 0 ((Size.to_Z bsz) * n))
-    else None
-| None => None
-end.
+  Some (Mem.alloc M 0
+          match GV2int TD Size.ThirtyTwo gn with
+            | Some n => (Size.to_Z bsz) * n
+            | None => 0
+          end).
 
 Definition malloc_one (TD:TargetData) (M:mem) (bsz:sz) (al:align)
   : option (mem * mblock)%type :=
-if (Coqlib.zlt 0 (Size.to_Z bsz)) then
-  Some (Mem.alloc M 0 (Size.to_Z bsz))
-else None.
+  Some (Mem.alloc M 0 (Size.to_Z bsz)).
 
 Definition free (TD:TargetData) (M:mem) (ptr:mptr) : option mem :=
 match GV2ptr TD (getPointerSize TD) ptr with
@@ -1258,22 +1254,74 @@ match GV2ptr TD (getPointerSize TD) ptr with
 | _ => None
 end.
 
-Fixpoint mstore_aux M (gv:GenericValue) b ofs : option mem :=
-match gv with
-| nil => Some M
-| (v,c)::gv' =>
-    match (Mem.store c M b ofs v) with
-    | Some M' => mstore_aux M' gv' b (ofs+size_chunk c)%Z
-    | _ => None
-    end
-end.
+Definition has_chunk_eq (v : val) (chk : AST.memory_chunk) : bool :=
+  match v, chk with
+    | Vundef, _ => true
+    | Vint wz i0, AST.Mint wz' =>
+      beq_nat wz wz'
+    | Vfloat f, AST.Mfloat32 =>
+      if Floats.Float.eq_dec f (Floats.Float.singleoffloat f) then true else false
+    | Vptr _ _, AST.Mint wz =>
+      beq_nat wz 31%nat
+    | Vinttoptr _, AST.Mint wz =>
+      beq_nat wz 31%nat
+    | _, _ =>
+      false
+  end.
+
+Lemma has_chunk_eq_prop v chk (H: has_chunk_eq v chk) :
+  Val.has_chunk v chk.
+Proof.
+  destruct v, chk; simpl in *; auto;
+    repeat
+      match goal with
+        | [H: is_true false |- _] =>
+          unfold is_true in H; inversion H
+        | [H: is_true (beq_nat ?a ?b) |- _] =>
+          apply beq_nat_true in H; subst
+        | [H: context[Floats.Float.eq_dec ?a ?b] |- _] =>
+          destruct (Floats.Float.eq_dec a b); try inversion H
+      end;
+    auto.
+  split; [auto|].
+  apply Int.unsigned_range.
+Qed.
+
+Lemma memory_chunk_eq_prop a b
+  (H: AST.memory_chunk_eq a b) : a = b.
+Proof.
+  destruct a, b; unfold AST.memory_chunk_eq in H; simpl in *; auto;
+    try match goal with
+          | [H: is_true false |- _] =>
+            unfold is_true in H; inversion H
+        end.
+  apply beq_nat_true in H; subst; auto.
+Qed.
+
+Fixpoint mstore_aux M (mc:list memory_chunk) (gv:GenericValue) b ofs : option mem :=
+  match mc, gv with
+    | nil, nil => Some M
+    | c'::mc', (v,c)::gv' =>
+      if memory_chunk_eq c' c && has_chunk_eq v c
+      then
+        match (Mem.store c M b ofs v) with
+          | Some M' => mstore_aux M' mc' gv' b (ofs+size_chunk c)%Z
+          | _ => None
+        end
+      else None
+    | _, _ => None
+  end.
 
 Definition mstore (TD:TargetData) (M:mem) (ptr:mptr) (t:typ) (gv:GenericValue)
-  (a:align) : option mem :=
-match GV2ptr TD (getPointerSize TD) ptr with
-| Some (Vptr b ofs) => mstore_aux M gv b (Int.signed 31 ofs)
-| _ => None
-end.
+           (a:align) : option mem :=
+  match GV2ptr TD (getPointerSize TD) ptr with
+    | Some (Vptr b ofs) =>
+      match flatten_typ TD t with
+        | Some mc => mstore_aux M mc gv b (Int.signed 31 ofs)
+        | None => None
+      end
+    | _ => None
+  end.
 
 Definition gep (TD:TargetData) (ty:typ) (vidxs:list GenericValue) (inbounds:bool)
   (ty':typ) (ma:GenericValue) : option GenericValue :=
@@ -2192,39 +2240,39 @@ Qed.
 
 Lemma malloc_inv : forall TD Mem0 tsz gn align0 Mem' mb,
   malloc TD Mem0 tsz gn align0 = ret (Mem', mb) ->
-  exists n, GV2int TD Size.ThirtyTwo gn = Some n /\
-    (0 < (Size.to_Z tsz) * n)%Z /\
-    Mem.alloc Mem0 0 (Size.to_Z tsz * n) = (Mem', mb).
+  Mem.alloc Mem0 0
+        match GV2int TD Size.ThirtyTwo gn with
+          | Some n => (Size.to_Z tsz) * n
+          | None => 0
+        end = (Mem', mb).
 Proof.
-  intros.
-  unfold malloc in H.
-  destruct (GV2int TD Size.ThirtyTwo gn); try solve [inversion H; subst].
-  destruct (Coqlib.zlt 0 (Size.to_Z tsz * z)); inversion H; subst.
-  exists z.
-  destruct (Mem.alloc Mem0 0 (Size.to_Z tsz * z)).
-  repeat (split; auto).
+  intros. inv H. auto.
 Qed.
 
 Lemma store_inv : forall TD Mem0 gvp t gv align Mem',
   mstore TD Mem0 gvp t gv align = Some Mem' ->
-  exists b, exists ofs,
+  exists b, exists ofs, exists mc,
     GV2ptr TD (getPointerSize TD) gvp = Some (Vptr b ofs) /\
-    mstore_aux Mem0 gv b (Int.signed 31 ofs) = Some Mem'.
+    flatten_typ TD t = Some mc /\
+    mstore_aux Mem0 mc gv b (Int.signed 31 ofs) = Some Mem'.
 Proof.
   intros TD Mem0 gvp t gv align Mem' H.
   unfold mstore in H.
   destruct (GV2ptr TD (getPointerSize TD) gvp); try solve [inversion H; subst].
   destruct v; try solve [inversion H; subst].
-  exists b. exists i0. split; auto.
+  exists b. exists i0.
+  destruct (flatten_typ TD t); inv H.
+  exists l0. split; auto.
 Qed.
 
-Lemma mstore_inversion : forall Mem2 t align0 TD gvp2 Mem2'
-  (gv2 : GenericValue)
-  (H21 : mstore TD Mem2 gvp2 t gv2 align0 = ret Mem2'),
-  exists b, exists ofs, exists cm,
+ Lemma mstore_inversion : forall Mem2 t align0 TD gvp2 Mem2'
+   (gv2 : GenericValue)
+   (H21 : mstore TD Mem2 gvp2 t gv2 align0 = ret Mem2'),
+  exists b, exists ofs, exists cm, exists mc,
     gvp2 = (Vptr b ofs,cm)::nil /\
-    mstore_aux Mem2 gv2 b (Int.signed 31 ofs) = ret Mem2'.
-Proof.
+    flatten_typ TD t = Some mc /\
+    mstore_aux Mem2 mc gv2 b (Int.signed 31 ofs) = ret Mem2'.
+ Proof.
   intros.
   unfold mstore in H21.
   remember (GV2ptr TD (getPointerSize TD) gvp2) as R.
@@ -2235,7 +2283,9 @@ Proof.
   destruct p.
   destruct v; try solve [inversion HeqR].
   destruct gvp2; inv HeqR.
-  exists b0. exists i1. exists m. eauto.
+  exists b0. exists i1. exists m.
+  destruct (flatten_typ TD t); inv H21.
+  exists l0. eauto.
 Qed.
 
 (* Properties of sizeMC *)

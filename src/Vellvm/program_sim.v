@@ -174,12 +174,12 @@ Proof.
   destruct cfg; simpl in Hundef.
   destruct St1; simpl in Hundef.
   destruct ECS.
-  destruct Hundef as [J | [J | [J | [J | [J | [J | [J | J]]]]]]]; inv J.
+  destruct Hundef as [J | [J | [J | [J | [J | [J | J]]]]]]; inv J.
   destruct e; tinv Hundef.
   intro Hop.
   destruct CurCmds.
     destruct Hundef as
-      [Hundef | [Hundef | [Hundef | [J | [J | [J | [J | J]]]]]]];
+      [Hundef | [Hundef | [Hundef | [J | [J | [J | J]]]]]];
       try solve [inversion J].
       destruct Terminator; tinv Hundef.
       destruct ECS; tinv Hundef.
@@ -206,28 +206,28 @@ Proof.
 
     destruct Hundef as
       [Hundef | [Hundef | [Hundef | [Hundef |
-        [Hundef | [Hundef | [Hundef | Hundef]]]]]]];
+        [Hundef | [Hundef | Hundef]]]]]];
       tinv Hundef.
       destruct CurBB as [? [? ? t]]; tinv Hundef.
       destruct t; tinv Hundef.
-      destruct_cmd c; tinv Hundef.
-        remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R.
-        destruct R; tinv Hundef.
-        remember (getTypeAllocSize CurTargetData t) as R.
-        destruct R; tinv Hundef.
-        destruct Hundef as [gn [Hinst Hundef]].
-        remember (malloc CurTargetData Mem s gn a) as R.
-        destruct R; tinv Hundef.
-        inv Hop. symmetry_ctx. uniq_result. 
+      (* destruct_cmd c; tinv Hundef. *)
+        (* remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R. *)
+        (* destruct R; tinv Hundef. *)
+        (* remember (getTypeAllocSize CurTargetData t) as R. *)
+        (* destruct R; tinv Hundef. *)
+        (* destruct Hundef as [gn [Hinst Hundef]]. *)
+        (* remember (malloc CurTargetData Mem s gn a) as R. *)
+        (* destruct R; tinv Hundef. *)
+        (* inv Hop. symmetry_ctx. uniq_result.  *)
 
-        remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R.
-        destruct R; tinv Hundef.
-        remember (getTypeAllocSize CurTargetData t) as R.
-        destruct R; tinv Hundef.
-        destruct Hundef as [gn [Hinst Hundef]].
-        remember (malloc CurTargetData Mem s gn a) as R.
-        destruct R; tinv Hundef.
-        inv Hop. symmetry_ctx. uniq_result. 
+        (* remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R. *)
+        (* destruct R; tinv Hundef. *)
+        (* remember (getTypeAllocSize CurTargetData t) as R. *)
+        (* destruct R; tinv Hundef. *)
+        (* destruct Hundef as [gn [Hinst Hundef]]. *)
+        (* remember (malloc CurTargetData Mem s gn a) as R. *)
+        (* destruct R; tinv Hundef. *)
+        (* inv Hop. symmetry_ctx. uniq_result.  *)
 
       destruct_cmd c; tinv Hundef.
         remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R.
@@ -568,3 +568,10 @@ Proof.
         apply In_middle.
 Qed.
 
+(* 
+*** Local Variables: ***
+*** coq-prog-name: "coqtop"  ***
+*** coq-prog-args: ("-emacs-U" "-impredicative-set") ***
+*** coq-load-path: ("../../../../release/theory/metatheory_8.3/" "../../../../release/vol/src3.0/Vellvm/" "../../../../release/vol/src3.0/Vellvm/compcert/" "../../../../release/vol/src3.0/Vellvm/monads/" "../../../../release/vol/src3.0/Vellvm/ott/" "../../../../release/vol/src3.0/Vellvm/Dominators/" "../../../../release/vol/src3.0/Vellvm/GraphBasics/" "../../../../release/vol/src3.0/Transforms/")  ***
+*** End: ***
+ *)

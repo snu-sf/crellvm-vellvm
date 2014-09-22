@@ -2942,29 +2942,29 @@ match cfg with
      |} => True
   | _ => False
   end \/
-  match S with
-  | {| ECS :=
-         {| CurCmds := insn_malloc _ t v a::_ ;
-            Locals := lc|} :: _;
-       Mem := M |}
-  | {| ECS :=
-         {| CurCmds := insn_alloca _ t v a::_ ;
-            Locals := lc|} :: _;
-       Mem := M |} =>
-       match getOperandValue td v lc gl with
-       | Some gvs =>
-           match getTypeAllocSize td t with
-           | Some asz => exists gn, gn @ gvs /\
-               match malloc td M asz gn a with
-               | None => True
-               | _ => False
-               end
-           | _ => False
-           end
-       | _ => False
-       end
-  | _ => False
-  end \/
+  (* match S with *)
+  (* | {| ECS := *)
+  (*        {| CurCmds := insn_malloc _ t v a::_ ; *)
+  (*           Locals := lc|} :: _; *)
+  (*      Mem := M |} *)
+  (* | {| ECS := *)
+  (*        {| CurCmds := insn_alloca _ t v a::_ ; *)
+  (*           Locals := lc|} :: _; *)
+  (*      Mem := M |} => *)
+  (*      match getOperandValue td v lc gl with *)
+  (*      | Some gvs => *)
+  (*          match getTypeAllocSize td t with *)
+  (*          | Some asz => exists gn, gn @ gvs /\ *)
+  (*              match malloc td M asz gn a with *)
+  (*              | None => True *)
+  (*              | _ => False *)
+  (*              end *)
+  (*          | _ => False *)
+  (*          end *)
+  (*      | _ => False *)
+  (*      end *)
+  (* | _ => False *)
+  (* end \/ *)
   match S with
   | {| ECS := {| CurCmds := insn_free _ _ v::_ ;
                              Locals := lc|} :: _;
@@ -3450,9 +3450,10 @@ Proof.
       exists events.E0.
       eauto.
 
-      unfold undefined_state.
-      right. rewrite J. rewrite J2. right. right. right. left.
-      exists gn. rewrite <- HeqR0. undefbehave.
+      inv HeqR0.
+      (* unfold undefined_state. *)
+      (* right. rewrite J. rewrite J2. right. right. right. left. *)
+      (* exists gn. rewrite <- HeqR0. undefbehave. *)
 
   SCase "free".
     assert (exists gvs, getOperandValue (los, nts) v lc gl = Some gvs)
@@ -3483,7 +3484,7 @@ Proof.
       eauto.
 
       unfold undefined_state.
-      right. rewrite J. right. right. right. right. left.
+      right. rewrite J. right. right. right. left.
       exists gv. rewrite <- HeqR0. undefbehave.
 
   SCase "alloca".
@@ -3521,10 +3522,11 @@ Proof.
       exists events.E0.
       eauto.
 
-      right.
-      unfold undefined_state.
-      right. rewrite J. rewrite J2. right. right. left. exists gn.
-      rewrite <- HeqR0. undefbehave.
+      inv HeqR0.
+      (* right. *)
+      (* unfold undefined_state. *)
+      (* right. rewrite J. rewrite J2. right. right. left. exists gn. *)
+      (* rewrite <- HeqR0. undefbehave. *)
 
   SCase "load".
     assert (exists gvs, getOperandValue (los, nts) v lc gl = Some gvs)
@@ -3556,7 +3558,7 @@ Proof.
 
       right.
       unfold undefined_state.
-      right. rewrite J. right. right. right. right. left. exists gv.
+      right. rewrite J. right. right. right. left. exists gv.
       rewrite <- HeqR0. undefbehave.
 
   SCase "store".
@@ -3598,7 +3600,7 @@ Proof.
 
       right.
       unfold undefined_state.
-      right. rewrite J. rewrite J0. right. right. right. right. right. left.
+      right. rewrite J. rewrite J0. right. right. right. right. left.
       exists gv. exists mgv.  rewrite <- HeqR0. undefbehave.
 
   SCase "gep".
@@ -3905,22 +3907,29 @@ Proof.
 
         right.
         unfold undefined_state.
-        right. right. right. right. right. right. right.
+        right. right. right. right. right. right.
         rewrite J'. rewrite G. exists fptr. rewrite <- HeqHlk. rewrite <- HeqHelk.
         split; auto. exists gvs. rewrite <- HeqR0. rewrite <- HeqR'. undefbehave.
 
       right.
       unfold undefined_state.
-      right. rewrite J'. rewrite G. right. right. right. right. right. right.
+      right. rewrite J'. rewrite G. right. right. right. right. right.
       exists fptr. rewrite <- HeqHlk. rewrite <- HeqHelk.
       split; auto. exists gvs.  rewrite <- HeqR0. undefbehave.
 
    SSCase "stuck".
      right.
      unfold undefined_state.
-     right. rewrite J'. rewrite G. right. right. right. right. right. right.
+     right. rewrite J'. rewrite G. right. right. right. right. right.
      exists fptr. rewrite <- HeqHlk. rewrite <- HeqHelk. split; auto.
 Qed.
 
 End OpsemPP. End OpsemPP.
 
+(* 
+*** Local Variables: ***
+*** coq-prog-name: "coqtop"  ***
+*** coq-prog-args: ("-emacs-U" "-impredicative-set") ***
+*** coq-load-path: ("../../../../release/theory/metatheory_8.3/" "../../../../release/vol/src3.0/Vellvm/" "../../../../release/vol/src3.0/Vellvm/compcert/" "../../../../release/vol/src3.0/Vellvm/monads/" "../../../../release/vol/src3.0/Vellvm/ott/" "../../../../release/vol/src3.0/Vellvm/Dominators/" "../../../../release/vol/src3.0/Vellvm/GraphBasics/" "../../../../release/vol/src3.0/Transforms/")  ***
+*** End: ***
+ *)

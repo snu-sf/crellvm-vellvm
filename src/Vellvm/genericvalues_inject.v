@@ -1773,238 +1773,249 @@ Proof.
     eapply MoreMem.free_left_nonmap_inj; eauto.
 Qed.
 
-(* The sb_ds_trans_lib.mem_simulation__malloc should use this lemma. *)
-Lemma mem_inj__malloc : forall mi TD Mem Mem2 tsz gn align0 Mem' mb mgb,
-  wf_sb_mi mgb mi Mem Mem2 ->
-  MoreMem.mem_inj mi Mem Mem2 ->
-  malloc TD Mem tsz gn align0 = ret (Mem', mb) ->
-  exists mi', exists Mem2', exists mb',
-    malloc TD Mem2 tsz gn align0 = ret (Mem2', mb') /\
-    wf_sb_mi mgb mi' Mem' Mem2' /\
-    MoreMem.mem_inj mi' Mem' Mem2' /\
-    Values.inject_incr mi mi' /\
-    mi' mb = Some (mb', 0) /\
-    (forall b, b <> mb -> mi b = mi' b).
+(* (* The sb_ds_trans_lib.mem_simulation__malloc should use this lemma. *) *)
+(* Lemma mem_inj__malloc : forall mi TD Mem Mem2 tsz gn align0 Mem' mb mgb, *)
+(*   wf_sb_mi mgb mi Mem Mem2 -> *)
+(*   MoreMem.mem_inj mi Mem Mem2 -> *)
+(*   malloc TD Mem tsz gn align0 = ret (Mem', mb) -> *)
+(*   exists mi', exists Mem2', exists mb', *)
+(*     malloc TD Mem2 tsz gn align0 = ret (Mem2', mb') /\ *)
+(*     wf_sb_mi mgb mi' Mem' Mem2' /\ *)
+(*     MoreMem.mem_inj mi' Mem' Mem2' /\ *)
+(*     Values.inject_incr mi mi' /\ *)
+(*     mi' mb = Some (mb', 0) /\ *)
+(*     (forall b, b <> mb -> mi b = mi' b). *)
+(* Proof. *)
+(*   intros mi TD Mem Mem2 tsz gn align0 Mem' mb mgb Hwfmi Hmsim Halloc. *)
+(*   unfold malloc in *. *)
+(*   remember (GV2int TD Size.ThirtyTwo gn) as R. *)
+(*   destruct R; try solve [inversion Halloc]. *)
+(*   remember (Mem.alloc Mem 0 (Size.to_Z tsz * z)) as R1. *)
+(*   destruct R1 as [Mem1 mb1]. *)
+(*   destruct (zlt 0 (Size.to_Z tsz * z)); inv Halloc. *)
+(*   remember (Mem.alloc Mem2 0 (Size.to_Z tsz * z)) as R2. *)
+(*   destruct R2 as [Mem2' mb2]. *)
+(*   exists (fun b => if zeq b mb then Some (mb2,0%Z) else mi b). *)
+(*   exists Mem2'. exists mb2. *)
+(*   split; auto. *)
+(*   assert (inject_incr mi (fun b : Z => if zeq b mb then ret (mb2, 0) else mi b)) *)
+(*     as Hinject_incr. *)
+(*     unfold inject_incr. *)
+(*     intros b b' d H. *)
+(*     destruct (zeq b mb); subst; auto. *)
+(*       clear - Hwfmi H HeqR1. *)
+(*       symmetry in HeqR1. *)
+(*       apply Mem.alloc_result in HeqR1. subst. *)
+(*       destruct Hwfmi as [_ _ Hmap1 _]. *)
+(*       assert (mi (Mem.nextblock Mem) = None) as J. *)
+(*         apply Hmap1; auto with zarith. *)
+(*       rewrite H in J. inversion J. *)
+
+(*   split; auto. *)
+(*   Case "wfmi". *)
+(*     clear - Hwfmi HeqR2 HeqR1. *)
+(*     destruct Hwfmi as [Hno_overlap Hnull Hmap1 Hmap2 mi_freeblocks *)
+(*       mi_mappedblocks mi_range_block mi_bounds mi_globals]. *)
+(*     symmetry in HeqR2, HeqR1. *)
+(*     assert (J:=HeqR2). *)
+(*     apply Mem.nextblock_alloc in HeqR2. *)
+(*     split. *)
+(*     SCase "no_overlap". *)
+(*       clear - Hno_overlap J Hmap2. *)
+(*       unfold MoreMem.meminj_no_overlap in *. *)
+(*       intros. *)
+(*       destruct (zeq b1 mb); subst. *)
+(*         destruct (zeq b2 mb); subst. *)
+(*           contradict H; auto. *)
+
+(*           inv H0. *)
+(*           apply Hmap2 in H1. *)
+(*           apply Mem.alloc_result in J. *)
+(*           subst. clear - H1. intro J. subst. contradict H1; zauto. *)
+(*         destruct (zeq b2 mb); subst; eauto. *)
+(*           inv H1. *)
+(*           apply Hmap2 in H0. *)
+(*           apply Mem.alloc_result in J. *)
+(*           subst. clear - H0. intro J. subst. contradict H0; zauto. *)
+(*     SCase "null". *)
+(*       destruct (zeq Mem.nullptr mb); subst; auto. *)
+(*         apply Mem.alloc_result in HeqR1. *)
+(*         assert(J':=@Mem.nextblock_pos Mem). *)
+(*         rewrite <- HeqR1 in J'. *)
+(*         unfold Mem.nullptr in J'. *)
+(*         contradict J'; zauto. *)
+(*     SCase "map1". *)
+(*       intros b H2. *)
+(*       assert (J':=HeqR1). *)
+(*       apply Mem.alloc_result in J'. *)
+(*       apply Mem.nextblock_alloc in HeqR1. *)
+(*       rewrite HeqR1 in H2. *)
+(*       destruct (zeq b mb); subst; zeauto. *)
+(*         contradict H2; zauto. *)
+(*     SCase "map2". *)
+(*       intros b1 b delta2 J'. *)
+(*       rewrite HeqR2. *)
+(*       destruct (zeq b1 mb); subst; zeauto. *)
+(*         inv J'. *)
+(*         apply Mem.alloc_result in J. *)
+(*         subst. *)
+(*         auto with zarith. *)
+(*     SCase "freeblocks". *)
+(*       intros b J'. *)
+(*       destruct (zeq b mb); subst. *)
+(*         apply Mem.valid_new_block in HeqR1. *)
+(*         contradict HeqR1; auto. *)
+
+(*         apply mi_freeblocks. *)
+(*           intro J1. apply J'. *)
+(*           eapply Mem.valid_block_alloc; eauto. *)
+(*     SCase "mappedblocks". *)
+(*       intros b b' delta J'. *)
+(*       destruct (zeq b mb); subst. *)
+(*         inv J'. *)
+(*         apply Mem.valid_new_block in J; auto. *)
+(*         eapply Mem.valid_block_alloc; eauto. *)
+(*     SCase "range_block". *)
+(*       intros b b' delta J'. *)
+(*       destruct (zeq b mb); inv J'; subst; eauto. *)
+(*     SCase "bounds". *)
+(*       intros b b' delta J'. *)
+(*       erewrite Mem.bounds_alloc; eauto. *)
+(*       erewrite Mem.bounds_alloc with (m2:=Mem2'); eauto. *)
+(*       unfold eq_block. *)
+(*       destruct (zeq b mb); subst. *)
+(*         inv J'. *)
+(*         destruct (zeq b' b'); subst; auto. *)
+(*           contradict n; auto. *)
+
+(*         destruct (zeq b' mb2); subst; eauto. *)
+(*           apply Hmap2 in J'. *)
+(*           apply Mem.alloc_result in J. *)
+(*           rewrite J in J'. contradict J'; zauto. *)
+(*     SCase "globals". *)
+(*       intros b J'. *)
+(*       destruct (zeq b mb); subst; eauto. *)
+(*         assert (J'':=J'). *)
+(*         apply mi_globals in J'. *)
+(*         destruct (Mem.valid_block_dec Mem mb). *)
+(*           apply Mem.fresh_block_alloc in HeqR1. *)
+(*           contradict HeqR1; auto. *)
+
+(*           apply mi_freeblocks in n. *)
+(*           rewrite n in J'. inversion J'. *)
+
+(*   split; auto. *)
+(*   Case "msim". *)
+(*       destruct Hmsim. *)
+(*       apply MoreMem.mk_mem_inj. *)
+(*       SSCase "mi_access". *)
+(*         intros b1 b2 d c ofs p J1 J2. *)
+(*         destruct (zeq b1 mb); subst; inv J1. *)
+(*         SSSCase "b1=mb". *)
+(*           symmetry in HeqR1. *)
+(*           symmetry in HeqR2. *)
+(*           destruct J2 as [J21 J22]. *)
+(*           assert (0 <= ofs /\ ofs + size_chunk c <= Size.to_Z tsz * z) as EQ. *)
+(*             destruct (Z_le_dec 0 ofs). *)
+(*               destruct (Z_le_dec (ofs + size_chunk c) (Size.to_Z tsz * z)); auto. *)
+(*                 apply Mem.perm_alloc_3 with (ofs:=ofs+size_chunk c-1) (p:=p) in *)
+(*                   HeqR1; auto with zarith. *)
+(*                 unfold Mem.range_perm in J21. *)
+(*                 assert (ofs <= ofs + size_chunk c - 1 < ofs + size_chunk c) as J. *)
+(*                   assert (J':=@Memdata.size_chunk_pos c). *)
+(*                   auto with zarith. *)
+(*                 apply J21 in J. *)
+(*                 contradict J; auto. *)
+(*               apply Mem.perm_alloc_3 with (ofs:=ofs) (p:=p) in HeqR1; *)
+(*                 auto with zarith. *)
+(*               unfold Mem.range_perm in J21. *)
+(*               assert (ofs <= ofs < ofs + size_chunk c) as J. *)
+(*                 assert (J':=@Memdata.size_chunk_pos c). *)
+(*                 auto with zarith. *)
+(*               apply J21 in J. *)
+(*               contradict J; auto. *)
+
+(*           apply Mem.valid_access_alloc_same with (chunk:=c)(ofs:=ofs+0) in HeqR2; *)
+(*             auto with zarith. *)
+(*             eapply Mem.valid_access_implies; eauto using perm_F_any. *)
+
+(*         SSSCase "b1<>mb". *)
+(*           eapply Mem.valid_access_alloc_other; eauto. *)
+(*           eapply Mem.valid_access_alloc_inv with (b:=mb)(lo:=0) *)
+(*             (hi:=Size.to_Z tsz * z)(p:=p) in J2; eauto. *)
+(*           destruct (eq_block); subst; try solve [eauto | contradict n; auto]. *)
+
+(*       SSCase "mi_memval". *)
+(* Transparent Mem.alloc. *)
+(*         intros b1 ofs b2 d J1 J2. *)
+(*         injection HeqR1. intros NEXT MEM. *)
+(*         injection HeqR2. intros NEXT2 MEM2. *)
+(*         destruct Mem2. destruct Mem2'. destruct Mem. destruct Mem'. *)
+(*         inv MEM. *)
+(*         inv MEM2. clear HeqR1 HeqR2. *)
+(*         simpl in *. *)
+(*         unfold Mem.perm in *. simpl in *. *)
+(*         clear maxaddress_pos0 conversion_props0 maxaddress_pos2 *)
+(*               conversion_props2. *)
+(*         unfold update. *)
+(*         destruct (zeq b1 nextblock1); subst; inv J1. *)
+(*         SSSCase "b1=nextblock1". *)
+(*           destruct (zeq b2 b2) as [e | n]; *)
+(*             try solve [contradict n; auto]. *)
+(*           apply MoreMem.memval_inject_undef. *)
+
+(*         SSSCase "b1<>mb". *)
+(*           destruct (zeq b2 nextblock); subst. *)
+(*             clear - H0 Hwfmi. *)
+(*             destruct Hwfmi. simpl in *. *)
+(*             apply Hmap4 in H0. *)
+(*             contradict H0; auto with zarith. *)
+
+(*             apply MoreMem.memval_inject_incr with (f:=mi); auto. *)
+(*               apply mi_memval; auto. *)
+(*                 clear - J2 n. *)
+(*                 unfold update in J2. *)
+(*                 destruct (zeq b1 nextblock1); subst; *)
+(*                   try solve [auto | contradict n; auto]. *)
+
+(* Global Opaque Mem.alloc. *)
+
+(*   split; auto. *)
+(*   split. *)
+(*     destruct (zeq mb mb); auto. *)
+(*       contradict n; auto. *)
+(*     intros. *)
+(*     destruct (zeq b mb); subst; auto. *)
+(*       contradict H; auto. *)
+(* Qed. *)
+
+Lemma val_inject_has_chunk mi v1 v2 chk
+  (Hinj: MoreMem.val_inject mi v1 v2) :
+  has_chunk_eq v1 chk = has_chunk_eq v2 chk.
 Proof.
-  intros mi TD Mem Mem2 tsz gn align0 Mem' mb mgb Hwfmi Hmsim Halloc.
-  unfold malloc in *.
-  remember (GV2int TD Size.ThirtyTwo gn) as R.
-  destruct R; try solve [inversion Halloc].
-  remember (Mem.alloc Mem 0 (Size.to_Z tsz * z)) as R1.
-  destruct R1 as [Mem1 mb1].
-  destruct (zlt 0 (Size.to_Z tsz * z)); inv Halloc.
-  remember (Mem.alloc Mem2 0 (Size.to_Z tsz * z)) as R2.
-  destruct R2 as [Mem2' mb2].
-  exists (fun b => if zeq b mb then Some (mb2,0%Z) else mi b).
-  exists Mem2'. exists mb2.
-  split; auto.
-  assert (inject_incr mi (fun b : Z => if zeq b mb then ret (mb2, 0) else mi b))
-    as Hinject_incr.
-    unfold inject_incr.
-    intros b b' d H.
-    destruct (zeq b mb); subst; auto.
-      clear - Hwfmi H HeqR1.
-      symmetry in HeqR1.
-      apply Mem.alloc_result in HeqR1. subst.
-      destruct Hwfmi as [_ _ Hmap1 _].
-      assert (mi (Mem.nextblock Mem) = None) as J.
-        apply Hmap1; auto with zarith.
-      rewrite H in J. inversion J.
-
-  split; auto.
-  Case "wfmi".
-    clear - Hwfmi HeqR2 HeqR1.
-    destruct Hwfmi as [Hno_overlap Hnull Hmap1 Hmap2 mi_freeblocks
-      mi_mappedblocks mi_range_block mi_bounds mi_globals].
-    symmetry in HeqR2, HeqR1.
-    assert (J:=HeqR2).
-    apply Mem.nextblock_alloc in HeqR2.
-    split.
-    SCase "no_overlap".
-      clear - Hno_overlap J Hmap2.
-      unfold MoreMem.meminj_no_overlap in *.
-      intros.
-      destruct (zeq b1 mb); subst.
-        destruct (zeq b2 mb); subst.
-          contradict H; auto.
-
-          inv H0.
-          apply Hmap2 in H1.
-          apply Mem.alloc_result in J.
-          subst. clear - H1. intro J. subst. contradict H1; zauto.
-        destruct (zeq b2 mb); subst; eauto.
-          inv H1.
-          apply Hmap2 in H0.
-          apply Mem.alloc_result in J.
-          subst. clear - H0. intro J. subst. contradict H0; zauto.
-    SCase "null".
-      destruct (zeq Mem.nullptr mb); subst; auto.
-        apply Mem.alloc_result in HeqR1.
-        assert(J':=@Mem.nextblock_pos Mem).
-        rewrite <- HeqR1 in J'.
-        unfold Mem.nullptr in J'.
-        contradict J'; zauto.
-    SCase "map1".
-      intros b H2.
-      assert (J':=HeqR1).
-      apply Mem.alloc_result in J'.
-      apply Mem.nextblock_alloc in HeqR1.
-      rewrite HeqR1 in H2.
-      destruct (zeq b mb); subst; zeauto.
-        contradict H2; zauto.
-    SCase "map2".
-      intros b1 b delta2 J'.
-      rewrite HeqR2.
-      destruct (zeq b1 mb); subst; zeauto.
-        inv J'.
-        apply Mem.alloc_result in J.
-        subst.
-        auto with zarith.
-    SCase "freeblocks".
-      intros b J'.
-      destruct (zeq b mb); subst.
-        apply Mem.valid_new_block in HeqR1.
-        contradict HeqR1; auto.
-
-        apply mi_freeblocks.
-          intro J1. apply J'.
-          eapply Mem.valid_block_alloc; eauto.
-    SCase "mappedblocks".
-      intros b b' delta J'.
-      destruct (zeq b mb); subst.
-        inv J'.
-        apply Mem.valid_new_block in J; auto.
-        eapply Mem.valid_block_alloc; eauto.
-    SCase "range_block".
-      intros b b' delta J'.
-      destruct (zeq b mb); inv J'; subst; eauto.
-    SCase "bounds".
-      intros b b' delta J'.
-      erewrite Mem.bounds_alloc; eauto.
-      erewrite Mem.bounds_alloc with (m2:=Mem2'); eauto.
-      unfold eq_block.
-      destruct (zeq b mb); subst.
-        inv J'.
-        destruct (zeq b' b'); subst; auto.
-          contradict n; auto.
-
-        destruct (zeq b' mb2); subst; eauto.
-          apply Hmap2 in J'.
-          apply Mem.alloc_result in J.
-          rewrite J in J'. contradict J'; zauto.
-    SCase "globals".
-      intros b J'.
-      destruct (zeq b mb); subst; eauto.
-        assert (J'':=J').
-        apply mi_globals in J'.
-        destruct (Mem.valid_block_dec Mem mb).
-          apply Mem.fresh_block_alloc in HeqR1.
-          contradict HeqR1; auto.
-
-          apply mi_freeblocks in n.
-          rewrite n in J'. inversion J'.
-
-  split; auto.
-  Case "msim".
-      destruct Hmsim.
-      apply MoreMem.mk_mem_inj.
-      SSCase "mi_access".
-        intros b1 b2 d c ofs p J1 J2.
-        destruct (zeq b1 mb); subst; inv J1.
-        SSSCase "b1=mb".
-          symmetry in HeqR1.
-          symmetry in HeqR2.
-          destruct J2 as [J21 J22].
-          assert (0 <= ofs /\ ofs + size_chunk c <= Size.to_Z tsz * z) as EQ.
-            destruct (Z_le_dec 0 ofs).
-              destruct (Z_le_dec (ofs + size_chunk c) (Size.to_Z tsz * z)); auto.
-                apply Mem.perm_alloc_3 with (ofs:=ofs+size_chunk c-1) (p:=p) in
-                  HeqR1; auto with zarith.
-                unfold Mem.range_perm in J21.
-                assert (ofs <= ofs + size_chunk c - 1 < ofs + size_chunk c) as J.
-                  assert (J':=@Memdata.size_chunk_pos c).
-                  auto with zarith.
-                apply J21 in J.
-                contradict J; auto.
-              apply Mem.perm_alloc_3 with (ofs:=ofs) (p:=p) in HeqR1;
-                auto with zarith.
-              unfold Mem.range_perm in J21.
-              assert (ofs <= ofs < ofs + size_chunk c) as J.
-                assert (J':=@Memdata.size_chunk_pos c).
-                auto with zarith.
-              apply J21 in J.
-              contradict J; auto.
-
-          apply Mem.valid_access_alloc_same with (chunk:=c)(ofs:=ofs+0) in HeqR2;
-            auto with zarith.
-            eapply Mem.valid_access_implies; eauto using perm_F_any.
-
-        SSSCase "b1<>mb".
-          eapply Mem.valid_access_alloc_other; eauto.
-          eapply Mem.valid_access_alloc_inv with (b:=mb)(lo:=0)
-            (hi:=Size.to_Z tsz * z)(p:=p) in J2; eauto.
-          destruct (eq_block); subst; try solve [eauto | contradict n; auto].
-
-      SSCase "mi_memval".
-Transparent Mem.alloc.
-        intros b1 ofs b2 d J1 J2.
-        injection HeqR1. intros NEXT MEM.
-        injection HeqR2. intros NEXT2 MEM2.
-        destruct Mem2. destruct Mem2'. destruct Mem. destruct Mem'.
-        inv MEM.
-        inv MEM2. clear HeqR1 HeqR2.
-        simpl in *.
-        unfold Mem.perm in *. simpl in *.
-        clear maxaddress_pos0 conversion_props0 maxaddress_pos2
-              conversion_props2.
-        unfold update.
-        destruct (zeq b1 nextblock1); subst; inv J1.
-        SSSCase "b1=nextblock1".
-          destruct (zeq b2 b2) as [e | n];
-            try solve [contradict n; auto].
-          apply MoreMem.memval_inject_undef.
-
-        SSSCase "b1<>mb".
-          destruct (zeq b2 nextblock); subst.
-            clear - H0 Hwfmi.
-            destruct Hwfmi. simpl in *.
-            apply Hmap4 in H0.
-            contradict H0; auto with zarith.
-
-            apply MoreMem.memval_inject_incr with (f:=mi); auto.
-              apply mi_memval; auto.
-                clear - J2 n.
-                unfold update in J2.
-                destruct (zeq b1 nextblock1); subst;
-                  try solve [auto | contradict n; auto].
-
-Global Opaque Mem.alloc.
-
-  split; auto.
-  split.
-    destruct (zeq mb mb); auto.
-      contradict n; auto.
-    intros.
-    destruct (zeq b mb); subst; auto.
-      contradict H; auto.
+  destruct v1, v2; inv Hinj; auto.
 Qed.
 
 (* sb_ds_trans_lib.simulation_mstore_aux should use this *)
 Lemma mem_inj_mstore_aux : forall b b2 delta mi mgb
-  (H1 : mi b = ret (b2, delta)) gv ofs gv2 Mem0 Mem2 Mem0'
+  (H1 : mi b = ret (b2, delta)) mc gv ofs gv2 Mem0 Mem2 Mem0'
   (Hwfmi : wf_sb_mi mgb mi Mem0 Mem2)
   (Hmsim : MoreMem.mem_inj mi Mem0 Mem2)
   (Hinj : gv_inject mi gv gv2)
-  (Hmstores : mstore_aux Mem0 gv b ofs = ret Mem0'),
+  (Hmstores : mstore_aux Mem0 mc gv b ofs = ret Mem0'),
    exists Mem2',
-     mstore_aux Mem2 gv2 b2 (ofs + delta) = ret Mem2' /\
+     mstore_aux Mem2 mc gv2 b2 (ofs + delta) = ret Mem2' /\
      wf_sb_mi mgb mi Mem0' Mem2' /\
      MoreMem.mem_inj mi Mem0' Mem2'.
 Proof.
-  induction gv; simpl; intros.
-    inv Hmstores. inv Hinj. simpl. eauto.
-
-    destruct a. inv Hinj.
+  induction mc; destruct gv; simpl; intros.
+    inv Hinj; inv Hmstores; eauto.
+    inv Hinj; inv Hmstores; eauto.
+    inv Hinj; inv Hmstores; eauto.
+    destruct p. inv Hinj.
+    destruct (AST.memory_chunk_eq a m); simpl in *; tinv Hmstores.
+    rewrite <- (val_inject_has_chunk mi v v2 m H4).
+    destruct (has_chunk_eq v m); simpl in *; tinv Hmstores.
     remember (Mem.store m Mem0 b ofs v) as R1.
     destruct R1 as [M|]; tinv Hmstores.
     symmetry in HeqR1.
@@ -2016,7 +2027,7 @@ Proof.
     simpl. rewrite Hmstore.
     assert (ofs + delta + size_chunk m = ofs + size_chunk m + delta) as EQ. ring.
     rewrite EQ.
-    apply IHgv with (Mem0:=M); auto.
+    apply IHmc with (Mem0:=M) (gv:=gv); auto.
     Case "wf_sb_mi".
       split; auto.
       SCase "Hnext1".
