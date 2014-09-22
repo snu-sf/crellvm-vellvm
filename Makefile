@@ -1,6 +1,6 @@
 OTT ?= ott
 
-COQLIBS=-I src/Vellvm -I src/Vellvm/ott -I src/Vellvm/Dominators \
+COQLIBS=-I src/Vellvm -I src/Vellvm/ott -I src/Vellvm/Dominators -I src/Extraction \
 	-I lib/GraphBasics -I lib/compcert-1.9 -I lib/cpdtlib -I lib/metalib-20090714 \
 	-R lib/Coq-Equations-8.4/theories Equations -I lib/Coq-Equations-8.4/src
 MAKECOQ=make -f Makefile.coq COQLIBS="$(COQLIBS)"

@@ -98,3 +98,6 @@
 ./src/Vellvm/Dominators/dom_set_tree.v
 ./src/Vellvm/Dominators/dom_list_tree_wf.v
 ./src/Vellvm/Dominators/dom_list_df.v
+
+./src/Extraction/extraction_core.v
+./src/Extraction/extraction_dom.v
