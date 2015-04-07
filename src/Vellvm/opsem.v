@@ -958,11 +958,11 @@ end.
 (* Return the final result if state is a final state. *)
 Definition s_isFinialState (cfg:Config) (state:State) : option GVs :=
 match state with
-| (mkState (mkEC _ _ nil (insn_return_void _) _ _) (nil) _ ) => 
+| (mkState (mkEC _ _ nil (insn_return_void _) _ _) nil _ ) => 
     (* This case cannot be None at any context. *)
     const2GV (OpsemAux.CurTargetData cfg) (OpsemAux.Globals cfg) 
       (const_int Size.One (INTEGER.of_Z 1%Z 1%Z false))
-| (mkState (mkEC _ _ nil (insn_return _ _ v) lc _) (nil) _ ) => 
+| (mkState (mkEC _ _ nil (insn_return _ _ v) lc _) nil _ ) => 
     (* This case cannot be None at well-formed context. 
        In other words, if a program reaches here, but returns None, 
        the program is stuck. *)
