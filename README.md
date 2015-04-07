@@ -15,11 +15,11 @@ way to parse LLVM bitcode into a Vellvm AST.
 
 ## Dependencies
 
-- camlp4 (For equations plugin -- no longer included with OCaml as of 4.02)
+- camlp4, [ott 0.25](http://www.cl.cam.ac.uk/~pes20/ott/)
+    + `opam install camlp4 ott`
 - Coq 8.4pl5, configured with `-usecamlp4` option
-    + Install Coq by `./configure -prefix ~/.local -usecamlp4 && make && make install`
-- [ott 0.25](http://www.cl.cam.ac.uk/~pes20/ott/)
-    + Install by `opam install ott`
+    + Download [this](https://coq.inria.fr/distrib/V8.4pl5/files/coq-8.4pl5.tar.gz).
+    + `./configure -prefix ~/.local -usecamlp4 && make && make install`
 
 ## Building
 
