@@ -657,7 +657,7 @@ end.
 
 Inductive sInsn : Config -> State -> State -> trace -> Prop :=
 | sReturn : forall S TD Ps F B rid RetTy Result lc gl fs
-                            F' B' c' cs' tmn' lc' ECS
+                            F' B' c' cs' tmn' lc' ECS EC
                             Mem Mem' als als' lc'',
   Instruction.isCallInst c' = true ->
   (* FIXME: we should get Result before free?! *)
@@ -670,7 +670,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     E0
 
 | sReturnVoid : forall S TD Ps F B rid lc gl fs
-                            F' B' c' tmn' lc' ECS
+                            F' B' c' tmn' lc' ECS EC
                             cs' Mem Mem' als als',
   Instruction.isCallInst c' = true ->
   free_allocas TD Mem als = Some Mem' ->
@@ -682,7 +682,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     E0 
 
 | sBranch : forall S TD Ps F B lc gl fs bid Cond l1 l2 conds c
-                              ps' cs' tmn' lc' ECS Mem als,
+                              ps' cs' tmn' lc' ECS EC Mem als,
   getOperandValue TD Cond lc gl = Some conds ->
   c @ conds ->
   Some (stmts_intro ps' cs' tmn') = (if isGVZero TD c
@@ -697,7 +697,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     E0 
 
 | sBranch_uncond : forall S TD Ps F B lc gl fs bid l
-                           ps' cs' tmn' lc' ECS Mem als,
+                           ps' cs' tmn' lc' EC ECS Mem als,
   Some (stmts_intro ps' cs' tmn') = (lookupBlockViaLabelFromFdef F l) ->
   switchToNewBasicBlock TD (l, stmts_intro ps' cs' tmn') B gl lc = Some lc'->
   sInsn (mkCfg S TD Ps gl fs)
@@ -705,21 +705,21 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     (mkState (mkEC F (l, stmts_intro ps' cs' tmn') cs' tmn' lc' als) (ECS) Mem)
     E0 
 
-| sBop: forall S TD Ps F B lc gl fs id bop sz v1 v2 gvs3 ECS cs tmn Mem als,
+| sBop: forall S TD Ps F B lc gl fs id bop sz v1 v2 gvs3 EC ECS cs tmn Mem als,
   BOP TD lc gl bop sz v1 v2 = Some gvs3 ->
   sInsn (mkCfg S TD Ps gl fs)
     (mkState (mkEC F B ((insn_bop id bop sz v1 v2)::cs) tmn lc als) (ECS) Mem)
     (mkState (mkEC F B cs tmn (updateAddAL _ lc id gvs3) als) (ECS) Mem)
     E0 
 
-| sFBop: forall S TD Ps F B lc gl fs id fbop fp v1 v2 gvs3 ECS cs tmn Mem als,
+| sFBop: forall S TD Ps F B lc gl fs id fbop fp v1 v2 gvs3 EC ECS cs tmn Mem als,
   FBOP TD lc gl fbop fp v1 v2 = Some gvs3 ->
   sInsn (mkCfg S TD Ps gl fs)
     (mkState (mkEC F B ((insn_fbop id fbop fp v1 v2)::cs) tmn lc als) (ECS) Mem)
     (mkState (mkEC F B cs tmn (updateAddAL _ lc id gvs3) als) (ECS) Mem)
     E0 
 
-| sExtractValue : forall S TD Ps F B lc gl fs id t v gvs gvs' idxs ECS cs tmn
+| sExtractValue : forall S TD Ps F B lc gl fs id t v gvs gvs' idxs EC ECS cs tmn
                           Mem als t',
   getOperandValue TD v lc gl = Some gvs ->
   extractGenericValue TD t gvs idxs = Some gvs' ->
@@ -730,7 +730,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     E0
 
 | sInsertValue : forall S TD Ps F B lc gl fs id t v t' v' gvs gvs' gvs'' idxs
-                         ECS cs tmn Mem als,
+                         EC ECS cs tmn Mem als,
   getOperandValue TD v lc gl = Some gvs ->
   getOperandValue TD v' lc gl = Some gvs' ->
   insertGenericValue TD t gvs idxs t' gvs' = Some gvs'' ->
@@ -740,7 +740,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     (mkState (mkEC F B cs tmn (updateAddAL _ lc id gvs'') als) (ECS) Mem)
     E0 
 
-| sMalloc : forall S TD Ps F B lc gl fs id t v gns gn align ECS cs tmn Mem als
+| sMalloc : forall S TD Ps F B lc gl fs id t v gns gn align EC ECS cs tmn Mem als
                     Mem' tsz mb,
   getTypeAllocSize TD t = Some tsz ->
   getOperandValue TD v lc gl = Some gns ->
@@ -753,7 +753,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
                 als) (ECS) Mem')
     E0
 
-| sFree : forall S TD Ps F B lc gl fs fid t v ECS cs tmn Mem als Mem' mptrs mptr,
+| sFree : forall S TD Ps F B lc gl fs fid t v EC ECS cs tmn Mem als Mem' mptrs mptr,
   getOperandValue TD v lc gl = Some mptrs ->
   mptr @ mptrs ->
   free TD Mem mptr = Some Mem'->
@@ -762,7 +762,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     (mkState (mkEC F B cs tmn lc als) (ECS) Mem')
     E0
 
-| sAlloca : forall S TD Ps F B lc gl fs id t v gns gn align ECS cs tmn Mem als
+| sAlloca : forall S TD Ps F B lc gl fs id t v gns gn align EC ECS cs tmn Mem als
                     Mem' tsz mb,
   getTypeAllocSize TD t = Some tsz ->
   getOperandValue TD v lc gl = Some gns ->
@@ -775,7 +775,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
                    (mb::als)) (ECS) Mem')
     E0
 
-| sLoad : forall S TD Ps F B lc gl fs id t align v ECS cs tmn Mem als mps mp gv,
+| sLoad : forall S TD Ps F B lc gl fs id t align v EC ECS cs tmn Mem als mps mp gv,
   getOperandValue TD v lc gl = Some mps ->
   mp @ mps ->
   mload TD Mem mp t align = Some gv ->
@@ -784,7 +784,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     (mkState (mkEC F B cs tmn (updateAddAL _ lc id ($ gv # t $)) als) (ECS) Mem)
     E0
 
-| sStore : forall S TD Ps F B lc gl fs sid t align v1 v2 ECS cs tmn Mem als
+| sStore : forall S TD Ps F B lc gl fs sid t align v1 v2 EC ECS cs tmn Mem als
                    mp2 gv1 Mem' gvs1 mps2,
   getOperandValue TD v1 lc gl = Some gvs1 ->
   getOperandValue TD v2 lc gl = Some mps2 ->
@@ -796,7 +796,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     (mkState (mkEC F B cs tmn lc als) (ECS) Mem')
     E0
 
-| sGEP : forall S TD Ps F B lc gl fs id inbounds t v idxs vidxs vidxss ECS mp mp'
+| sGEP : forall S TD Ps F B lc gl fs id inbounds t v idxs vidxs vidxss EC ECS mp mp'
                  cs tmn Mem als t',
   getOperandValue TD v lc gl = Some mp ->
   values2GVs TD idxs lc gl = Some vidxss ->
@@ -808,7 +808,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     (mkState (mkEC F B cs tmn (updateAddAL _ lc id mp') als) (ECS) Mem)
     E0 
 
-| sTrunc : forall S TD Ps F B lc gl fs id truncop t1 v1 t2 gvs2 ECS cs tmn
+| sTrunc : forall S TD Ps F B lc gl fs id truncop t1 v1 t2 gvs2 EC ECS cs tmn
                    Mem als,
   TRUNC TD lc gl truncop t1 v1 t2 = Some gvs2 ->
   sInsn (mkCfg S TD Ps gl fs)
@@ -817,7 +817,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     (mkState (mkEC F B cs tmn (updateAddAL _ lc id gvs2) als) (ECS) Mem)
     E0
 
-| sExt : forall S TD Ps F B lc gl fs id extop t1 v1 t2 gvs2 ECS cs tmn Mem
+| sExt : forall S TD Ps F B lc gl fs id extop t1 v1 t2 gvs2 EC ECS cs tmn Mem
                  als,
   EXT TD lc gl extop t1 v1 t2 = Some gvs2 ->
   sInsn (mkCfg S TD Ps gl fs)
@@ -825,7 +825,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     (mkState (mkEC F B cs tmn (updateAddAL _ lc id gvs2) als) (ECS) Mem)
     E0
 
-| sCast : forall S TD Ps F B lc gl fs id castop t1 v1 t2 gvs2 ECS cs tmn Mem
+| sCast : forall S TD Ps F B lc gl fs id castop t1 v1 t2 gvs2 EC ECS cs tmn Mem
                   als,
   CAST TD lc gl castop t1 v1 t2 = Some gvs2 ->
   sInsn (mkCfg S TD Ps gl fs)
@@ -834,14 +834,14 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     (mkState (mkEC F B cs tmn (updateAddAL _ lc id gvs2) als) (ECS) Mem)
     E0
 
-| sIcmp : forall S TD Ps F B lc gl fs id cond t v1 v2 gvs3 ECS cs tmn Mem als,
+| sIcmp : forall S TD Ps F B lc gl fs id cond t v1 v2 gvs3 EC ECS cs tmn Mem als,
   ICMP TD lc gl cond t v1 v2 = Some gvs3 ->
   sInsn (mkCfg S TD Ps gl fs)
     (mkState (mkEC F B ((insn_icmp id cond t v1 v2)::cs) tmn lc als) (ECS) Mem)
     (mkState (mkEC F B cs tmn (updateAddAL _ lc id gvs3) als) (ECS) Mem)
     E0
 
-| sFcmp : forall S TD Ps F B lc gl fs id fcond fp v1 v2 gvs3 ECS cs tmn Mem
+| sFcmp : forall S TD Ps F B lc gl fs id fcond fp v1 v2 gvs3 EC ECS cs tmn Mem
                   als,
   FCMP TD lc gl fcond fp v1 v2 = Some gvs3 ->
   sInsn (mkCfg S TD Ps gl fs)
@@ -849,7 +849,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     (mkState (mkEC F B cs tmn (updateAddAL _ lc id gvs3) als) (ECS) Mem)
     E0
 
-| sSelect : forall S TD Ps F B lc gl fs id v0 t v1 v2 cond c ECS cs tmn Mem als
+| sSelect : forall S TD Ps F B lc gl fs id v0 t v1 v2 cond c EC ECS cs tmn Mem als
                     gvs1 gvs2,
   getOperandValue TD v0 lc gl = Some cond ->
   getOperandValue TD v1 lc gl = Some gvs1 ->
@@ -863,7 +863,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     E0
 
 | sCall : forall S TD Ps F B lc gl fs rid noret ca fid fv lp cs tmn fptrs fptr
-                 lc' l' ps' cs' tmn' ECS rt la va lb Mem als rt1 va1 fa gvs,
+                 lc' l' ps' cs' tmn' EC ECS rt la va lb Mem als rt1 va1 fa gvs,
   (* only look up the current module for the time being,
      do not support linkage. *)
   getOperandValue TD fv lc gl = Some fptrs ->
@@ -883,7 +883,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
                        lc als)::ECS) Mem)
     E0 
 
-| sExCall : forall S TD Ps F B lc gl fs rid noret ca fid fv lp cs tmn ECS dck
+| sExCall : forall S TD Ps F B lc gl fs rid noret ca fid fv lp cs tmn EC ECS dck
        rt la Mem als oresult Mem' lc' va rt1 va1 fa gvs fptr fptrs gvss tr,
   (* only look up the current module for the time being,
      do not support linkage.
