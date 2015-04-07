@@ -16,8 +16,10 @@ way to parse LLVM bitcode into a Vellvm AST.
 ## Dependencies
 
 - camlp4 (For equations plugin -- no longer included with OCaml as of 4.02)
-- Coq 8.4pl4, configured with `-usecamlp4` option
-- [ott 0.24](http://www.cl.cam.ac.uk/~pes20/ott/)
+- Coq 8.4pl5, configured with `-usecamlp4` option
+    + Install Coq by `./configure -prefix ~/.local -usecamlp4 && make && make install`
+- [ott 0.25](http://www.cl.cam.ac.uk/~pes20/ott/)
+    + Install by `opam install ott`
 
 ## Building
 
@@ -27,3 +29,7 @@ download all third-party sources into lib/src, extract, and apply patches.
 library. If you get an error about grammar.cma, make sure your version of coq
 was compiled with the same version of OCaml in your path.
 3. Run `make` to compile the Vellvm theories.
+
+## Interactive Theorem Proving
+
+Copy `/.coqrc` to your home directory and edit accordingly.
