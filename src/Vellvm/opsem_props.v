@@ -569,12 +569,11 @@ Proof.
   unfold b_genInitState in H.
   remember (s_genInitState S main Args initmem) as R.
   destruct R as [[]|]; tinv H. destruct c; tinv H. destruct s; tinv H.
+  
+  destruct EC0; tinv H.
+  
   destruct ECS0; tinv H.
-
-  - admit.
- (* destruct e; tinv H. *)
-  - admit.
- (* destruct ECS0; inv H; auto. *)
+  inv H; auto.
 Qed.
 
 Lemma b_converges__implies__s_converges : forall sys main VarArgs tr rg,
