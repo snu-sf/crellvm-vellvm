@@ -128,19 +128,20 @@ match tmn with
 | _ => True
 end.
 
-Fixpoint wf_ECStack TD (ps:list product) (ecs:ECStack) : Prop :=
+Fixpoint wf_ECStack_only TD (ps:list product) (ecs:ECStack) : Prop :=
 match ecs with
 | nil => True
 | ec::ecs' =>
-    wf_ExecutionContext TD ps ec /\ wf_ECStack TD ps ecs' /\ wf_call ec ecs'
+    wf_ExecutionContext TD ps ec /\ wf_ECStack_only TD ps ecs' /\ wf_call ec ecs'
 end.
 
 (* Stack is never empty, and must be well-formed. *)
 Definition wf_State (cfg:Config) (S:State) : Prop :=
 let '(mkCfg _ (los, nts) ps _ _ ) := cfg in
-let '(mkState ecs _) := S in
-ecs <> nil /\
-wf_ECStack (los,nts) ps ecs.
+let '(mkState ec ecs _) := S in
+(* ecs <> nil /\ *)
+True /\
+wf_ECStack_only (los,nts) ps (ec :: ecs).
 
 (* A configuration is well-formed if
    1) named types are well-formed
@@ -1538,7 +1539,7 @@ Qed.
 Lemma wf_State__inv : forall S los nts Ps F B c cs tmn lc als EC gl fs Mem0
   (HwfCfg: wf_Config (mkCfg S (los,nts) Ps gl fs)),
   wf_State (mkCfg S (los,nts) Ps gl fs)
-    (mkState ((mkEC F B (c::cs) tmn lc als)::EC) Mem0) ->
+    (mkState (mkEC F B (c::cs) tmn lc als) EC Mem0) ->
   wf_namedts S (los, nts) /\
   wf_global (los, nts) S gl /\
   wf_lc (los,nts) F lc /\
@@ -1638,13 +1639,14 @@ Lemma preservation_cmd_updated_case : forall
             Globals := gl;
             FunTable := fs |}
             {|
-            ECS := {|
+            EC := {|
                    CurFunction := F;
                    CurBB := B;
                    CurCmds := c0 :: cs;
                    Terminator := tmn;
                    Locals := lc;
-                   Allocas := als |} :: EC;
+                   Allocas := als |};
+            ECS := EC;
             Mem := Mem0 |}),
    wf_State {|
      CurSystem := S;
@@ -1653,13 +1655,14 @@ Lemma preservation_cmd_updated_case : forall
      Globals := gl;
      FunTable := fs |}
      {|
-     ECS := {|
+     EC := {|
             CurFunction := F;
             CurBB := B;
             CurCmds := cs;
             Terminator := tmn;
             Locals := updateAddAL GVs lc id0 gv3;
-            Allocas := als |} :: EC;
+            Allocas := als |};
+     ECS := EC;
      Mem := Mem0 |}.
 Proof.
 
@@ -1685,7 +1688,7 @@ end.
     eapply wf_system__uniqFdef; eauto.
   destruct R1; try solve [inversion Hinscope1].
   repeat (split; try solve [auto]).
-      intros; congruence.
+(*      intros; congruence. *)
       Case "wflc".
       eapply wf_lc_updateAddAL; eauto.
         eapply uniqF__lookupTypViaIDFromFdef; eauto using in_middle.
@@ -1759,13 +1762,14 @@ Lemma preservation_cmd_non_updated_case : forall
             Globals := gl;
             FunTable := fs |}
             {|
-            ECS := {|
+            EC := {|
                    CurFunction := F;
                    CurBB := B;
                    CurCmds := c0 :: cs;
                    Terminator := tmn;
                    Locals := lc;
-                   Allocas := als |} :: EC;
+                   Allocas := als |};
+            ECS := EC;
             Mem := Mem0 |}),
    wf_State {|
      CurSystem := S;
@@ -1774,13 +1778,14 @@ Lemma preservation_cmd_non_updated_case : forall
      Globals := gl;
      FunTable := fs |}
      {|
-     ECS := {|
+     EC := {|
             CurFunction := F;
             CurBB := B;
             CurCmds := cs;
             Terminator := tmn;
             Locals := lc;
-            Allocas := als |} :: EC;
+            Allocas := als |};
+     ECS := EC;
      Mem := Mem0 |}.
 Proof.
   intros.
@@ -1792,11 +1797,11 @@ Proof.
     as R1.
   destruct R1; try solve [inversion Hinscope1].
   repeat (split; try solve [auto]).
-      Case "0".
-      intros. congruence.
-      assert (NoDup (getStmtsLocs (stmts_intro ps3 (cs3' ++ c0 :: cs) tmn)))
-        as Hnotin.
-        eapply wf_system__uniq_block with (f:=F) in HwfSystem; eauto.
+      (* Case "0". *)
+      (* intros. congruence. *)
+      (* assert (NoDup (getStmtsLocs (stmts_intro ps3 (cs3' ++ c0 :: cs) tmn))) *)
+      (*   as Hnotin. *)
+      (*   eapply wf_system__uniq_block with (f:=F) in HwfSystem; eauto. *)
       Case "1".
       destruct cs; simpl_env in *.
       SCase "1.1.1".
@@ -1810,7 +1815,7 @@ Proof.
           eauto.
         rewrite Hid in J2.
         eapply wf_defs_eq; eauto.
-
+        admit.
       SCase "1.1.2".
         apply inscope_of_cmd_cmd in HeqR1; auto.
         destruct HeqR1 as [ids2 [J1 J2]].
@@ -1822,7 +1827,7 @@ Proof.
           eauto.
         rewrite Hid in J2.
         eapply wf_defs_eq ; eauto.
-
+        admit.
   exists l3. exists ps3. exists (cs3'++[c0]). simpl_env. auto.
 Qed.
 
@@ -3066,12 +3071,12 @@ Proof.
   destruct HwfCfg as [Hwftd1 [Hwfg1 [HwfSys1 HmInS1]]].
   destruct HwfS1 as [Hnonempty HwfECs].
   destruct ecs; try congruence.
-  destruct e as [f b cs tmn lc als].
+(*  destruct e as [f b cs tmn lc als]. *)
   destruct HwfECs as [[Hreach
                         [HbInF [HfInPs [Hwflc [Hinscope [l1 [ps1 [cs1 Heq]]]]]]]]
                       [HwfECs HwfCall]].
-  subst b.
-  destruct cs.
+(*  subst b. *)
+(*  destruct cs. *)
   Case "cs=nil".
     remember (inscope_of_tmn f (l1, stmts_intro ps1 (cs1 ++ nil) tmn) tmn) as R.
     destruct R; try solve [inversion Hinscope].
