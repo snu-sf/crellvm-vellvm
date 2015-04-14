@@ -2921,21 +2921,21 @@ Definition undefined_state (cfg: Config) (S : State): Prop :=
 match cfg with
 | {| CurTargetData := td; CurProducts := ps; Globals := gl; FunTable := fs |} =>
   match S with
-  | {| ECS := {|
+  | {| EC := {|
                 CurCmds := nil;
                 Terminator := insn_return _ _ _;
-                Allocas := als |} ::
-              {| CurCmds := c::_ |} :: _;
+                Allocas := als |};
+       ECS := {| CurCmds := c::_ |} :: _;
        Mem := M |} => free_allocas td M als = None
   | _ => False
   end \/
   match S with
-  | {| ECS := {|
+  | {| EC := {|
                 CurBB := _;
                 CurCmds := nil;
                 Terminator := insn_return_void _;
-                Allocas := als |} ::
-              {| CurCmds := c::_ |} :: _;
+                Allocas := als |};
+       ECS := {| CurCmds := c::_ |} :: _;
        Mem := M |} => free_allocas td M als = None \/
                       match getCallerReturnID c with
                       | Some _ => True
@@ -2944,11 +2944,11 @@ match cfg with
   | _ => False
   end \/
   match S with
-  | {| ECS := {|
+  | {| EC := {|
                 CurBB := (_, stmts_intro _ _ (insn_unreachable _));
                 CurCmds := nil;
                 Terminator := (insn_unreachable _)
-               |} :: _
+               |}
      |} => True
   | _ => False
   end \/
@@ -2976,8 +2976,8 @@ match cfg with
   (* | _ => False *)
   (* end \/ *)
   match S with
-  | {| ECS := {| CurCmds := insn_free _ _ v::_ ;
-                             Locals := lc|} :: _;
+  | {| EC := {| CurCmds := insn_free _ _ v::_ ;
+                             Locals := lc|};
        Mem := M |} =>
        match getOperandValue td v lc gl with
        | Some gvs => exists gv, gv @ gvs /\
@@ -2990,8 +2990,8 @@ match cfg with
   | _ => False
   end \/
   match S with
-  | {| ECS := {| CurCmds := insn_load _ t v a::_ ;
-                             Locals := lc|} :: _;
+  | {| EC := {| CurCmds := insn_load _ t v a::_ ;
+                             Locals := lc|};
        Mem := M |} =>
        match getOperandValue td v lc gl with
        | Some gvs => exists gv, gv @ gvs /\
@@ -3004,8 +3004,8 @@ match cfg with
   | _ => False
   end \/
   match S with
-  | {| ECS := {| CurCmds := insn_store _ t v v0 a::_ ;
-                             Locals := lc|} :: _;
+  | {| EC := {| CurCmds := insn_store _ t v v0 a::_ ;
+                             Locals := lc|};
        Mem := M |} =>
        match getOperandValue td v lc gl,
              getOperandValue td v0 lc gl with
@@ -3020,8 +3020,8 @@ match cfg with
   end \/
   match S with
   | {|
-       ECS := {| CurCmds := insn_call i0 n _ rt1 _ v p::_ ;
-                             Locals := lc|} :: _;
+       EC := {| CurCmds := insn_call i0 n _ rt1 _ v p::_ ;
+                             Locals := lc|};
        Mem := M |} =>
        match getOperandValue td v lc gl with
        | Some fptrs =>
@@ -3072,14 +3072,15 @@ Lemma progress : forall cfg S1 (HwfCfg: wf_Config cfg),
 Proof.
   intros cfg S1 HwfCfg HwfS1.
   destruct cfg as [s [los nts] ps gl fs].
-  destruct S1 as [ecs M].
+  destruct S1 as [ec ecs M].
   destruct HwfCfg as [Hwftd1 [Hwfg1 [HwfSys1 HmInS1]]].
   destruct HwfS1 as [Hnonempty HwfECs].
-  destruct ecs; try congruence.
-  destruct e as [f b cs tmn lc als].
+(*  destruct ecs; try congruence. *)
+  destruct ec as [f b cs tmn lc als].
   destruct HwfECs as [[Hreach
                         [HbInF [HfInPs [Hwflc [Hinscope [l1 [ps1 [cs1 Heq]]]]]]]]
                       [HwfECs HwfCall]].
+  (* ECCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC *)
   subst b.
   destruct cs.
   Case "cs=nil".
@@ -3135,7 +3136,7 @@ Proof.
             eauto.
 
         destruct Hretup as [lc'' Hretup].
-        exists (mkState ((mkEC f' b' cs' tmn' lc'' als')::ecs) M').
+        exists (mkState (mkEC f' b' cs' tmn' lc'' als') ecs M').
         exists events.E0.
         eauto.
 
@@ -3156,7 +3157,7 @@ Proof.
         rename HeqRm into J.
         destruct n; try solve [undefbehave].
         left.
-        exists (mkState ((mkEC f' b' cs' tmn' lc' als')::ecs) M').
+        exists (mkState (mkEC f' b' cs' tmn' lc' als') ecs M').
         exists events.E0.
         eauto.
 
@@ -3227,9 +3228,9 @@ Proof.
          exists (updateValuesForNewBlock RVs lc). auto.
 
       destruct Hswitch as [lc' Hswitch].
-      exists (mkState ((mkEC f (if isGVZero (los, nts) c then l3 else l2, 
+      exists (mkState (mkEC f (if isGVZero (los, nts) c then l3 else l2, 
                                 stmts_intro ps' cs' tmn') cs' tmn' lc'
-              als)::ecs) M).
+              als) ecs M).
       exists events.E0. eauto.
 
     SCase "tmn=br_uncond".
@@ -3268,8 +3269,8 @@ Proof.
          exists (updateValuesForNewBlock RVs lc). auto.
 
       destruct Hswitch as [lc' Hswitch].
-      exists (mkState ((mkEC f (l2, stmts_intro ps' cs' tmn') cs' tmn' lc'
-              als)::ecs) M).
+      exists (mkState (mkEC f (l2, stmts_intro ps' cs' tmn') cs' tmn' lc'
+              als) ecs M).
       exists events.E0. eauto.
 
     SCase "tmn=unreachable".
@@ -3310,14 +3311,15 @@ Proof.
     destruct Hinsn_bop as [gv3 Hinsn_bop].
     exists
          {|
-         ECS := {|
+         EC := {|
                 CurFunction := f;
                 CurBB := (l1, stmts_intro ps1
                            (cs1 ++ insn_bop i0 b s0 v v0 :: cs) tmn);
                 CurCmds := cs;
                 Terminator := tmn;
                 Locals := (updateAddAL _ lc i0 gv3);
-                Allocas := als |} :: ecs;
+                Allocas := als |};
+         ECS := ecs;
          Mem := M |}.
      exists events.E0. eauto.
 
@@ -3344,14 +3346,15 @@ Proof.
     destruct Hinsn_fbop as [gv3 Hinsn_fbop].
     exists
          {|
-         ECS := {|
+         EC := {|
                 CurFunction := f;
                 CurBB := (l1, stmts_intro ps1
                            (cs1 ++ insn_fbop i0 f0 f1 v v0 :: cs) tmn);
                 CurCmds := cs;
                 Terminator := tmn;
                 Locals := (updateAddAL _ lc i0 gv3);
-                Allocas := als |} :: ecs;
+                Allocas := als |};
+         ECS := ecs;
          Mem := M |}.
      exists events.E0. eauto.
 
@@ -3375,14 +3378,15 @@ Proof.
     destruct J' as [gv' J'].
     exists
          {|
-         ECS := {|
+         EC := {|
                 CurFunction := f;
                 CurBB := (l1, stmts_intro ps1
                            (cs1 ++ insn_extractvalue i0 t v l2 typ':: cs) tmn);
                 CurCmds := cs;
                 Terminator := tmn;
                 Locals := (updateAddAL _ lc i0 gv');
-                Allocas := als |} :: ecs;
+                Allocas := als |};
+         ECS := ecs;
          Mem := M |}.
      exists events.E0. eauto.
 
@@ -3414,14 +3418,15 @@ Proof.
     destruct J'' as [gv'' J''].
     exists
          {|
-         ECS := {|
+         EC := {|
                 CurFunction := f;
                 CurBB := (l1, stmts_intro ps1
                            (cs1 ++ insn_insertvalue i0 t v t0 v0 l2 :: cs) tmn);
                 CurCmds := cs;
                 Terminator := tmn;
                 Locals := (updateAddAL _ lc i0 gv'');
-                Allocas := als |} :: ecs;
+                Allocas := als |};
+         ECS := ecs;
          Mem := M |}.
      exists events.E0. eauto.
 
@@ -3447,7 +3452,7 @@ Proof.
       left.
       exists
          {|
-         ECS := {|
+         EC := {|
                 CurFunction := f;
                 CurBB := (l1, stmts_intro ps1
                            (cs1 ++ insn_malloc i0 t v a :: cs) tmn);
@@ -3455,7 +3460,8 @@ Proof.
                 Terminator := tmn;
                 Locals :=
                (updateAddAL _ lc i0 ($ (blk2GV (los, nts) mb) # typ_pointer t$));
-                Allocas := als |} :: ecs;
+                Allocas := als |};
+         ECS := ecs;
          Mem := M' |}.
       exists events.E0.
       eauto.
@@ -3481,14 +3487,15 @@ Proof.
       left.
       exists
          {|
-         ECS := {|
+         EC := {|
                 CurFunction := f;
                 CurBB := (l1, stmts_intro ps1
                            (cs1 ++ insn_free i0 t v :: cs) tmn);
                 CurCmds := cs;
                 Terminator := tmn;
                 Locals := lc;
-                Allocas := als |} :: ecs;
+                Allocas := als |};
+         ECS := ecs;
          Mem := M' |}.
       exists events.E0.
       eauto.
@@ -3519,7 +3526,7 @@ Proof.
       left.
       exists
          {|
-         ECS := {|
+         EC := {|
                 CurFunction := f;
                 CurBB := (l1, stmts_intro ps1
                            (cs1 ++ insn_alloca i0 t v a :: cs) tmn);
@@ -3527,7 +3534,8 @@ Proof.
                 Terminator := tmn;
                 Locals :=
                (updateAddAL _ lc i0 ($ (blk2GV (los, nts) mb) # typ_pointer t$));
-                Allocas := (mb::als) |} :: ecs;
+                Allocas := (mb::als) |};
+         ECS := ecs;
          Mem := M' |}.
       exists events.E0.
       eauto.
@@ -3554,14 +3562,15 @@ Proof.
       left.
       exists
          {|
-         ECS := {|
+         EC := {|
                 CurFunction := f;
                 CurBB := (l1, stmts_intro ps1
                            (cs1 ++ insn_load i0 t v a :: cs) tmn);
                 CurCmds := cs;
                 Terminator := tmn;
                 Locals := updateAddAL _ lc i0 ($ gv' # t$);
-                Allocas := als |} :: ecs;
+                Allocas := als |};
+         ECS := ecs;
          Mem := M |}.
       exists events.E0.
       eauto.
@@ -3596,14 +3605,15 @@ Proof.
       left.
       exists
          {|
-         ECS := {|
+         EC := {|
                 CurFunction := f;
                 CurBB := (l1, stmts_intro ps1
                            (cs1 ++ insn_store i0 t v v0 a :: cs) tmn);
                 CurCmds := cs;
                 Terminator := tmn;
                 Locals := lc;
-                Allocas := als |} :: ecs;
+                Allocas := als |};
+         ECS := ecs;
          Mem := M' |}.
       exists events.E0.
       eauto.
@@ -3637,14 +3647,15 @@ Proof.
     left.
     exists
          {|
-         ECS := {|
+         EC := {|
                 CurFunction := f;
                 CurBB := (l1, stmts_intro ps1
                            (cs1 ++ insn_gep i0 i1 t v l2 typ' :: cs) tmn);
                 CurCmds := cs;
                 Terminator := tmn;
                 Locals := (updateAddAL _ lc i0 mp');
-                Allocas := als |} :: ecs;
+                Allocas := als |};
+         ECS := ecs;
          Mem := M |}.
      exists events.E0. eauto.
 
@@ -3664,14 +3675,15 @@ Proof.
     destruct Hinsn_trunc as [gv2 Hinsn_trunc].
     exists
          {|
-         ECS := {|
+         EC := {|
                 CurFunction := f;
                 CurBB := (l1, stmts_intro ps1
                            (cs1 ++ insn_trunc i0 t t0 v t1 :: cs) tmn);
                 CurCmds := cs;
                 Terminator := tmn;
                 Locals := (updateAddAL _ lc i0 gv2);
-                Allocas := als |} :: ecs;
+                Allocas := als |};
+         ECS := ecs;
          Mem := M |}.
      exists events.E0. eauto.
 
@@ -3691,14 +3703,15 @@ Proof.
     destruct Hinsn_ext as [gv2 Hinsn_ext].
     exists
          {|
-         ECS := {|
+         EC := {|
                 CurFunction := f;
                 CurBB := (l1, stmts_intro ps1
                            (cs1 ++ insn_ext i0 e t v t0 :: cs) tmn);
                 CurCmds := cs;
                 Terminator := tmn;
                 Locals := (updateAddAL _ lc i0 gv2);
-                Allocas := als |} :: ecs;
+                Allocas := als |};
+         ECS := ecs;
          Mem := M |}.
      exists events.E0. eauto.
 
@@ -3718,14 +3731,15 @@ Proof.
     destruct Hinsn_cast as [gv2 Hinsn_cast].
     exists
          {|
-         ECS := {|
+         EC := {|
                 CurFunction := f;
                 CurBB := (l1, stmts_intro ps1
                            (cs1 ++ insn_cast i0 c t v t0 :: cs) tmn);
                 CurCmds := cs;
                 Terminator := tmn;
                 Locals := (updateAddAL _ lc i0 gv2);
-                Allocas := als |} :: ecs;
+                Allocas := als |};
+         ECS := ecs;
          Mem := M |}.
      exists events.E0. eauto.
 
@@ -3755,14 +3769,15 @@ Proof.
     destruct Hinsn_icmp as [gv2 Hinsn_icmp].
     exists
          {|
-         ECS := {|
+         EC := {|
                 CurFunction := f;
                 CurBB := (l1, stmts_intro ps1
                            (cs1 ++ insn_icmp i0 c t v v0 :: cs) tmn);
                 CurCmds := cs;
                 Terminator := tmn;
                 Locals := (updateAddAL _ lc i0 gv2);
-                Allocas := als |} :: ecs;
+                Allocas := als |};
+         ECS := ecs;
          Mem := M |}.
      exists events.E0. eauto.
 
@@ -3792,14 +3807,15 @@ Proof.
     destruct Hinsn_fcmp as [gv2 Hinsn_fcmp].
     exists
          {|
-         ECS := {|
+         EC := {|
                 CurFunction := f;
                 CurBB := (l1, stmts_intro ps1
                            (cs1 ++ insn_fcmp i0 f0 f1 v v0 :: cs) tmn);
                 CurCmds := cs;
                 Terminator := tmn;
                 Locals := (updateAddAL _ lc i0 gv2);
-                Allocas := als |} :: ecs;
+                Allocas := als |};
+         ECS := ecs;
          Mem := M |}.
      exists events.E0. eauto.
 
@@ -3827,7 +3843,7 @@ Proof.
     left.
     exists
          {|
-         ECS := {|
+         EC := {|
                 CurFunction := f;
                 CurBB := (l1, stmts_intro ps1
                            (cs1 ++ insn_select i0 v t v0 v1 :: cs) tmn);
@@ -3836,7 +3852,8 @@ Proof.
                 Locals := (if isGVZero (los, nts) c
                            then updateAddAL _ lc i0 gv1
                            else updateAddAL _ lc i0 gv0);
-                Allocas := als |} :: ecs;
+                Allocas := als |};
+         ECS := ecs;
          Mem := M |}.
      exists events.E0. eauto.
 
@@ -3872,9 +3889,10 @@ Proof.
     left.
     exists
          {|
-         ECS :=(mkEC (fdef_intro (fheader_intro fa rt fid la va) lb)
+         EC :=(mkEC (fdef_intro (fheader_intro fa rt fid la va) lb)
                      (l5, stmts_intro ps5 cs5 tmn5) cs5 tmn5 lc2
-                     nil)::
+                     nil);
+         ECS :=
                {|
                 CurFunction := f;
                 CurBB := (l1, stmts_intro ps1
@@ -3903,14 +3921,15 @@ Proof.
         left.
         exists
           {|
-          ECS :={|
+          EC :={|
                  CurFunction := f;
                  CurBB := (l1, stmts_intro ps1
                             (cs1 ++ insn_call i0 n c rt1 va1 v p :: cs) tmn);
                  CurCmds := cs;
                  Terminator := tmn;
                  Locals := lc';
-                 Allocas := als |} :: ecs;
+                 Allocas := als |};
+          ECS := ecs;
           Mem := Mem' |}.
         exists tr.
         eauto.
