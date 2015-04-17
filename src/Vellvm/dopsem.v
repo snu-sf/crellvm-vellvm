@@ -336,8 +336,8 @@ exists l0, exists ps0, exists cs0,
   Opsem.CurBB EC = (l0, stmts_intro ps0 (cs0 ++ Opsem.CurCmds EC)
     (Opsem.Terminator EC)).
 
-Definition wfECs_inv s m (ECs: list (@Opsem.ExecutionContext DGVs)) : Prop :=
-List.Forall (wfEC_inv s m) ECs.
+Definition wfECs_inv s m (EC: @Opsem.ExecutionContext DGVs) (ECs: list (@Opsem.ExecutionContext DGVs)) : Prop :=
+List.Forall (wfEC_inv s m) ECs /\ wfEC_inv s m EC.
 
 Lemma wf_EC__wfEC_inv: forall S los nts Ps EC
   (HwfS : wf_system S) 
@@ -358,16 +358,33 @@ Proof.
       eapply wf_system__wf_cmd in J2; eauto using in_middle.
 Qed.
 
-Lemma wf_ECStack__wfECs_inv: forall S los nts Ps ECs
+Lemma wf_ECStack__wfECs_inv: forall S los nts Ps EC ECs
   (HwfS : wf_system S) 
   (HMinS : moduleInSystemB (module_intro los nts Ps) S = true)
-  (Hwf : OpsemPP.wf_ECStack (los, nts) Ps ECs),
-  wfECs_inv S (module_intro los nts Ps) ECs.
+  (Hwf : OpsemPP.wf_ECStack (los, nts) Ps EC ECs),
+  wfECs_inv S (module_intro los nts Ps) EC ECs.
 Proof.
   unfold wfECs_inv.
-  induction ECs as [|]; simpl; intros; auto.
-    destruct Hwf as [J1 [J2 J3]].
-    constructor; eauto using wf_EC__wfEC_inv.
+  split.
+  - generalize dependent EC.
+    induction ECs.
+    + auto.
+    + constructor.
+      * apply wf_EC__wfEC_inv; eauto.
+      destruct Hwf.
+      destruct H0.
+      destruct H0.
+      destruct H2.
+      auto.
+      * eapply IHECs.
+      destruct Hwf.
+      destruct H0.
+      destruct H0.
+      destruct H2.
+      unfold OpsemPP.wf_ECStack.
+      repeat split; eauto.
+  - eapply wf_EC__wfEC_inv; eauto.
+    destruct Hwf; eauto.
 Qed.
 
 Lemma wf_State__wfECs_inv: forall cfg St (Hwfc: OpsemPP.wf_Config cfg) 
@@ -376,6 +393,7 @@ Lemma wf_State__wfECs_inv: forall cfg St (Hwfc: OpsemPP.wf_Config cfg)
     (module_intro (fst (OpsemAux.CurTargetData cfg))
                   (snd (OpsemAux.CurTargetData cfg))
                   (OpsemAux.CurProducts cfg) )
+    (Opsem.EC St)
     (Opsem.ECS St).
 Proof.
   intros.
@@ -393,8 +411,8 @@ exists l0, exists ps0, exists cs0,
   Opsem.CurBB EC = (l0, stmts_intro ps0 (cs0 ++ Opsem.CurCmds EC)
     (Opsem.Terminator EC)).
 
-Definition uniqECs (ECs: list (@Opsem.ExecutionContext DGVs)) : Prop :=
-List.Forall uniqEC ECs.
+Definition uniqECs (EC: (@Opsem.ExecutionContext DGVs)) (ECs: list (@Opsem.ExecutionContext DGVs)) : Prop :=
+List.Forall uniqEC ECs /\ uniqEC EC.
 
 Lemma wfEC_inv__uniqEC: forall s m EC (Hwf: wfEC_inv s m EC), uniqEC EC.
 Proof.
@@ -402,17 +420,29 @@ Proof.
   destruct Hwf as [J1 [J3 [_ J2]]]. split; auto.
 Qed.
 
-Lemma wfECs_inv__uniqECs: forall s m ECs (Hwf: wfECs_inv s m ECs), uniqECs ECs.
+Lemma wfECs_inv__uniqECs: forall s m EC ECs (Hwf: wfECs_inv s m EC ECs), uniqECs EC ECs.
 Proof.
   unfold wfECs_inv, uniqECs.
   intros.
-  induction Hwf; auto.
-    constructor; auto.
-      apply wfEC_inv__uniqEC in H; auto.
+
+  split.
+  *
+    destruct Hwf.
+    generalize dependent EC.
+    induction ECs; auto.
+    constructor; eauto.
+    inversion H; subst.
+    apply wfEC_inv__uniqEC in H3; auto.
+    inversion H; subst.
+    eapply IHECs; eauto.
+  *
+    destruct Hwf.
+    apply wfEC_inv__uniqEC in H0.
+    auto.
 Qed.
 
 Lemma wf_State__uniqECs: forall cfg St (Hwfc: OpsemPP.wf_Config cfg) 
-  (Hwfst: OpsemPP.wf_State cfg St), uniqECs (Opsem.ECS St).
+  (Hwfst: OpsemPP.wf_State cfg St), uniqECs (Opsem.EC St) (Opsem.ECS St).
 Proof.
   intros.
   destruct cfg as [? [? ?] ? ?].
