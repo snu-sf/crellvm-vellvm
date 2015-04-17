@@ -1820,7 +1820,6 @@ Proof.
           eauto.
         rewrite Hid in J2.
         eapply wf_defs_eq; eauto.
-
       SCase "1.1.2".
         apply inscope_of_cmd_cmd in HeqR1; auto.
         destruct HeqR1 as [ids2 [J1 J2]].
@@ -1832,7 +1831,6 @@ Proof.
           eauto.
         rewrite Hid in J2.
         eapply wf_defs_eq ; eauto.
-
   exists l3. exists ps3. exists (cs3'++[c0]). simpl_env. auto.
 Qed.
 
