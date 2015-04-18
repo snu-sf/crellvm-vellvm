@@ -1428,67 +1428,34 @@ Case "sMalloc".  abstract preservation_impure_case_tac.
 Case "sFree". eapply preservation_cmd_non_updated_case in HwfS1; simpl; eauto.
     simpl; auto.
 Case "sAlloca".
-  eapply preservation_impure_cmd_updated_case in HwfS1; simpl; eauto.
-  instantiate (1 := (insn_alloca id0 t v align0)).
-  - simpl; auto; destruct_wf.
-  - simpl; auto; destruct_wf.
-  - simpl; auto; destruct_wf.
+  eapply preservation_impure_cmd_updated_case; simpl; eauto.
+  
+    instantiate (1 := (insn_alloca id0 t v align0)). 
+    simpl; auto; destruct_wf.
+   simpl; auto; destruct_wf.
+   simpl; auto; destruct_wf.
     assert (HuniqF := HwfSystem).
     eapply wf_system__uniqFdef in HuniqF; eauto;
     intros c0 Hlkc0 b1 J; eapply wf_system__uniqFdef in HFinPs1; eauto;
     eapply isReachableFromEntry_helper; eauto.
-  - simpl; auto; destruct_wf.
-    instantiate (1 := Mem').
-    assert (HuniqF := HwfSystem).
-    eapply wf_system__uniqFdef in HuniqF; eauto.
-    eapply wf_system__uniqFdef in HFinPs1; eauto.
-    f_equal; eauto.
-    f_equal; eauto.
-       
-
-  (* - simpl. eauto. *)
-  (* - simpl. eauto. simpl. auto. destruct_wf. *)
-  (*   assert (HuniqF := HwfSystem). *)
-  (*   eapply wf_system__uniqFdef in HuniqF; eauto; *)
-  (*   intros c0 Hlkc0 b1 J; eapply wf_system__uniqFdef in HFinPs1; eauto; *)
-  (*   eapply isReachableFromEntry_helper; eauto. *)
-   
-  (* eapply preservation_impure_cmd_updated_case in Hwfpp1; simpl; eauto; *)
-  (*              simpl; auto; destruct_wf. *)
-
-  (*   ret id0 = getCmdID ?39875 *)
- 
-  (* - simpl; auto; destruct_wf. *)
-  (* - simpl; auto; destruct_wf. *)
-  (* - simpl; auto; destruct_wf. *)
-
-  (* eapply preservation_impure_cmd_updated_case in HwfS1; simpl; eauto; *)
-  (*              simpl; auto. *)
-  (* destruct_wf. *)
-  
-(*     assert (HuniqF := HwfSystem). *)
-(*     eapply wf_system__uniqFdef in HuniqF; eauto; *)
-(*     intros c0 Hlkc0 b1 J; eapply wf_system__uniqFdef in HFinPs1; eauto; *)
-(*     eapply isReachableFromEntry_helper; eauto. *)
- 
-(* admit. *)
-
-(* eapply preservation_cmd_non_updated_case in HwfS1; simpl; eauto; simpl; auto. *)
-
-(* Ltac preservation_impure_case_tac' := *)
-(* match goal with *)
-(* | abcd: (wf_State ?cfg ?S) |- _ => *)
-(*   pose abcd; *)
-(*   eapply preservation_impure_cmd_updated_case in abcd; simpl; eauto; *)
-(*                simpl; auto *)
-(* end. *)
-
-(* preservation_impure_case_tac'. *)
-
-
+   inversion H2 as [Htmp]; subst.
+    simpl; auto; destruct_wf.
+   auto.
 Case "sLoad".
-admit.
 (* abstract preservation_impure_case_tac. *)
+  eapply preservation_impure_cmd_updated_case; simpl; eauto.
+  
+    instantiate (1 := (insn_load id0 t v align0)). 
+    simpl; auto; destruct_wf.
+   simpl; auto; destruct_wf.
+   simpl; auto; destruct_wf.
+    assert (HuniqF := HwfSystem).
+    eapply wf_system__uniqFdef in HuniqF; eauto;
+    intros c0 Hlkc0 b1 J; eapply wf_system__uniqFdef in HFinPs1; eauto;
+    eapply isReachableFromEntry_helper; eauto.
+   inversion H1 as [Htmp]; subst.
+    simpl; auto; destruct_wf.
+   auto.
 
 Case "sStore". eapply preservation_cmd_non_updated_case in HwfS1; simpl; eauto;
     simpl; auto.
