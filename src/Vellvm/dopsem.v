@@ -361,7 +361,7 @@ Qed.
 Lemma wf_ECStack__wfECs_inv: forall S los nts Ps EC ECs
   (HwfS : wf_system S) 
   (HMinS : moduleInSystemB (module_intro los nts Ps) S = true)
-  (Hwf : OpsemPP.wf_ECStack (los, nts) Ps EC ECs),
+  (Hwf : OpsemPP.wf_ECStack (los, nts) Ps (EC::ECs)),
   wfECs_inv S (module_intro los nts Ps) EC ECs.
 Proof.
   unfold wfECs_inv.
