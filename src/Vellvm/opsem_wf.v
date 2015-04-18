@@ -128,25 +128,19 @@ match tmn with
 | _ => True
 end.
 
-Fixpoint wf_ECStack_only TD (ps:list product) (ecs:ECStack) : Prop :=
+Fixpoint wf_ECStack TD (ps:list product) (ecs:ECStack) : Prop :=
 match ecs with
 | nil => True
 | ec::ecs' =>
-    wf_ExecutionContext TD ps ec /\ wf_ECStack_only TD ps ecs' /\ wf_call ec ecs'
+    wf_ExecutionContext TD ps ec /\ wf_ECStack TD ps ecs' /\ wf_call ec ecs'
 end.
-
-(* Definition wf_ECStack := forall TD ps ec ecs, *)
-Definition wf_ECStack TD ps ec ecs :=
-  wf_ExecutionContext TD ps ec /\
-  wf_ECStack_only TD ps ecs /\
-  wf_call ec ecs.
 
 (* Stack is never empty, and must be well-formed. *)
 Definition wf_State (cfg:Config) (S:State) : Prop :=
 let '(mkCfg _ (los, nts) ps _ _ ) := cfg in
 let '(mkState ec ecs _) := S in
 42 :: nil <> nil /\
-wf_ECStack (los,nts) ps ec ecs.
+wf_ECStack (los,nts) ps (ec::ecs).
 
 (* A configuration is well-formed if
    1) named types are well-formed
