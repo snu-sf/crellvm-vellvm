@@ -114,21 +114,17 @@ match cs with
     end
 end.
 
-Fixpoint wf_ECStack_only TD gl (ps:list product) (ecs:ECStack) : Prop :=
+Fixpoint wf_ECStack TD gl (ps:list product) (ecs:ECStack) : Prop :=
 match ecs with
 | nil => True
 | ec::ecs' =>
-    wf_ExecutionContext TD gl ps ec /\ wf_ECStack_only TD gl ps ecs'
+    wf_ExecutionContext TD gl ps ec /\ wf_ECStack TD gl ps ecs'
 end.
-
-Definition wf_ECStack TD gl ps ec ecs :=
-  wf_ExecutionContext TD gl ps ec /\
-  (wf_ECStack_only TD gl ps ecs).
 
 Definition wf_State (cfg:Config) (S:State) : Prop :=
 let '(mkCfg s (los, nts) ps gl _ ) := cfg in
 let '(mkState ec ecs _) := S in
-wf_ECStack (los,nts) gl ps ec ecs.
+wf_ECStack (los,nts) gl ps (ec::ecs).
 
 (* Properties of eval_rhs *)
 Require Import Maps.
@@ -867,8 +863,8 @@ match goal with
 | Hwfcfg: OpsemPP.wf_Config ?cfg, Hwfpp1: OpsemPP.wf_State ?cfg _ |- _ =>
   destruct Hwfcfg as [_ [_ [HwfSystem HmInS]]];
   destruct Hwfpp1 as
-    [_ [[Hreach1 [HBinF1 [HFinPs1 [_ [_ [l3 [ps3 [cs3' Heq1]]]]]]]]
-     [_ HwfCall]]]; subst
+    [[Hreach1 [HBinF1 [HFinPs1 [_ [_ [l3 [ps3 [cs3' Heq1]]]]]]]]
+     [_ HwfCall]]; subst
 end.
 
 Lemma preservation_pure_cmd_updated_case : forall
@@ -1203,7 +1199,7 @@ Focus.
 Case "sReturn".
   destruct Hwfcfg as [Hwftd [Hwfg [HwfSystem HmInS]]].
   destruct Hwfpp1 as
-    [Hnonempty [
+    [
      [Hreach1 [HBinF1 [HFinPs1 [Hwflc1 [_ [l1 [ps1 [cs1' Heq1]]]]]]]]
      [
        [
@@ -1212,7 +1208,7 @@ Case "sReturn".
        ]
        HwfCall'
      ]
-    ]]; subst.
+    ]; subst.
   destruct HwfS1 as [Hinscope1 [Hinscope2 HwfEC]]; subst.
   unfold wf_ExecutionContext in *.
   remember (inscope_of_cmd F' (l2, stmts_intro ps2 (cs2' ++ c' :: cs') tmn') c')
@@ -1317,7 +1313,7 @@ Focus.
 Case "sReturnVoid".
   destruct Hwfcfg as [Hwftd [Hwfg [HwfSystem HmInS]]].
   destruct Hwfpp1 as
-    [Hnonempty [
+    [
      [Hreach1 [HBinF1 [HFinPs1 [Hwflc1 [_ [l1 [ps1 [cs1' Heq1]]]]]]]]
      [
        [
@@ -1326,7 +1322,7 @@ Case "sReturnVoid".
        ]
        HwfCall'
      ]
-    ]]; subst.
+    ]; subst.
   destruct HwfS1 as [Hinscope1 [Hinscope2 HwfEC]]; subst.
   unfold wf_ExecutionContext in *.
   remember (inscope_of_cmd F' (l2, stmts_intro ps2 (cs2' ++ c' :: cs') tmn') c')
@@ -1371,8 +1367,8 @@ Case "sReturnVoid".
 Case "sBranch".
   destruct Hwfcfg as [_ [_ [HwfSystem HmInS]]].
   destruct Hwfpp1 as
-    [_ [[Hreach1 [HBinF1 [HFinPs1 [_ [_ [l3 [ps3 [cs3' Heq1]]]]]]]]
-     [_ HwfCall]]]; subst.
+    [[Hreach1 [HBinF1 [HFinPs1 [_ [_ [l3 [ps3 [cs3' Heq1]]]]]]]]
+     [_ HwfCall]]; subst.
   destruct HwfS1 as [Hinscope1 HwfEC]; subst. 
   unfold wf_ExecutionContext in *.
   remember (inscope_of_tmn F
@@ -1394,8 +1390,8 @@ Focus.
 Case "sBranch_uncond".
   destruct Hwfcfg as [_ [_ [HwfSystem HmInS]]].
   destruct Hwfpp1 as
-    [_ [[Hreach1 [HBinF1 [HFinPs1 [_ [_ [l3 [ps3 [cs3' Heq1]]]]]]]]
-     [_ HwfCall]]]; subst.
+    [[Hreach1 [HBinF1 [HFinPs1 [_ [_ [l3 [ps3 [cs3' Heq1]]]]]]]]
+     [_ HwfCall]]; subst.
   destruct HwfS1 as [Hinscope1 HwfEC]; subst. 
   unfold wf_ExecutionContext in *.
   remember (inscope_of_tmn F
