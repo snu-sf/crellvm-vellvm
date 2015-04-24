@@ -366,8 +366,8 @@ Lemma wf_ECStack__wfECs_inv: forall S los nts Ps ECs
 Proof.
   unfold wfECs_inv.
   induction ECs as [|]; simpl; intros; auto.
-    destruct Hwf as [J1 [J2 J3]].
-    constructor; eauto using wf_EC__wfEC_inv.
+  destruct Hwf as [J1 [J2 J3]].
+  constructor; eauto using wf_EC__wfEC_inv.
 Qed.
 
 Lemma wf_State__wfECs_inv: forall cfg St (Hwfc: OpsemPP.wf_Config cfg) 
@@ -376,7 +376,8 @@ Lemma wf_State__wfECs_inv: forall cfg St (Hwfc: OpsemPP.wf_Config cfg)
     (module_intro (fst (OpsemAux.CurTargetData cfg))
                   (snd (OpsemAux.CurTargetData cfg))
                   (OpsemAux.CurProducts cfg) )
-    (Opsem.ECS St).
+    (Opsem.EC St :: 
+    Opsem.ECS St).
 Proof.
   intros.
   destruct cfg as [? [? ?] ? ?].
@@ -384,6 +385,8 @@ Proof.
   destruct Hwfc as [? [? [? ?]]].
   destruct Hwfst. simpl.
   eapply wf_ECStack__wfECs_inv; eauto.
+  destruct H4; auto.
+  simpl; split; auto.
 Qed.
 
 Definition uniqEC (EC: @Opsem.ExecutionContext DGVs) : Prop :=
@@ -402,7 +405,7 @@ Proof.
   destruct Hwf as [J1 [J3 [_ J2]]]. split; auto.
 Qed.
 
-Lemma wfECs_inv__uniqECs: forall s m ECs (Hwf: wfECs_inv s m ECs), uniqECs ECs.
+Lemma wfECs_inv__uniqECs: forall s m EC ECs (Hwf: wfECs_inv s m (EC::ECs)), uniqECs (EC::ECs).
 Proof.
   unfold wfECs_inv, uniqECs.
   intros.
@@ -412,14 +415,16 @@ Proof.
 Qed.
 
 Lemma wf_State__uniqECs: forall cfg St (Hwfc: OpsemPP.wf_Config cfg) 
-  (Hwfst: OpsemPP.wf_State cfg St), uniqECs (Opsem.ECS St).
+  (Hwfst: OpsemPP.wf_State cfg St), uniqECs ((Opsem.EC St) :: (Opsem.ECS St)).
 Proof.
   intros.
   destruct cfg as [? [? ?] ? ?].
   destruct St.
   destruct Hwfc as [? [? [? ?]]].
-  destruct Hwfst. simpl.
-  eapply wf_ECStack__wfECs_inv in H4; eauto.
+  destruct Hwfst as [? [? ?]]. simpl.
+  assert(H6 : OpsemPP.wf_ECStack (l0, n) CurProducts (EC :: ECS)).
+  simpl. split; auto.
+  eapply wf_ECStack__wfECs_inv in H6; eauto.
   eapply wfECs_inv__uniqECs; eauto.
 Qed.
 

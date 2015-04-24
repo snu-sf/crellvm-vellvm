@@ -32,4 +32,4 @@ was compiled with the same version of OCaml in your path.
 
 ## Interactive Theorem Proving
 
-Copy `/.coqrc` to your home directory and edit accordingly.
+Copy 'coqrc_example' to '~/.coqrc' and edit accordingly.

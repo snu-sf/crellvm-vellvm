@@ -302,8 +302,8 @@ Definition bInsn__implies__sop_plus_prop cfg state state' tr
   state = (mkbEC B cs tmn lc als Mem) ->
   state' = (mkbEC B' cs' tmn' lc' als' Mem') ->
   sop_plus (mkCfg S TD Ps gl fs)
-           (mkState ((mkEC F B cs tmn lc als)::ECs) Mem)
-           (mkState ((mkEC F B' cs' tmn' lc' als')::ECs) Mem') tr.
+           (mkState (mkEC F B cs tmn lc als) ECs Mem)
+           (mkState (mkEC F B' cs' tmn' lc' als') ECs Mem') tr.
 Definition bops__implies__sop_star_prop cfg state state' tr
   (db:@bops GVsSig cfg state state' tr) :=
   forall S TD Ps gl fs F B cs tmn lc als Mem B' cs' tmn' lc' als' Mem' ECs,
@@ -311,8 +311,8 @@ Definition bops__implies__sop_star_prop cfg state state' tr
   state = (mkbEC B cs tmn lc als Mem) ->
   state' = (mkbEC B' cs' tmn' lc' als' Mem') ->
   sop_star (mkCfg S TD Ps gl fs)
-           (mkState ((mkEC F B cs tmn lc als)::ECs) Mem)
-           (mkState ((mkEC F B' cs' tmn' lc' als')::ECs) Mem') tr.
+           (mkState (mkEC F B cs tmn lc als) ECs Mem)
+           (mkState (mkEC F B' cs' tmn' lc' als') ECs Mem') tr.
 Definition bFdef__implies__sop_star_prop fv rt lp S TD Ps lc gl fs Mem lc'
 als' Mem' B'' rid oResult tr
 (db:@bFdef GVsSig fv rt lp S TD Ps lc gl fs Mem lc' als' Mem' B'' rid oResult tr)
@@ -330,12 +330,12 @@ als' Mem' B'' rid oResult tr
     params2GVs TD lp lc gl = Some gvs /\
     initLocals TD la gvs = Some lc0 /\
     sop_star (mkCfg S TD Ps gl fs)
-      (mkState ((mkEC (fdef_intro (fheader_intro fa rt fid la va) lb)
+      (mkState (mkEC (fdef_intro (fheader_intro fa rt fid la va) lb)
                               (l', stmts_intro ps' cs' tmn') cs' tmn'
-                              lc0 nil)::ECs) Mem)
-      (mkState ((mkEC (fdef_intro (fheader_intro fa rt fid la va) lb)
+                              lc0 nil) ECs Mem)
+      (mkState (mkEC (fdef_intro (fheader_intro fa rt fid la va) lb)
                                B'' nil (insn_return rid rt Result) lc'
-                               als')::ECs) Mem')
+                               als') ECs Mem')
       tr
   | None => forall ECs fptrs,
     getOperandValue TD fv lc gl = Some fptrs ->
@@ -349,12 +349,12 @@ als' Mem' B'' rid oResult tr
     params2GVs TD lp lc gl = Some gvs /\
     initLocals TD la gvs = Some lc0 /\
     sop_star (mkCfg S TD Ps gl fs)
-      (mkState ((mkEC (fdef_intro (fheader_intro fa rt fid la va) lb)
+      (mkState (mkEC (fdef_intro (fheader_intro fa rt fid la va) lb)
                               (l', stmts_intro ps' cs' tmn') cs' tmn'
-                              lc0 nil)::ECs) Mem)
-      (mkState ((mkEC (fdef_intro (fheader_intro fa rt fid la va) lb)
+                              lc0 nil) ECs Mem)
+      (mkState (mkEC (fdef_intro (fheader_intro fa rt fid la va) lb)
                                B'' nil (insn_return_void rid) lc'
-                               als')::ECs) Mem')
+                               als') ECs Mem')
       tr
   end
   .
@@ -396,21 +396,25 @@ Proof.
       [lc0' [J1 [J2 [J3 [J4 [J5 J6]]]]]]]]]]]]]]]]].
     rewrite <- E0_left.
     apply sop_plus_cons with
-     (state2:=mkState ((mkEC (fdef_intro (fheader_intro fa0 rt fid0 la0 va0) lb0)
-                             (l0, stmts_intro ps0 cs0 tmn0') cs0 tmn0' lc0' nil)::
-                        (mkEC F0 B0 
-                          ((insn_call rid noret0 ca rt1 va1 fv lp)::cs')
-                          tmn0 lc0 als0)::ECs) Mem1); eauto.
+     (state2:=(mkState
+                (mkEC (fdef_intro (fheader_intro fa0 rt fid0 la0 va0) lb0)
+                             (l0, stmts_intro ps0 cs0 tmn0') cs0 tmn0' lc0' nil)
+                ((mkEC F0 B0 
+                      ((insn_call rid noret0 ca rt1 va1 fv lp)::cs')
+                      tmn0 lc0 als0)::ECs)
+                Mem1)); eauto.
     rewrite <- E0_right.
     apply sop_star_trans with
-     (state2:=mkState ((mkEC (fdef_intro (fheader_intro fa0 rt fid0 la0 va0) lb0)
-                               (l'', stmts_intro ps'' cs''
-                                (insn_return Rid rt Result)) nil
-                                (insn_return Rid rt Result) lc'
-                                als')::
-                        (mkEC F0 B0 
-                          ((insn_call rid noret0 ca rt1 va1 fv lp)::cs')
-                          tmn0 lc0 als0)::ECs) Mem'); auto.
+    (state2:=mkState
+               (mkEC (fdef_intro (fheader_intro fa0 rt fid0 la0 va0) lb0)
+                      (l'', stmts_intro ps'' cs''
+                                        (insn_return Rid rt Result)) nil
+                      (insn_return Rid rt Result) lc'
+                      als')
+                  ((mkEC F0 B0 
+                         ((insn_call rid noret0 ca rt1 va1 fv lp)::cs')
+                         tmn0 lc0 als0)::ECs)
+                  Mem'); auto.
       apply sInsn__implies__sop_star.
         apply sReturn; auto.
           erewrite func_callUpdateLocals_is_returnUpdateLocals; eauto.
@@ -424,26 +428,29 @@ Proof.
       [lc0'' [J1 [J2 [J3 [J4 [J5 J6]]]]]]]]]]]]]]]]].
     rewrite <- E0_left.
     apply sop_plus_cons with
-     (state2:=mkState ((mkEC (fdef_intro (fheader_intro fa0 rt fid0 la0 va0) lb0)
-                            (l0, stmts_intro ps0 cs0 tmn0') cs0 tmn0' lc0'' nil)::
-                        (mkEC F0 B0 
-                         ((insn_call rid noret0 ca rt1 va1 fv lp)::cs')
-                         tmn0 lc0 als0)::ECs) Mem1); eauto.
+     (state2:=mkState
+                (mkEC (fdef_intro (fheader_intro fa0 rt fid0 la0 va0) lb0)
+                      (l0, stmts_intro ps0 cs0 tmn0') cs0 tmn0' lc0'' nil)
+                ((mkEC F0 B0 
+                      ((insn_call rid noret0 ca rt1 va1 fv lp)::cs')
+                      tmn0 lc0 als0)::ECs)
+       Mem1); eauto.
     rewrite <- E0_right.
     apply proc_callUpdateLocals_is_id in e0.
     destruct e0; subst.
     apply sop_star_trans with
-     (state2:=mkState ((mkEC (fdef_intro (fheader_intro fa0 rt fid0 la0 va0) lb0)
+     (state2:=mkState
+                (mkEC (fdef_intro (fheader_intro fa0 rt fid0 la0 va0) lb0)
                                (l'', stmts_intro ps'' cs'' (insn_return_void Rid))
-                                nil (insn_return_void Rid) lc' als')::
-                        (mkEC F0 B0 
-                         ((insn_call rid true ca rt1 va1 fv lp)::cs')
-                         tmn0 lc'0 als0)::ECs) Mem'); auto.
-
+                                nil (insn_return_void Rid) lc' als')
+                ((mkEC F0 B0 
+                      ((insn_call rid true ca rt1 va1 fv lp)::cs')
+                      tmn0 lc'0 als0)::ECs)
+                Mem'); auto.
   Case "bops_cons".
     destruct S2 as [b3 cs3 tmn3 lc3 als3].
     apply sop_star_trans with
-      (state2:=mkState ((mkEC F b3 cs3 tmn3 lc3 als3)::ECs) bMem0); auto.
+      (state2:=mkState (mkEC F b3 cs3 tmn3 lc3 als3) ECs bMem0); auto.
 
   Case "bFdef_func".
     rewrite H0 in e. inv e. exists fptr. exists fa. exists fid. exists la.
@@ -461,8 +468,8 @@ Lemma bInsn__implies__sop_plus : forall tr S TD Ps gl fs F B cs tmn lc als Mem B
   @bInsn GVsSig (mkbCfg S TD Ps gl fs F) (mkbEC B cs tmn lc als Mem)
     (mkbEC B' cs' tmn' lc' als' Mem') tr ->
   sop_plus (mkCfg S TD Ps gl fs)
-           (mkState ((mkEC F B cs tmn lc als)::ECs) Mem)
-           (mkState ((mkEC F B' cs' tmn' lc' als')::ECs) Mem') tr.
+           (mkState (mkEC F B cs tmn lc als) ECs Mem)
+           (mkState (mkEC F B' cs' tmn' lc' als') ECs Mem') tr.
 Proof.
   destruct b__implies__s as [J _]. intros.
   unfold bInsn__implies__sop_plus_prop in J. eapply J; eauto.
@@ -473,8 +480,8 @@ Lemma bInsn__implies__sop_star : forall tr S TD Ps gl fs F B cs tmn lc als Mem B
   @bInsn GVsSig (mkbCfg S TD Ps gl fs F) (mkbEC B cs tmn lc als Mem)
     (mkbEC B' cs' tmn' lc' als' Mem') tr ->
   sop_star (mkCfg S TD Ps gl fs)
-           (mkState ((mkEC F B cs tmn lc als)::ECs) Mem)
-           (mkState ((mkEC F B' cs' tmn' lc' als')::ECs) Mem') tr.
+           (mkState (mkEC F B cs tmn lc als) ECs Mem)
+           (mkState (mkEC F B' cs' tmn' lc' als') ECs Mem') tr.
 Proof.
   intros. eapply bInsn__implies__sop_plus in H; eauto.
 Qed.
@@ -484,8 +491,8 @@ Lemma bops__implies__sop_star : forall tr S TD Ps gl fs F B cs tmn lc als Mem B'
   @bops GVsSig (mkbCfg S TD Ps gl fs F) (mkbEC B cs tmn lc als Mem)
     (mkbEC B' cs' tmn' lc' als' Mem') tr ->
   sop_star (mkCfg S TD Ps gl fs)
-           (mkState ((mkEC F B cs tmn lc als)::ECs) Mem)
-           (mkState ((mkEC F B' cs' tmn' lc' als')::ECs) Mem') tr.
+           (mkState (mkEC F B cs tmn lc als) ECs Mem)
+           (mkState (mkEC F B' cs' tmn' lc' als') ECs Mem') tr.
 Proof.
   destruct b__implies__s as [_ [J _]]. intros.
   unfold bops__implies__sop_star_prop in J. eapply J; eauto.
@@ -506,12 +513,12 @@ Lemma bFdef_func__implies__sop_star : forall fv rt lp S TD Ps ECs lc gl fs
   params2GVs TD lp lc gl = Some gvs /\
   initLocals TD la gvs = Some lc0 /\
   sop_star (mkCfg S TD Ps gl fs)
-    (mkState ((mkEC (fdef_intro (fheader_intro fa rt fid la va) lb)
+    (mkState (mkEC (fdef_intro (fheader_intro fa rt fid la va) lb)
                              (l', stmts_intro ps' cs' tmn') cs' tmn' lc0
-                             nil)::ECs) Mem)
-    (mkState ((mkEC (fdef_intro (fheader_intro fa rt fid la va) lb)
+                             nil) ECs Mem)
+    (mkState (mkEC (fdef_intro (fheader_intro fa rt fid la va) lb)
                              B'' nil (insn_return rid rt Result) lc'
-                             als')::ECs) Mem')
+                             als') ECs Mem')
     tr.
 Proof.
   intros fv rt lp S TD Ps ECs lc gl fs Mem0 lc' als' Mem' B'' rid Result tr
@@ -535,12 +542,12 @@ Lemma bFdef_proc__implies__sop_star : forall fv rt lp S TD Ps ECs lc gl fs
   params2GVs TD lp lc gl = Some gvs /\
   initLocals TD la gvs = Some lc0 /\
   sop_star (mkCfg S TD Ps gl fs)
-    (mkState ((mkEC (fdef_intro (fheader_intro fa rt fid la va) lb)
+    (mkState (mkEC (fdef_intro (fheader_intro fa rt fid la va) lb)
                             (l', stmts_intro ps' cs' tmn') cs' tmn' lc0
-                            nil)::ECs) Mem)
-    (mkState ((mkEC (fdef_intro (fheader_intro fa rt fid la va) lb)
+                            nil) ECs Mem)
+    (mkState (mkEC (fdef_intro (fheader_intro fa rt fid la va) lb)
                              B'' nil (insn_return_void rid) lc'
-                             als')::ECs) Mem')
+                             als') ECs Mem')
     tr.
 Proof.
   intros fv rt lp S TD Ps ECs lc gl fs Mem0 lc' als' Mem' B'' rid tr fptrs H H1.
@@ -556,13 +563,17 @@ Lemma b_genInitState_inv : forall S main Args initmem S0 TD Ps gl fs F B cs tmn
  @b_genInitState GVsSig S main Args initmem =
    Some (mkbCfg S0 TD Ps gl fs F, mkbEC B cs tmn lc als M) ->
  s_genInitState S main Args initmem =
-   Some (mkCfg S0 TD Ps gl fs, mkState ((mkEC F B cs tmn lc als)::nil) M).
+   Some (mkCfg S0 TD Ps gl fs, mkState (mkEC F B cs tmn lc als) nil M).
 Proof.
   intros.
   unfold b_genInitState in H.
   remember (s_genInitState S main Args initmem) as R.
   destruct R as [[]|]; tinv H. destruct c; tinv H. destruct s; tinv H.
-  destruct ECS0; tinv H. destruct e; tinv H. destruct ECS0; inv H; auto.
+  
+  destruct EC0; tinv H.
+  
+  destruct ECS0; tinv H.
+  inv H; auto.
 Qed.
 
 Lemma b_converges__implies__s_converges : forall sys main VarArgs tr rg,
@@ -612,13 +623,14 @@ Lemma bFdefInf_bopInf__implies__sop_diverges :
    getOperandValue TD fv lc gl = ret fptrs0 ->
    sop_diverges (mkCfg S TD Ps gl fs)
      {|
-     ECS := {|
+     EC := {|
             CurFunction := fdef_intro (fheader_intro fa rt fid la va) lb;
             CurBB := (l', stmts_intro ps' cs' tmn');
             CurCmds := cs';
             Terminator := tmn';
             Locals := lc1;
-            Allocas := nil |} :: ECs;
+            Allocas := nil |};
+     ECS := ECs;
      Mem := Mem0 |} tr.
 Proof.
   cofix CIH_bFdefInf.
@@ -626,7 +638,7 @@ Proof.
   assert (forall S tr TD Ps gl fs F B cs tmn lc als Mem ECs,
     @bInsnInf GVsSig (mkbCfg S TD Ps gl fs F) (mkbEC B cs tmn lc als Mem) tr ->
     sop_diverges (mkCfg S TD Ps gl fs)
-                 (mkState ((mkEC F B cs tmn lc als)::ECs) Mem) tr)
+                 (mkState (mkEC F B cs tmn lc als) ECs Mem) tr)
     as bInsnInf__implies__sop_diverges.
     cofix CIH_bInsnInf.
     intros S tr TD Ps gl fs F B cs tmn lc als Mem ECs HbInsnInf.
@@ -636,10 +648,10 @@ Proof.
     assert (HbFdefInf:=H12).
     inversion H12; subst.
     apply sop_diverges_intro with
-      (state2:=mkState ((mkEC (fdef_intro (fheader_intro fa rt fid la va)lb)
+      (state2:=mkState (mkEC (fdef_intro (fheader_intro fa rt fid la va)lb)
                                ((l', stmts_intro ps' cs' tmn')) cs' tmn' lc1
-                               nil)::
-                        (mkEC F B 
+                               nil)
+                        ((mkEC F B 
                           ((insn_call rid noret0 ca rt1 va1 fv lp)::cs0)
                           tmn lc als)::ECs) Mem);
       try solve [clear CIH_bFdefInf CIH_bInsnInf; eauto].
@@ -651,7 +663,7 @@ Proof.
   assert (forall S tr TD Ps gl fs F B cs tmn lc als Mem ECs,
     @bopInf GVsSig (mkbCfg S TD Ps gl fs F) (mkbEC B cs tmn lc als Mem) tr ->
     sop_diverges (mkCfg S TD Ps gl fs)
-                 (mkState ((mkEC F B cs tmn lc als)::ECs) Mem) tr)
+                 (mkState (mkEC F B cs tmn lc als) ECs Mem) tr)
     as bopInf__implies__sop_diverges.
     cofix CIH_bopInf.
     intros S tr TD Ps gl fs F B cs tmn lc als Mem ECs HbopInf.
@@ -685,8 +697,8 @@ Lemma bFdefInf__implies__sop_diverges : forall fv rt lp S TD Ps ECs lc gl fs Mem
   params2GVs TD lp lc gl = Some gvs /\
   initLocals TD la gvs = Some lc0 /\
   sop_diverges (mkCfg S TD Ps gl fs)
-    (mkState ((mkEC (fdef_intro (fheader_intro fa rt fid la va) lb)
-              (l', stmts_intro ps' cs' tmn') cs' tmn' lc0 nil)::ECs) Mem)
+    (mkState (mkEC (fdef_intro (fheader_intro fa rt fid la va) lb)
+              (l', stmts_intro ps' cs' tmn') cs' tmn' lc0 nil) ECs Mem)
     tr.
 Proof.
   intros fv rt lp S TD Ps ECs lc gl fs Mem0 tr fptrs HdbFdefInf Hget.
@@ -702,7 +714,7 @@ Lemma bInsnInf__implies__sop_diverges : forall S tr TD Ps gl fs F B cs tmn lc al
   Mem ECs,
   @bInsnInf GVsSig (mkbCfg S TD Ps gl fs F) (mkbEC B cs tmn lc als Mem) tr ->
   sop_diverges (mkCfg S TD Ps gl fs)
-    (mkState ((mkEC F B cs tmn lc als)::ECs) Mem) tr.
+    (mkState (mkEC F B cs tmn lc als) ECs Mem) tr.
 Proof.
   cofix CIH_bInsnInf.
   intros S tr TD Ps gl fs F B cs tmn lc als Mem ECs HbInsnInf.
@@ -712,10 +724,10 @@ Proof.
   assert (HbFdefInf:=H12).
   inversion H12; subst.
   apply sop_diverges_intro with
-    (state2:=mkState ((mkEC (fdef_intro (fheader_intro fa rt fid la va)lb)
+    (state2:=mkState (mkEC (fdef_intro (fheader_intro fa rt fid la va)lb)
                              (l', stmts_intro ps' cs' tmn') cs' tmn' lc1
-                             nil)::
-                      (mkEC F B 
+                             nil )
+                      ((mkEC F B 
                         ((insn_call rid noret0 ca rt1 va1 fv lp)::cs0)
                         tmn lc als)::ECs) Mem);
     try solve [clear CIH_bInsnInf; eauto].
@@ -728,7 +740,7 @@ Lemma bopInf__implies__sop_diverges : forall S tr TD Ps gl fs F B cs tmn lc als
   Mem ECs,
   @bopInf GVsSig (mkbCfg S TD Ps gl fs F) (mkbEC B cs tmn lc als Mem) tr ->
   sop_diverges (mkCfg S TD Ps gl fs)
-    (mkState ((mkEC F B cs tmn lc als)::ECs) Mem) tr.
+    (mkState (mkEC F B cs tmn lc als) ECs Mem) tr.
 Proof.
   cofix CIH_bopInf.
   intros S tr TD Ps gl fs F B cs tmn lc als Mem ECs HbopInf.
