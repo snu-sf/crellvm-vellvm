@@ -1,13 +1,24 @@
-(defvar str-format nil "")
+;Assumption : all files with dependency are explicitly declared with "Require" Vernacular command.
+;Assumption : coq-LocateLibrary works well.
+;Assumption : dependent files compiles well.
+;Assumption : Require command starts at the first column (broken, ListSet.v?)
+;Optimize : just copy related commands at the beginning of buffer?
+
+(defvar str-format nil
+		"Searching target, to find Require Vernacular command.")
 (setq str-format "Require")
-(defvar current-dir nil "")
+(defvar current-dir nil
+		"Current directory.")
 (setq current-dir (file-name-directory (or load-file-name buffer-file-name)))
-(defvar copy-dir nil "")
+(defvar copy-dir nil
+		"Copy destination directory.")
 (setq copy-dir (concat current-dir "Syntax/"))
-(defun get-line-content () ""
+(defun get-line-content ()
+		"It assumes the cursor is in a line containing \"Require\". The Vernacular command format is \"Require [Import|Export|] blah blah.\"."
 		(interactive)
 		(print (delete "Export" (delete "Import" (delete "Require" (split-string (buffer-substring-no-properties (line-beginning-position) (- (line-end-position) 1))))))))
-(defun coq-LocateLibrary2 (name) ""
+(defun coq-LocateLibrary2 (name)
+		"Modification of \"coq-LocateLibrary2\", as it requires interactive input."
 		(proof-shell-wait)
 		(proof-shell-ready-prover)
   (proof-shell-invisible-command
@@ -17,17 +28,20 @@
 		(coq-LocateLibrary2 name)
 		(car (last (split-string (proof-shell-strip-output-markup proof-shell-last-output)))))
 (defun vo-location-to-v-location (location)
+		"Change string that ends with .vo to .v"
 		(substring location 0 -1))
 (defun check-validity (location)
+		"Check if location is \"initial.coq\", I don't know what it is but it doesn't exist. Also, check if path contains \".local\", to check whether it is Coq's default library. Default library causes some problem with namespace like Coq.Bool instead of Bool."
 		(setq source_name (car (last (split-string location "/"))))
 		(setq path-list (remove source_name (split-string location "/")))
 		(not (or (string-equal source_name "initial.coq")
 											(member ".local" path-list))))
-(defvar queue ""
-		nil)
-(defvar history ""
-		nil)
-(defun copy-dependency (my-file-dir) ""
+(defvar queue nil
+		"Queue for search." )
+(defvar history nil
+		"Check whether the node is visited.")
+(defun copy-dependency (my-file-dir)
+		"Copy dependent files of argument."
 		(unless (member my-file-dir history) 
 				(push my-file-dir history)
 				(if (file-exists-p my-file-dir)	
@@ -36,16 +50,15 @@
 										(switch-to-buffer my-file-buffer)
 										(setq case-fold-search nil)
 										(if proof-shell-buffer (proof-shell-exit t))
-										(evil-goto-first-line)
+										(beginning-of-buffer)
 										(while (search-forward str-format nil t))
 										(proof-goto-point)
-																																								;		(proof-process-buffer)
-										(evil-goto-first-line)
+										(beginning-of-buffer)
 										(while (search-forward str-format nil t)
 												(if (= (- (point) (line-beginning-position)) 7)
-																(let ((deps (mapcar 'name-to-location (get-line-content)))
-																						(dep)
-																						(depv))
+																(let ((deps (mapcar 'name-to-location (get-line-content))) ;Require command may have list of names. It is list of its .vo file paths.
+																						(dep) ;Treat only one this time, others are queued.
+																						(depv)) ;dep is .vo file path, and it is .v file path obtained simply by chopping the last character. File may may not exist.
 																		(setq dep (car deps))
 																		(print deps)
 																		(print dep)
@@ -53,11 +66,10 @@
 																		(print queue)
 
 																		(setq depv (vo-location-to-v-location dep))
-																		(if (check-validity dep) ;;why not just v_location? location such as such as initial.coq
+																		(if (check-validity dep) ;;why not just v_location? location such as initial.coq
 																						(if (file-exists-p depv)
 																										(progn
 																												(print (concat "Copying from " depv " to " copy-dir))
-																												;; (setq queue (cons v_location queue))
 																												(setq queue (append (list depv) queue))
 																												(copy-file depv copy-dir t))
 																								(progn
@@ -77,149 +89,23 @@
 
 
 (setq history nil)
+;; (setq queue '("Vellvm/opsem.v"))
 (setq queue '("Vellvm/syntax.v"))
-;;(setq queue '("/home/youngju.song/coq_related/vellvm-legacy-snu-sf/lib/metalib-20090714/CoqUniquenessTac.v"))
-;;(setq queue '("/home/youngju.song/coq_related/vellvm-legacy-snu-sf/lib/compcert-1.9/Axioms.v"))
 
+;Create directory, if it already exists, do nothing.
 (condition-case nil
 				(make-directory copy-dir)
 		(error nil))
+;Do search.
 (while (not (equal queue nil))
 		(print queue)
-		;; (let ((current-target (car queue)))
-		;; 		(setq queue (cdr queue))
-		;; 	(copy-dependency current-target))
 		(copy-dependency (pop queue))
 		)
+
+(let ((default-directory copy-dir))
+		(shell-command "coq_makefile -arg -impredicative-set -install none *.v -o Makefile && make -j4"))
 ;(eval-buffer nil t)
+;eval it!
 ;if you uncomment it, it is inf loop
 
-
-;; Require ClassicalFacts.
-
-;; (defun tmp (a)
-;; 		(concat "!!!!" a))
-;; (mapcar 'tmp (split-string "Decidable DecidableTypeEx FSetFacts"))
-;; (split-string "Decidable")
-
-;;    [uniqueness] tactic (defined below) requires. *)
-
-;;Require Import Decidable.abcd.efg DecidableTypeEx FSetFacts.
-
-;; (copy-dependency "Vellvm/syntax.v")
-;; (describe-variable 'queue)
-
-
-
-
-
-
-;; "/home/youngju.song/.local/lib/coq/theories/ZArith/ZArith.v"
-
-;; (split-string "abc/def/ghi" "/")
-
-;; (copy-dependency my-file-dir)
-;; (copy-dependency "/home/youngju.song/coq_related/vellvm-legacy/src/Vellvm/syntax.v")
-;; (copy-dependency "/home/youngju.song/coq_related/vellvm-legacy/src/Vellvm/ott/ott_list_core.v")
-;; (copy-dependency "/home/youngju.song/coq_related/vellvm-legacy/src/Vellvm/datatype_base.v")
-
-;; (if (shell-command "coq_makefile -install none *.v -o Makefile && make -j4")
-;; 				(print "NOOOOO"))
-
-;; (copy-file "/home/youngju.song/coq_related/vellvm-legacy/src/Vellvm/ott/ott_list_eq_dec.v" ".")
-
-
-;; (defun coq-ask-do (ask do &optional dontguess postformatcmd)
-;;   "Ask for an ident and print the corresponding term."
-;;   (let* ((cmd) (postform (if (eq postformatcmd nil) 'identity postformatcmd)))
-;;     (proof-shell-ready-prover)
-;;     (setq cmd (coq-guess-or-ask-for-string ask dontguess))
-;;     (proof-shell-invisible-command
-;;      (format (concat do " %s . ") (funcall postform cmd)))))
-;; (defun coq-LocateLibrary ()
-;;   "Locate a library."
-;;   (interactive)
-;;   (coq-ask-do "Locate Library" "Locate Library"))
-
-
-;; (pg-insert-last-output-as-comment)
-
-;; (coq-LocateLibrary2 "syntax_base")
-
-;; (while (re-search-forward "message" nil t)
-;;   (replace-match "notfun"))
-
-;; (defun pg-insert-last-output-as-comment ()
-;;   "Insert the last output from the proof system as a comment in the proof script."
-;;   (interactive)
-;;   (if proof-shell-last-output
-;;       (let  ((beg (point)))
-;; 	(insert (proof-shell-strip-output-markup proof-shell-last-output))
-;; 	(comment-region beg (point)))))
-
-
-
-
-
-
-;; (defun proof-shell-invisible-command (cmd &optional wait invisiblecallback
-;; 					  &rest flags)
-;;   "Send CMD to the proof process.
-;; The CMD is `invisible' in the sense that it is not recorded in buffer.
-;; CMD may be a string or a string-yielding expression.
-
-;; Automatically add `proof-terminal-string' if necessary, examining
-;; `proof-shell-no-auto-terminate-commands'.
-
-;; By default, let the command be processed asynchronously.
-;; But if optional WAIT command is non-nil, wait for processing to finish
-;; before and after sending the command.
-
-;; In case CMD is (or yields) nil, do nothing.
-
-;; INVISIBLECALLBACK will be invoked after the command has finished,
-;; if it is set.  It should probably run the hook variables
-;; `proof-state-change-hook'.
-
-;; FLAGS are additional flags to put onto the `proof-action-list'.
-;; The flag 'invisible is always added to FLAGS."
-;;   (unless (stringp cmd)
-;;     (setq cmd (eval cmd)))
-;;   (if cmd
-;;       (progn
-;; 	(unless (or (null proof-terminal-string)
-;; 		    (not proof-shell-auto-terminate-commands)
-;; 		    (string-match (concat
-;; 				   (regexp-quote proof-terminal-string)
-;; 				   "[ \t]*$") cmd))
-;; 	  (setq cmd (concat cmd proof-terminal-string)))
-;; 	(if wait (proof-shell-wait))
-;; 	(proof-shell-ready-prover)  ; start proof assistant; set vars.
-;; 	(let* ((callback
-;; 		(if invisiblecallback
-;; 		    (lexical-let ((icb invisiblecallback))
-;; 		      (lambda (span)
-;; 			(funcall icb span)))
-;; 		  'proof-done-invisible)))
-;; 	  (proof-start-queue nil nil
-;; 			     (list (proof-shell-action-list-item
-;; 				    cmd
-;; 				    callback
-;; 				    (cons 'invisible flags)))))
-;; 	(if wait (proof-shell-wait)))))
-
-
-
-;; (defun proof-process-buffer ()
-;;   "Process the current (or script) buffer, and maybe move point to the end."
-;;   (interactive)
-;;   (proof-with-script-buffer
-;;    (save-excursion
-;;      (goto-char (point-max))
-;;      (proof-assert-until-point-interactive))
-;;    (proof-maybe-follow-locked-end))
-;;   (when proof-fast-process-buffer
-;;     (message "Processing buffer...")
-;;     (proof-shell-wait)
-;;     (message "Processing buffer...done")))
 
