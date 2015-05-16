@@ -4,19 +4,14 @@
 (setq current-dir (file-name-directory (or load-file-name buffer-file-name)))
 (defvar copy-dir nil "")
 (setq copy-dir (concat current-dir "Syntax/"))
-(defun get-line-content ()
+(defun get-line-content () ""
 		(interactive)
-		(evil-forward-word-begin)
-		(evil-forward-word-begin)
-		(let ((start) (end))
-				(setq start (point))
-				(setq end (- (line-end-position) 1))
-				(print (buffer-substring-no-properties start end))))
-(defun coq-LocateLibrary2 (name)
+		(print (delete "Export" (delete "Import" (delete "Require" (split-string (buffer-substring-no-properties (line-beginning-position) (- (line-end-position) 1))))))))
+(defun coq-LocateLibrary2 (name) ""
 		(proof-shell-wait)
 		(proof-shell-ready-prover)
   (proof-shell-invisible-command
-     (format (concat "Locate Library" " %s . ") (funcall 'identity name)) t))
+			(format (concat "Locate Library" " %s . ") (funcall 'identity name)) t))
 (defun name-to-location (name)
 		"Change library name string to its .vo file location."
 		(coq-LocateLibrary2 name)
@@ -28,10 +23,9 @@
 		(setq path-list (remove source_name (split-string location "/")))
 		(not (or (string-equal source_name "initial.coq")
 											(member ".local" path-list))))
-(defvar queue nil)
-(setq queue nil)
-
-(defun copy-dependency (my-file-dir)
+(defvar queue ""
+		nil)
+(defun copy-dependency (my-file-dir) ""
 		(if (file-exists-p my-file-dir)	
 						(let ((my-file-buffer (find-file-noselect my-file-dir)))
 								(copy-file my-file-dir copy-dir t)
@@ -45,7 +39,7 @@
 								(evil-goto-first-line)
 								(while (search-forward str-format nil t)
 										(if (= (- (point) (line-beginning-position)) 7)
-														(let ((deps (mapcar 'name-to-location (split-string (get-line-content))))
+														(let ((deps (mapcar 'name-to-location (get-line-content)))
 																				(dep)
 																				(depv))
 																(setq dep (car deps))
@@ -77,16 +71,21 @@
 		)
 
 (setq queue '("Vellvm/syntax.v"))
-;; (setq queue '("/home/youngju.song/coq_related/vellvm-legacy-snu-sf/lib/metalib-20090714/CoqUniquenessTac.v"))
+;;(setq queue '("/home/youngju.song/coq_related/vellvm-legacy-snu-sf/lib/metalib-20090714/CoqUniquenessTac.v"))
+;;(setq queue '("/home/youngju.song/coq_related/vellvm-legacy-snu-sf/lib/compcert-1.9/Axioms.v"))
+
 (condition-case nil
 				(make-directory copy-dir)
 		(error nil))
 (while (not (equal queue nil))
-		(let ((current-target (car queue)))
-				(setq queue (cdr queue))
-				(copy-dependency current-target))
+		(print queue)
+		;; (let ((current-target (car queue)))
+		;; 		(setq queue (cdr queue))
+		;; 	(copy-dependency current-target))
+		(copy-dependency (pop queue))
 		)
-(eval-buffer)
+;(eval-buffer nil t)
+;if you uncomment it, it is inf loop
 
 
 ;; Require ClassicalFacts.
