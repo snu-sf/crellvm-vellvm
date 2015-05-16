@@ -4,19 +4,25 @@
 (setq current-dir (file-name-directory (or load-file-name buffer-file-name)))
 (defvar copy-dir nil "")
 (setq copy-dir (concat current-dir "Syntax/"))
-(setq copy-dir "Syntax")
 (defun get-line-content ()
+		(interactive)
 		(evil-forward-word-begin)
 		(evil-forward-word-begin)
 		(let ((start) (end))
 				(setq start (point))
 				(setq end (- (line-end-position) 1))
-				(buffer-substring-no-properties start end)))
+				(print (buffer-substring-no-properties start end))))
 (defun coq-LocateLibrary2 (name)
 		(proof-shell-wait)
 		(proof-shell-ready-prover)
   (proof-shell-invisible-command
      (format (concat "Locate Library" " %s . ") (funcall 'identity name)) t))
+(defun name-to-location (name)
+		"Change library name string to its .vo file location."
+		(coq-LocateLibrary2 name)
+		(car (last (split-string (proof-shell-strip-output-markup proof-shell-last-output)))))
+(defun vo-location-to-v-location (location)
+		(substring location 0 -1))
 (defun check-validity (location)
 		(setq source_name (car (last (split-string location "/"))))
 		(setq path-list (remove source_name (split-string location "/")))
@@ -26,46 +32,55 @@
 (setq queue nil)
 
 (defun copy-dependency (my-file-dir)
-		(let (
-								(my-file-buffer (find-file-noselect my-file-dir))
-								)
-				(copy-file my-file-dir copy-dir t)
-				(switch-to-buffer my-file-buffer)
-				(if proof-shell-buffer (proof-shell-exit t))
-				(evil-goto-first-line)
-				(while (search-forward str-format nil t))
-				(proof-goto-point)
+		(if (file-exists-p my-file-dir)	
+						(let ((my-file-buffer (find-file-noselect my-file-dir)))
+								(copy-file my-file-dir copy-dir t)
+								(switch-to-buffer my-file-buffer)
+								(setq case-fold-search nil)
+								(if proof-shell-buffer (proof-shell-exit t))
+								(evil-goto-first-line)
+								(while (search-forward str-format nil t))
+								(proof-goto-point)
 																																								;		(proof-process-buffer)
+								(evil-goto-first-line)
+								(while (search-forward str-format nil t)
+										(if (= (- (point) (line-beginning-position)) 7)
+														(let ((deps (mapcar 'name-to-location (split-string (get-line-content))))
+																				(dep)
+																				(depv))
+																(setq dep (car deps))
+																(print deps)
+																(print dep)
+																(setq queue (append (mapcar 'vo-location-to-v-location (cdr deps)) queue))
+																(print queue)
 
-				(evil-goto-first-line)
-				(while (search-forward str-format nil t)
-						(let ((name (get-line-content))
-												(vo_location)
-												(v_location))
-								(print name)
-								(coq-LocateLibrary2 name)
-								(setq vo_location (car (last (split-string (proof-shell-strip-output-markup proof-shell-last-output)))))
-								(setq v_location (substring vo_location 0 -1))
-								(print v_location)
-								(if (check-validity vo_location)
-												(if (file-exists-p v_location)
-																(progn
-																		(print (concat "Copying from " v_location " to " copy-dir))
-																		;; (setq queue (cons v_location queue))
-																		(setq queue (append (list v_location) queue))
-																		(copy-file v_location copy-dir t))
-														(progn
-																(print "No .v file exists, copying .vo file instead.")
-																(copy-file vo_location copy-dir t)))
+																(setq depv (vo-location-to-v-location dep))
+																(if (check-validity dep) ;;why not just v_location? location such as such as initial.coq
+																				(if (file-exists-p depv)
+																								(progn
+																										(print (concat "Copying from " depv " to " copy-dir))
+																										;; (setq queue (cons v_location queue))
+																										(setq queue (append (list depv) queue))
+																										(copy-file depv copy-dir t))
+																						(progn
+																								(print "No .v file exists, copying .vo file instead.")
+																								(copy-file dep copy-dir t)))
+																		)
+																)
+												)
 										)
+								(proof-shell-exit t)
+								(kill-buffer)
 								)
-						)
-				(proof-shell-exit t)
-				(kill-buffer)
 				)
+		nil
 		)
 
 (setq queue '("Vellvm/syntax.v"))
+;; (setq queue '("/home/youngju.song/coq_related/vellvm-legacy-snu-sf/lib/metalib-20090714/CoqUniquenessTac.v"))
+(condition-case nil
+				(make-directory copy-dir)
+		(error nil))
 (while (not (equal queue nil))
 		(let ((current-target (car queue)))
 				(setq queue (cdr queue))
@@ -73,10 +88,21 @@
 		)
 (eval-buffer)
 
-;;Require Import Decidable DecidableTypeEx FSetFacts.
+
+;; Require ClassicalFacts.
+
+;; (defun tmp (a)
+;; 		(concat "!!!!" a))
+;; (mapcar 'tmp (split-string "Decidable DecidableTypeEx FSetFacts"))
+;; (split-string "Decidable")
+
+;;    [uniqueness] tactic (defined below) requires. *)
+
+;;Require Import Decidable.abcd.efg DecidableTypeEx FSetFacts.
 
 ;; (copy-dependency "Vellvm/syntax.v")
 ;; (describe-variable 'queue)
+
 
 
 
