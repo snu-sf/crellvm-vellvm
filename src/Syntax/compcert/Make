@@ -1,0 +1,8 @@
+-arg -impredicative-set
+-install none
+
+./Floats.v
+./alist.v
+./Coqlib.v
+./Integers.v
+./Axioms.v

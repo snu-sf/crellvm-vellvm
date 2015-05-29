@@ -1,0 +1,9 @@
+-arg -impredicative-set
+-install none
+
+./datatype_base.v
+./syntax_base.v
+./ott_list_eq_dec.v
+./syntax.v
+./ott_list_core.v
+./monad.v
