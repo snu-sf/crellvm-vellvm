@@ -81,6 +81,7 @@
 ./src/Vellvm/vellvm.v
 ./src/Vellvm/memory_props.v
 ./src/Vellvm/program_sim.v
+./src/Vellvm/interpreter.v
 
 ./src/Vellvm/Dominators/dom_type.v
 ./src/Vellvm/Dominators/dom_libs.v
