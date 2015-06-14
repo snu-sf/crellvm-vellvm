@@ -6,3 +6,14 @@
 ./Coqlib.v
 ./Integers.v
 ./Axioms.v
+./Maps.v
+./Memdata.v
+./Memtype.v
+./Memory.v
+./AST.v
+./Errors.v
+./Values.v
+./Iteration.v
+./Kildall.v
+./Lattice.v
+./Coqlib.v

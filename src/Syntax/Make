@@ -7,3 +7,7 @@
 ./syntax.v
 ./ott_list_core.v
 ./monad.v
+./util.v
+./targetdata.v
+./infrastructure.v
+./vellvm_tactics.v
