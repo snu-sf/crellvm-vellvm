@@ -20,8 +20,7 @@ Definition interInsn (cfg:Config) (state:@State DGVs) : option (State*trace) :=
 let '(mkCfg Sys TD Ps gl fs) := cfg in
 (* Check if the stack is empty. *)
 match state with
-| mkState nil Mem0 => None
-| mkState ((mkEC F B cs tmn lc als)::EC) Mem0 =>
+| mkState (mkEC F B cs tmn lc als) EC Mem0 =>
   (* If cs is nil, we check tmn,
      otherwise, we check the first cmd in cs *)
   match cs with
@@ -39,7 +38,7 @@ match state with
         then
           do Mem' <- free_allocas TD Mem0 als;
           do lc'' <- returnUpdateLocals TD c' Result lc lc' gl;
-             ret ((mkState ((mkEC F' B' cs' tmn' lc'' als')::EC'') Mem'),
+             ret ((mkState (mkEC F' B' cs' tmn' lc'' als') EC'' Mem'),
                   E0)
         else None
       end
@@ -56,7 +55,7 @@ match state with
           match (getCallerReturnID c') with
           | None =>
               do Mem' <- free_allocas TD Mem0 als;
-                 ret ((mkState ((mkEC F' B' cs' tmn' lc' als')::EC'') Mem'),
+                 ret ((mkState (mkEC F' B' cs' tmn' lc' als') EC'' Mem'),
                       E0)
           | _ => None
           end
@@ -74,8 +73,8 @@ match state with
             let l' := if isGVZero TD cond0 then l2 else l1 in
             do lc' <- (switchToNewBasicBlock TD (l', 
                          stmts_intro ps' cs' tmn') B gl lc);
-               ret ((mkState ((mkEC F (l', stmts_intro ps' cs' tmn') cs'
-                     tmn' lc' als)::EC) Mem0), E0)
+               ret ((mkState (mkEC F (l', stmts_intro ps' cs' tmn') cs'
+                     tmn' lc' als) EC Mem0), E0)
         end
     | insn_br_uncond bid l0 =>
       (* look up the target block *)
@@ -84,8 +83,8 @@ match state with
       | Some (stmts_intro ps' cs' tmn') =>
           do lc' <- (switchToNewBasicBlock TD (l0, stmts_intro ps' cs' tmn')
                      B gl lc);
-          ret ((mkState ((mkEC F (l0, stmts_intro ps' cs' tmn') cs'
-                 tmn' lc' als)::EC) Mem0), E0)
+          ret ((mkState (mkEC F (l0, stmts_intro ps' cs' tmn') cs'
+                 tmn' lc' als) EC Mem0), E0)
       end
     | insn_unreachable _ => None
     end
@@ -94,93 +93,93 @@ match state with
     match c with
     | insn_bop id0 bop0 sz0 v1 v2 =>
       do gv3 <- BOP TD lc gl bop0 sz0 v1 v2;
-         ret ((mkState ((mkEC F B cs tmn (updateAddAL _ lc id0 gv3) 
-              als)::EC) Mem0), E0)         
+         ret ((mkState (mkEC F B cs tmn (updateAddAL _ lc id0 gv3) 
+              als) EC Mem0), E0)         
     | insn_fbop id0 fbop0 fp0 v1 v2 => 
       do gv3 <- FBOP TD lc gl fbop0 fp0 v1 v2;
-         ret ((mkState ((mkEC F B cs tmn (updateAddAL _ lc id0 gv3) 
-              als)::EC) Mem0), E0)         
+         ret ((mkState (mkEC F B cs tmn (updateAddAL _ lc id0 gv3) 
+              als) EC Mem0), E0)         
     | insn_extractvalue id0 t v idxs _ =>
       do gv <- getOperandValue TD v lc gl;
       do gv' <- extractGenericValue TD t gv idxs;
-         ret ((mkState ((mkEC F B cs tmn (updateAddAL _ lc id0 gv')
-               als)::EC) Mem0), E0)
+         ret ((mkState (mkEC F B cs tmn (updateAddAL _ lc id0 gv')
+               als) EC Mem0), E0)
     | insn_insertvalue id0 t v t' v' idxs =>
       do gv <- getOperandValue TD v lc gl;
       do gv' <- getOperandValue TD v' lc gl;
       do gv'' <- insertGenericValue TD t gv idxs t' gv';
-         ret ((mkState ((mkEC F B cs tmn (updateAddAL _ lc id0 gv'')
-              als)::EC) Mem0), E0)
+         ret ((mkState (mkEC F B cs tmn (updateAddAL _ lc id0 gv'')
+              als) EC Mem0), E0)
     | insn_malloc id0 t v0 align0 =>
       do tsz <- getTypeAllocSize TD t;
       do gn <- getOperandValue TD v0 lc gl;
       match (malloc TD Mem0 tsz gn align0) with
       | None => None
       | Some (Mem', mb) =>
-        ret ((mkState ((mkEC F B cs tmn (updateAddAL _ lc id0
-               ($ (blk2GV TD mb) # (typ_pointer t) $)) als)::EC) Mem'),
+        ret ((mkState (mkEC F B cs tmn (updateAddAL _ lc id0
+               ($ (blk2GV TD mb) # (typ_pointer t) $)) als) EC Mem'),
             E0)
       end
     | insn_free fid t v =>
       do mptr <- getOperandValue TD v lc gl;
       do Mem' <- free TD Mem0 mptr;
-         ret ((mkState ((mkEC F B cs tmn lc als)::EC) Mem'), E0)
+         ret ((mkState (mkEC F B cs tmn lc als) EC Mem'), E0)
     | insn_alloca id0 t v0 align0 =>
       do tsz <- getTypeAllocSize TD t;
       do gn <- getOperandValue TD v0 lc gl;
       match (malloc TD Mem0 tsz gn align0) with
       | None => None
       | Some (Mem', mb) =>
-          ret ((mkState ((mkEC F B cs tmn (updateAddAL _ lc id0
+          ret ((mkState (mkEC F B cs tmn (updateAddAL _ lc id0
                  ($ (blk2GV TD mb) # (typ_pointer t) $))
-                 (mb::als))::EC) Mem'),
+                 (mb::als)) EC Mem'),
                E0)
       end
     | insn_load id0 t v align0 =>
       do mp <- getOperandValue TD v lc gl;
       do gv <- mload TD Mem0 mp t align0;
-         ret ((mkState ((mkEC F B cs tmn (updateAddAL _ lc id0
+         ret ((mkState (mkEC F B cs tmn (updateAddAL _ lc id0
                 ($ gv # t $)) als)
-              ::EC) Mem0), E0)
+               EC Mem0), E0)
     | insn_store sid t v1 v2 align0 =>
       do gv1 <- getOperandValue TD v1 lc gl;
       do mp2 <- getOperandValue TD v2 lc gl;
       do Mem' <- mstore TD Mem0 mp2 t gv1 align0;
-         ret ((mkState ((mkEC F B cs tmn lc als)::EC) Mem'), E0)
+         ret ((mkState (mkEC F B cs tmn lc als) EC Mem'), E0)
     | insn_gep id0 inbounds0 t v idxs t' =>
       do mp <- getOperandValue TD v lc gl;
       do vidxs <- values2GVs TD idxs lc gl;
       do mp' <- GEP TD t mp vidxs inbounds0 t';
-         ret ((mkState ((mkEC F B cs tmn (updateAddAL _ lc id0 mp')
-               als)::EC) Mem0), E0)
+         ret ((mkState (mkEC F B cs tmn (updateAddAL _ lc id0 mp')
+               als) EC Mem0), E0)
     | insn_trunc id0 truncop0 t1 v1 t2 =>
       do gv2 <- TRUNC TD lc gl truncop0 t1 v1 t2;
-         ret ((mkState ((mkEC F B cs tmn (updateAddAL _ lc id0 gv2)
-               als)::EC) Mem0), E0)
+         ret ((mkState (mkEC F B cs tmn (updateAddAL _ lc id0 gv2)
+               als) EC Mem0), E0)
     | insn_ext id0 extop0 t1 v1 t2 =>
       do gv2 <- EXT TD lc gl extop0 t1 v1 t2;
-         ret ((mkState ((mkEC F B cs tmn (updateAddAL _ lc id0 gv2)
-               als)::EC) Mem0), E0)
+         ret ((mkState (mkEC F B cs tmn (updateAddAL _ lc id0 gv2)
+               als) EC Mem0), E0)
     | insn_cast id0 castop0 t1 v1 t2 =>
       do gv2 <- CAST TD lc gl castop0 t1 v1 t2;
-         ret ((mkState ((mkEC F B cs tmn (updateAddAL _ lc id0 gv2)
-               als)::EC) Mem0), E0)
+         ret ((mkState (mkEC F B cs tmn (updateAddAL _ lc id0 gv2)
+               als) EC Mem0), E0)
 
     | insn_icmp id0 cond0 t v1 v2 =>
       do gv3 <- ICMP TD lc gl cond0 t v1 v2;
-         ret ((mkState ((mkEC F B cs tmn (updateAddAL _ lc id0 gv3)
-               als)::EC) Mem0), E0)
+         ret ((mkState (mkEC F B cs tmn (updateAddAL _ lc id0 gv3)
+               als) EC Mem0), E0)
     | insn_fcmp id0 fcond0 fp v1 v2 =>
       do gv3 <- FCMP TD lc gl fcond0 fp v1 v2;
-         ret ((mkState ((mkEC F B cs tmn (updateAddAL _ lc id0 gv3)
-               als)::EC) Mem0), E0)
+         ret ((mkState (mkEC F B cs tmn (updateAddAL _ lc id0 gv3)
+               als) EC Mem0), E0)
     | insn_select id0 v0 t v1 v2 =>
       do cond0 <- getOperandValue TD v0 lc gl;
       do gv1 <- getOperandValue TD v1 lc gl;
       do gv2 <- getOperandValue TD v2 lc gl;
-         ret ((mkState ((mkEC F B cs tmn
+         ret ((mkState (mkEC F B cs tmn
                 (if isGVZero TD cond0 then updateAddAL _ lc id0 gv2
-                 else updateAddAL _ lc id0 gv1) als)::EC) Mem0),
+                 else updateAddAL _ lc id0 gv1) als) EC Mem0),
              E0)  
     | insn_call rid noret0 tailc0 rt1 va1 fv lp =>
       (* only look up the current module for the time being,
@@ -198,7 +197,7 @@ match state with
                       TD gl Mem0 fid rt' (args2Typs la) dck gvs) with
               | Some (oresult, tr, Mem1) =>
                 do lc' <- exCallUpdateLocals TD rt1 noret0 rid oresult lc;
-                ret ((mkState ((mkEC F B cs tmn lc' als)::EC) Mem1),
+                ret ((mkState (mkEC F B cs tmn lc' als) EC Mem1),
                      tr)
               | None => None
               end
@@ -212,14 +211,16 @@ match state with
             | Some (l', stmts_intro ps' cs' tmn') =>
                 do gvs <- params2GVs TD lp lc gl;
                 do lc0 <- initLocals TD la gvs;
-                ret ((mkState ((mkEC (fdef_intro
-                      (fheader_intro fa rt fid la va) lb)
-                      (l', stmts_intro ps' cs' tmn') cs' tmn' lc0
-                      nil)::
-                    (mkEC F B 
-                      ((insn_call rid noret0 tailc0 rt1 va1 fv lp)::cs) tmn
-                      lc als)::EC) Mem0),
-                    E0)
+                ret ((
+mkState 
+    (mkEC (fdef_intro
+             (fheader_intro fa rt fid la va) lb)
+          (l', stmts_intro ps' cs' tmn') cs' tmn' lc0
+          nil)
+           ((mkEC F B 
+                  ((insn_call rid noret0 tailc0 rt1 va1 fv lp)::cs) tmn
+                  lc als)::EC) Mem0),
+                     E0)
             end
         else None
       end
@@ -276,10 +277,11 @@ Lemma interInsn__implies__dsInsn : forall cfg state state' tr,
 Proof.
   intros cfg state state' tr HinterInsn.
   destruct cfg. destruct state.
-  destruct ECS0; simpl in HinterInsn;
-    try solve [inversion HinterInsn].
+  (* destruct ECS0; simpl in HinterInsn; *)
+  (*   try solve [inversion HinterInsn]. *)
+  simpl in HinterInsn; try solve [inversion HinterInsn]. 
 
-    destruct e as [F B cs tmn lc als].
+    destruct EC0 as [F B cs tmn lc als].
     destruct cs.
       destruct tmn as [? ? v|?|? v l0 l1|? l0|].
       Case "insn_return".
