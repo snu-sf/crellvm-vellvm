@@ -36,9 +36,7 @@
 ./lib/GraphBasics/Paths.v
 
 ./src/Vellvm/ott/ott_list_base.v
-./src/Vellvm/ott/ott_list_core.v
 ./src/Vellvm/ott/ott_list_distinct.v
-./src/Vellvm/ott/ott_list_eq_dec.v
 ./src/Vellvm/ott/ott_list_flat_map.v
 ./src/Vellvm/ott/ott_list_mem.v
 ./src/Vellvm/ott/ott_list_nth.v
@@ -49,7 +47,6 @@
 ./src/Vellvm/ott/ott_list.v
 
 ./src/Vellvm/analysis.v
-./src/Vellvm/datatype_base.v
 ./src/Vellvm/dopsem.v
 ./src/Vellvm/events.v
 ./src/Vellvm/external_intrinsics.v
@@ -57,9 +54,7 @@
 ./src/Vellvm/genericvalues_props.v
 ./src/Vellvm/genericvalues.v
 ./src/Vellvm/infrastructure_props.v
-./src/Vellvm/infrastructure.v
 ./src/Vellvm/memory_sim.v
-./src/Vellvm/monad.v
 ./src/Vellvm/ndopsem.v
 ./src/Vellvm/opsem_dom.v
 ./src/Vellvm/opsem_inst.v
@@ -67,17 +62,12 @@
 ./src/Vellvm/opsem.v
 ./src/Vellvm/opsem_wf.v
 ./src/Vellvm/static.v
-./src/Vellvm/syntax_base.v
-./src/Vellvm/syntax.v
 ./src/Vellvm/tactics.v
 ./src/Vellvm/targetdata_props.v
-./src/Vellvm/targetdata.v
 ./src/Vellvm/trace.v
 ./src/Vellvm/typing_rules.v
 ./src/Vellvm/typings_props.v
 ./src/Vellvm/typings.v
-./src/Vellvm/util.v
-./src/Vellvm/vellvm_tactics.v
 ./src/Vellvm/vellvm.v
 ./src/Vellvm/memory_props.v
 ./src/Vellvm/program_sim.v
