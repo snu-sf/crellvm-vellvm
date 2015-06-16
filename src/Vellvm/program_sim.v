@@ -158,8 +158,8 @@ Lemma s_isFinialState__stuck: forall St1 St2 cfg tr
 Proof.
   intros.
   destruct St1; simpl in Hfinal.
-  destruct ECS; try congruence.
-  destruct e; try congruence.
+  (* destruct ECS; try congruence. *)
+  destruct EC; try congruence.
   destruct CurCmds; try congruence.
   intro J.
   destruct Terminator; try congruence; destruct ECS; try congruence; inv J.
@@ -173,9 +173,9 @@ Proof.
   unfold OpsemPP.undefined_state in Hundef.
   destruct cfg; simpl in Hundef.
   destruct St1; simpl in Hundef.
-  destruct ECS.
-  destruct Hundef as [J | [J | [J | [J | [J | [J | J]]]]]]; inv J.
-  destruct e; tinv Hundef.
+  (* destruct ECS. *)
+  (* destruct Hundef as [J | [J | [J | [J | [J | [J | J]]]]]]; inv J. *)
+  destruct EC; tinv Hundef.
   intro Hop.
   destruct CurCmds.
     destruct Hundef as
@@ -470,8 +470,8 @@ Proof.
   split.
     eapply genGlobalAndInitMem__wf_global in HeqR1; eauto.
   split; auto.
-  split; auto.
-    intro J. congruence.
+  (* split; auto. *)
+  (*   intro J. congruence. *)
   split.
     eapply main_wf_params in HeqR0; eauto.
     eapply OpsemPP.wf_ExecutionContext__at_beginning_of_function; eauto.

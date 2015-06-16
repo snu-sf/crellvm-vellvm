@@ -58,7 +58,6 @@
 ./src/Vellvm/genericvalues.v
 ./src/Vellvm/infrastructure_props.v
 ./src/Vellvm/infrastructure.v
-./src/Vellvm/interpreter.v
 ./src/Vellvm/memory_sim.v
 ./src/Vellvm/monad.v
 ./src/Vellvm/ndopsem.v
@@ -99,5 +98,3 @@
 ./src/Vellvm/Dominators/dom_list_tree_wf.v
 ./src/Vellvm/Dominators/dom_list_df.v
 
-./src/Extraction/extraction_core.v
-./src/Extraction/extraction_dom.v
