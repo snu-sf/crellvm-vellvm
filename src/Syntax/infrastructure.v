@@ -14,7 +14,6 @@ Require Import Integers.
 Require Import Coqlib.
 Require Import Maps.
 Require Import Memory.
-Require Import Kildall.
 Require Import Lattice.
 Require Import targetdata.
 Require Import util.
@@ -3005,15 +3004,15 @@ Module ArrayType <: SigArrayType.
 
 End ArrayType.
 
-Definition typ2memory_chunk (t:typ) : option AST.memory_chunk :=
-  match t with
-  | typ_int bsz => Some (AST.Mint (Size.to_nat bsz -1))
-  | typ_floatpoint fp_float => Some AST.Mfloat32
-  | typ_floatpoint fp_double => Some AST.Mfloat64
-  | typ_floatpoint _ => None
-  | typ_pointer _ => Some (AST.Mint 31)
-  | _ => None
-  end.
+(* Definition typ2memory_chunk (t:typ) : option AST.memory_chunk := *)
+(*   match t with *)
+(*   | typ_int bsz => Some (AST.Mint (Size.to_nat bsz -1)) *)
+(*   | typ_floatpoint fp_float => Some AST.Mfloat32 *)
+(*   | typ_floatpoint fp_double => Some AST.Mfloat64 *)
+(*   | typ_floatpoint _ => None *)
+(*   | typ_pointer _ => Some (AST.Mint 31) *)
+(*   | _ => None *)
+(*   end. *)
 
 Definition wf_alignment (TD:LLVMtd.TargetData) (t:typ) : Prop :=
 forall s a (abi_or_pref:bool),

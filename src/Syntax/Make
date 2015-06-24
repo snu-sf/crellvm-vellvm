@@ -11,3 +11,5 @@
 ./targetdata.v
 ./infrastructure.v
 ./vellvm_tactics.v
+./extraction_core.v
+./extraction_dom.v

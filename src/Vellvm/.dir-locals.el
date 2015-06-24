@@ -5,6 +5,7 @@
                                        s)))
                         (setq coq-load-path 
                               `(
+                                ,(pre "../Syntax")
                                 ,(pre "../../lib/compcert-2.4/lib")
                                 ,(pre "../../lib/compcert-2.4/ia32")
                                 ,(pre "../../lib/compcert-2.4/common")
