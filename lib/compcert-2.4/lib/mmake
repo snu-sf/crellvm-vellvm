@@ -6,4 +6,7 @@ coq_makefile \
 -I ../flocq/Calc \
 -I ../flocq/Core \
 -I ../flocq/ \
+-I ../ia32/ \
+-I ./ \
+-I ../../metalib-20090714/ \
 > Makefile

@@ -8,4 +8,6 @@ coq_makefile \
 -I ../flocq/Calc \
 -I ../flocq/Core \
 -I ../flocq/ \
+-I ../lib/ \
+-I ./ \
 > Makefile
