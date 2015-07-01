@@ -4,6 +4,6 @@ coq_makefile \
 -I ../Prop \
 -I ../Appli \
 -I ../Calc \
--I ../Core \
 -I ../ \
+-I ./ \
 > Makefile
