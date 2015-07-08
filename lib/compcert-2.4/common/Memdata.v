@@ -31,10 +31,8 @@ Require Import Values.
 
 Definition size_chunk (chunk: memory_chunk) : Z :=
   match chunk with
-  | Mint8signed => 1
-  | Mint8unsigned => 1
-  | Mint16signed => 2
-  | Mint16unsigned => 2
+  | Mint8 => 1
+  | Mint16 => 2
   | Mint32 => 4
   | Mint64 => 8
   | Mfloat32 => 4
@@ -80,10 +78,8 @@ Qed.
 
 Definition align_chunk (chunk: memory_chunk) : Z := 
   match chunk with
-  | Mint8signed => 1
-  | Mint8unsigned => 1
-  | Mint16signed => 2
-  | Mint16unsigned => 2
+  | Mint8 => 1
+  | Mint16 => 2
   | Mint32 => 4
   | Mint64 => 8
   | Mfloat32 => 4
@@ -357,8 +353,8 @@ Definition proj_value (q: quantity) (vl: list memval) : val :=
 
 Definition encode_val (chunk: memory_chunk) (v: val) : list memval :=
   match v, chunk with
-  | Vint n, (Mint8signed | Mint8unsigned) => inj_bytes (encode_int 1%nat (Int.unsigned n))
-  | Vint n, (Mint16signed | Mint16unsigned) => inj_bytes (encode_int 2%nat (Int.unsigned n))
+  | Vint n, Mint8 => inj_bytes (encode_int 1%nat (Int.unsigned n))
+  | Vint n, Mint16 => inj_bytes (encode_int 2%nat (Int.unsigned n))
   | Vint n, Mint32 => inj_bytes (encode_int 4%nat (Int.unsigned n))
   | Vptr b ofs, Mint32 => inj_value Q32 v
   | Vlong n, Mint64 => inj_bytes (encode_int 8%nat (Int64.unsigned n))
@@ -373,10 +369,8 @@ Definition decode_val (chunk: memory_chunk) (vl: list memval) : val :=
   match proj_bytes vl with
   | Some bl =>
       match chunk with
-      | Mint8signed => Vint(Int.sign_ext 8 (Int.repr (decode_int bl)))
-      | Mint8unsigned => Vint(Int.zero_ext 8 (Int.repr (decode_int bl)))
-      | Mint16signed => Vint(Int.sign_ext 16 (Int.repr (decode_int bl)))
-      | Mint16unsigned => Vint(Int.zero_ext 16 (Int.repr (decode_int bl)))
+      | Mint8 => Vint(Int.zero_ext 8 (Int.repr (decode_int bl)))
+      | Mint16 => Vint(Int.zero_ext 16 (Int.repr (decode_int bl)))
       | Mint32 => Vint(Int.repr(decode_int bl))
       | Mint64 => Vlong(Int64.repr(decode_int bl))
       | Mfloat32 => Vsingle(Float32.of_bits (Int.repr (decode_int bl)))
@@ -438,14 +432,8 @@ Qed.
 Definition decode_encode_val (v1: val) (chunk1 chunk2: memory_chunk) (v2: val) : Prop :=
   match v1, chunk1, chunk2 with
   | Vundef, _, _ => v2 = Vundef
-  | Vint n, Mint8signed, Mint8signed => v2 = Vint(Int.sign_ext 8 n)
-  | Vint n, Mint8unsigned, Mint8signed => v2 = Vint(Int.sign_ext 8 n)
-  | Vint n, Mint8signed, Mint8unsigned => v2 = Vint(Int.zero_ext 8 n)
-  | Vint n, Mint8unsigned, Mint8unsigned => v2 = Vint(Int.zero_ext 8 n)
-  | Vint n, Mint16signed, Mint16signed => v2 = Vint(Int.sign_ext 16 n)
-  | Vint n, Mint16unsigned, Mint16signed => v2 = Vint(Int.sign_ext 16 n)
-  | Vint n, Mint16signed, Mint16unsigned => v2 = Vint(Int.zero_ext 16 n)
-  | Vint n, Mint16unsigned, Mint16unsigned => v2 = Vint(Int.zero_ext 16 n)
+  | Vint n, Mint8, Mint8 => v2 = Vint(Int.zero_ext 8 n)
+  | Vint n, Mint16, Mint16 => v2 = Vint(Int.zero_ext 16 n)
   | Vint n, Mint32, Mint32 => v2 = Vint n
   | Vint n, Many32, (Mint32 | Many32) => v2 = Vint n
   | Vint n, Mint32, Mfloat32 => v2 = Vsingle(Float32.of_bits n)
@@ -458,18 +446,18 @@ Definition decode_encode_val (v1: val) (chunk1 chunk2: memory_chunk) (v2: val) :
   | Vlong n, Mint64, Mint64 => v2 = Vlong n
   | Vlong n, Mint64, Mfloat64 => v2 = Vfloat(Float.of_bits n)
   | Vlong n, Many64, Many64 => v2 = Vlong n
-  | Vlong n, (Mint8signed|Mint8unsigned|Mint16signed|Mint16unsigned|Mint32|Mfloat32|Mfloat64|Many32), _ => v2 = Vundef
+  | Vlong n, (Mint8|Mint16|Mint32|Mfloat32|Mfloat64|Many32), _ => v2 = Vundef
   | Vlong n, _, _ => True (**r nothing meaningful to say about v2 *)
   | Vfloat f, Mfloat64, Mfloat64 => v2 = Vfloat f
   | Vfloat f, Mfloat64, Mint64 => v2 = Vlong(Float.to_bits f)
   | Vfloat f, Many64, Many64 => v2 = Vfloat f
-  | Vfloat f, (Mint8signed|Mint8unsigned|Mint16signed|Mint16unsigned|Mint32|Mfloat32|Mint64|Many32), _ => v2 = Vundef
+  | Vfloat f, (Mint8|Mint16|Mint32|Mfloat32|Mint64|Many32), _ => v2 = Vundef
   | Vfloat f, _, _ => True   (* nothing interesting to say about v2 *)
   | Vsingle f, Mfloat32, Mfloat32 => v2 = Vsingle f
   | Vsingle f, Mfloat32, Mint32 => v2 = Vint(Float32.to_bits f)
   | Vsingle f, Many32, Many32 => v2 = Vsingle f
   | Vsingle f, Many64, Many64 => v2 = Vsingle f
-  | Vsingle f, (Mint8signed|Mint8unsigned|Mint16signed|Mint16unsigned|Mint32|Mint64|Mfloat64|Many64), _ => v2 = Vundef
+  | Vsingle f, (Mint8|Mint16|Mint32|Mint64|Mfloat64|Many64), _ => v2 = Vundef
   | Vsingle f, _, _ => True (* nothing interesting to say about v2 *)
   end.
 
@@ -496,13 +484,7 @@ Opaque inj_value.
   try (rewrite proj_inj_bytes); try (rewrite proj_bytes_inj_value);
   try (rewrite proj_inj_value); try (rewrite proj_inj_value_mismatch by congruence);
   auto.
-  rewrite decode_encode_int_1. decEq. apply Int.sign_ext_zero_ext. omega.
   rewrite decode_encode_int_1. decEq. apply Int.zero_ext_idem. omega.
-  rewrite decode_encode_int_1. decEq. apply Int.sign_ext_zero_ext. omega.
-  rewrite decode_encode_int_1. decEq. apply Int.zero_ext_idem. omega.
-  rewrite decode_encode_int_2. decEq. apply Int.sign_ext_zero_ext. omega.
-  rewrite decode_encode_int_2. decEq. apply Int.zero_ext_idem. omega.
-  rewrite decode_encode_int_2. decEq. apply Int.sign_ext_zero_ext. omega.
   rewrite decode_encode_int_2. decEq. apply Int.zero_ext_idem. omega.
   rewrite decode_encode_int_4. auto.
   rewrite decode_encode_int_4. auto.
@@ -536,58 +518,30 @@ Proof.
   destruct chunk; exact I || apply Val.load_result_type.
 Qed.
 
-Lemma encode_val_int8_signed_unsigned:
-  forall v, encode_val Mint8signed v = encode_val Mint8unsigned v.
-Proof.
-  intros. destruct v; simpl; auto.
-Qed.
-
-Lemma encode_val_int16_signed_unsigned:
-  forall v, encode_val Mint16signed v = encode_val Mint16unsigned v.
-Proof.
-  intros. destruct v; simpl; auto.
-Qed.
-
 Lemma encode_val_int8_zero_ext:
-  forall n, encode_val Mint8unsigned (Vint (Int.zero_ext 8 n)) = encode_val Mint8unsigned (Vint n).
+  forall n, encode_val Mint8 (Vint (Int.zero_ext 8 n)) = encode_val Mint8 (Vint n).
 Proof.
   intros; unfold encode_val. decEq. apply encode_int_8_mod. apply Int.eqmod_zero_ext. 
   compute; intuition congruence.
 Qed.
 
-Lemma encode_val_int8_sign_ext:
-  forall n, encode_val Mint8signed (Vint (Int.sign_ext 8 n)) = encode_val Mint8signed (Vint n).
-Proof.
-  intros; unfold encode_val. decEq. apply encode_int_8_mod. apply Int.eqmod_sign_ext'. compute; auto.
-Qed.
-
 Lemma encode_val_int16_zero_ext:
-  forall n, encode_val Mint16unsigned (Vint (Int.zero_ext 16 n)) = encode_val Mint16unsigned (Vint n).
+  forall n, encode_val Mint16 (Vint (Int.zero_ext 16 n)) = encode_val Mint16 (Vint n).
 Proof.
   intros; unfold encode_val. decEq. apply encode_int_16_mod. apply Int.eqmod_zero_ext. compute; intuition congruence.
-Qed.
-
-Lemma encode_val_int16_sign_ext:
-  forall n, encode_val Mint16signed (Vint (Int.sign_ext 16 n)) = encode_val Mint16signed (Vint n).
-Proof.
-  intros; unfold encode_val. decEq. apply encode_int_16_mod. apply Int.eqmod_sign_ext'. compute; auto.
 Qed.
 
 Lemma decode_val_cast:
   forall chunk l,
   let v := decode_val chunk l in
   match chunk with
-  | Mint8signed => v = Val.sign_ext 8 v
-  | Mint8unsigned => v = Val.zero_ext 8 v
-  | Mint16signed => v = Val.sign_ext 16 v
-  | Mint16unsigned => v = Val.zero_ext 16 v
+  | Mint8 => v = Val.zero_ext 8 v
+  | Mint16 => v = Val.zero_ext 16 v
   | _ => True
   end.
 Proof.
   unfold decode_val; intros; destruct chunk; auto; destruct (proj_bytes l); auto.
-  unfold Val.sign_ext. rewrite Int.sign_ext_idem; auto. omega.
   unfold Val.zero_ext. rewrite Int.zero_ext_idem; auto. omega. 
-  unfold Val.sign_ext. rewrite Int.sign_ext_idem; auto. omega.
   unfold Val.zero_ext. rewrite Int.zero_ext_idem; auto. omega.
 Qed.
 

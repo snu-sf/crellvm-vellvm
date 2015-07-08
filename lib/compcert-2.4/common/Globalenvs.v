@@ -57,7 +57,7 @@ Set Implicit Arguments.
 
 Function store_zeros (m: mem) (b: block) (p: Z) (n: Z) {wf (Zwf 0) n}: option mem :=
   if zle n 0 then Some m else
-    match Mem.store Mint8unsigned m b p Vzero with
+    match Mem.store Mint8 m b p Vzero with
     | Some m' => store_zeros m' b (p + 1) (n - 1)
     | None => None
     end.
@@ -512,8 +512,8 @@ Qed.
 
 Definition store_init_data (m: mem) (b: block) (p: Z) (id: init_data) : option mem :=
   match id with
-  | Init_int8 n => Mem.store Mint8unsigned m b p (Vint n)
-  | Init_int16 n => Mem.store Mint16unsigned m b p (Vint n)
+  | Init_int8 n => Mem.store Mint8 m b p (Vint n)
+  | Init_int16 n => Mem.store Mint16 m b p (Vint n)
   | Init_int32 n => Mem.store Mint32 m b p (Vint n)
   | Init_int64 n => Mem.store Mint64 m b p (Vlong n)
   | Init_float32 n => Mem.store Mfloat32 m b p (Vsingle n)
@@ -759,7 +759,7 @@ Definition read_as_zero (m: mem) (b: block) (ofs len: Z) : Prop :=
   (align_chunk chunk | p) ->
   Mem.load chunk m b p =
   Some (match chunk with
-        | Mint8unsigned | Mint8signed | Mint16unsigned | Mint16signed | Mint32 => Vint Int.zero
+        | Mint8 | Mint16 | Mint32 => Vint Int.zero
         | Mint64 => Vlong Int64.zero
         | Mfloat32 => Vsingle Float32.zero
         | Mfloat64 => Vfloat Float.zero
@@ -784,8 +784,8 @@ Proof.
       with ((Byte Byte.zero :: nil) ++ list_repeat n' (Byte Byte.zero)).
     apply Mem.loadbytes_concat. 
     erewrite store_zeros_loadbytes_outside; eauto.
-    change (Byte Byte.zero :: nil) with (encode_val Mint8unsigned Vzero).
-    change 1 with (size_chunk Mint8unsigned).
+    change (Byte Byte.zero :: nil) with (encode_val Mint8 Vzero).
+    change 1 with (size_chunk Mint8).
     eapply Mem.loadbytes_store_same; eauto. 
     right; omega.
     eapply IHo; eauto. omega. omega. omega. omega. 
@@ -838,10 +838,10 @@ Fixpoint load_store_init_data (m: mem) (b: block) (p: Z) (il: list init_data) {s
   match il with
   | nil => True
   | Init_int8 n :: il' =>
-      Mem.load Mint8unsigned m b p = Some(Vint(Int.zero_ext 8 n))
+      Mem.load Mint8 m b p = Some(Vint(Int.zero_ext 8 n))
       /\ load_store_init_data m b (p + 1) il'
   | Init_int16 n :: il' =>
-      Mem.load Mint16unsigned m b p = Some(Vint(Int.zero_ext 16 n))
+      Mem.load Mint16 m b p = Some(Vint(Int.zero_ext 16 n))
       /\ load_store_init_data m b (p + 2) il'
   | Init_int32 n :: il' =>
       Mem.load Mint32 m b p = Some(Vint n)
@@ -893,8 +893,8 @@ Proof.
   apply H0. generalize (init_data_size_pos a); omega. omega. auto.  
   intro D. 
   destruct a; simpl in Heqo; intuition.
-  eapply (A Mint8unsigned (Vint i)); eauto.
-  eapply (A Mint16unsigned (Vint i)); eauto.
+  eapply (A Mint8 (Vint i)); eauto.
+  eapply (A Mint16 (Vint i)); eauto.
   eapply (A Mint32 (Vint i)); eauto.
   eapply (A Mint64 (Vlong i)); eauto.
   eapply (A Mfloat32 (Vsingle f)); eauto.

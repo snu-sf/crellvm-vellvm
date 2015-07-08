@@ -772,14 +772,13 @@ End COMPARISONS.
   at a given address, and reading it back.  If it is read back with
   chunk [Mint8unsigned], zero-extension must be performed, resulting
   in [0xFF].  If it is read back as a [Mint8signed], sign-extension is
-  performed and [0xFFFFFFFF] is returned. *)
+  performed and [0xFFFFFFFF] is returned.
+  fixed: vellvm does not need signedness *)
 
 Definition load_result (chunk: memory_chunk) (v: val) :=
   match chunk, v with
-  | Mint8signed, Vint n => Vint (Int.sign_ext 8 n)
-  | Mint8unsigned, Vint n => Vint (Int.zero_ext 8 n)
-  | Mint16signed, Vint n => Vint (Int.sign_ext 16 n)
-  | Mint16unsigned, Vint n => Vint (Int.zero_ext 16 n)
+  | Mint8, Vint n => Vint (Int.zero_ext 8 n)
+  | Mint16, Vint n => Vint (Int.zero_ext 16 n)
   | Mint32, Vint n => Vint n
   | Mint32, Vptr b ofs => Vptr b ofs
   | Mint64, Vlong n => Vlong n

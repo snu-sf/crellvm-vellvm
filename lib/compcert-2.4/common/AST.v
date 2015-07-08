@@ -131,19 +131,31 @@ Definition signature_main :=
 
 (** Memory accesses (load and store instructions) are annotated by
   a ``memory chunk'' indicating the type, size and signedness of the
-  chunk of memory being accessed. *)
+  chunk of memory being accessed.
+  fixed: signedness is not used in vellvm *)
 
 Inductive memory_chunk : Type :=
-  | Mint8signed     (**r 8-bit signed integer *)
-  | Mint8unsigned   (**r 8-bit unsigned integer *)
-  | Mint16signed    (**r 16-bit signed integer *)
-  | Mint16unsigned  (**r 16-bit unsigned integer *)
+  | Mint8           (**r 8-bit unsigned integer *)
+  | Mint16          (**r 16-bit unsigned integer *)
   | Mint32          (**r 32-bit integer, or pointer *)
   | Mint64          (**r 64-bit integer *)
   | Mfloat32        (**r 32-bit single-precision float *)
   | Mfloat64        (**r 64-bit double-precision float *)
   | Many32          (**r any value that fits in 32 bits *)
   | Many64.         (**r any value *)
+
+Definition memory_chunk_eq (c1 c2: memory_chunk) : bool := 
+  match c1, c2 with
+  | Mint8, Mint8 => true
+  | Mint16, Mint16 => true
+  | Mint32, Mint32 => true
+  | Mint64, Mint64 => true
+  | Mfloat32, Mfloat32 => true
+  | Mfloat64, Mfloat64 => true
+  | Many32, Many32 => true
+  | Many64, Many64 => true
+  | _, _ => false
+  end.
 
 Definition chunk_eq: forall (c1 c2: memory_chunk), {c1=c2} + {c1<>c2}.
 Proof. decide equality. Defined.
@@ -153,10 +165,8 @@ Global Opaque chunk_eq.
 
 Definition type_of_chunk (c: memory_chunk) : typ :=
   match c with
-  | Mint8signed => Tint
-  | Mint8unsigned => Tint
-  | Mint16signed => Tint
-  | Mint16unsigned => Tint
+  | Mint8 => Tint
+  | Mint16 => Tint
   | Mint32 => Tint
   | Mint64 => Tlong
   | Mfloat32 => Tsingle

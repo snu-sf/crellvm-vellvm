@@ -253,7 +253,7 @@ Axiom valid_pointer_nonempty_perm:
   valid_pointer m b ofs = true <-> perm m b ofs Cur Nonempty.
 Axiom valid_pointer_valid_access:
   forall m b ofs,
-  valid_pointer m b ofs = true <-> valid_access m Mint8unsigned b ofs Nonempty.
+  valid_pointer m b ofs = true <-> valid_access m Mint8 b ofs Nonempty.
 
 (** C allows pointers one past the last element of an array.  These are not
   valid according to the previously defined [valid_pointer]. The property
@@ -306,21 +306,10 @@ Axiom load_cast:
   forall m chunk b ofs v,
   load chunk m b ofs = Some v ->
   match chunk with
-  | Mint8signed => v = Val.sign_ext 8 v
-  | Mint8unsigned => v = Val.zero_ext 8 v
-  | Mint16signed => v = Val.sign_ext 16 v
-  | Mint16unsigned => v = Val.zero_ext 16 v
+  | Mint8 => v = Val.zero_ext 8 v
+  | Mint16 => v = Val.zero_ext 16 v
   | _ => True
   end.
-
-Axiom load_int8_signed_unsigned:
-  forall m b ofs,
-  load Mint8signed m b ofs = option_map (Val.sign_ext 8) (load Mint8unsigned m b ofs).
-
-Axiom load_int16_signed_unsigned:
-  forall m b ofs,
-  load Mint16signed m b ofs = option_map (Val.sign_ext 16) (load Mint16unsigned m b ofs).
-
 
 (** ** Properties of [loadbytes]. *)
 
@@ -484,28 +473,14 @@ Axiom loadbytes_store_other:
 (** [store] is insensitive to the signedness or the high bits of
   small integer quantities. *)
 
-Axiom store_signed_unsigned_8:
-  forall m b ofs v,
-  store Mint8signed m b ofs v = store Mint8unsigned m b ofs v.
-Axiom store_signed_unsigned_16:
-  forall m b ofs v,
-  store Mint16signed m b ofs v = store Mint16unsigned m b ofs v.
 Axiom store_int8_zero_ext:
   forall m b ofs n,
-  store Mint8unsigned m b ofs (Vint (Int.zero_ext 8 n)) =
-  store Mint8unsigned m b ofs (Vint n).
-Axiom store_int8_sign_ext:
-  forall m b ofs n,
-  store Mint8signed m b ofs (Vint (Int.sign_ext 8 n)) =
-  store Mint8signed m b ofs (Vint n).
+  store Mint8 m b ofs (Vint (Int.zero_ext 8 n)) =
+  store Mint8 m b ofs (Vint n).
 Axiom store_int16_zero_ext:
   forall m b ofs n,
-  store Mint16unsigned m b ofs (Vint (Int.zero_ext 16 n)) =
-  store Mint16unsigned m b ofs (Vint n).
-Axiom store_int16_sign_ext:
-  forall m b ofs n,
-  store Mint16signed m b ofs (Vint (Int.sign_ext 16 n)) =
-  store Mint16signed m b ofs (Vint n).
+  store Mint16 m b ofs (Vint (Int.zero_ext 16 n)) =
+  store Mint16 m b ofs (Vint n).
 
 (** ** Properties of [storebytes]. *)
 

@@ -38,7 +38,9 @@ Require Import Floats.
 Require Import Values.
 Require Export Memdata.
 Require Export Memtype.
-
+(* 1. eliminate signed
+2. nat -> ...
+*)
 (* To avoid useless definitions of inductors in extracted code. *)
 Local Unset Elimination Schemes.
 Local Unset Case Analysis Schemes.
@@ -306,7 +308,7 @@ Qed.
 
 Theorem valid_pointer_valid_access:
   forall m b ofs,
-  valid_pointer m b ofs = true <-> valid_access m Mint8unsigned b ofs Nonempty.
+  valid_pointer m b ofs = true <-> valid_access m Mint8 b ofs Nonempty.
 Proof.
   intros. rewrite valid_pointer_nonempty_perm. 
   split; intros.
@@ -689,44 +691,14 @@ Theorem load_cast:
   forall m chunk b ofs v,
   load chunk m b ofs = Some v ->
   match chunk with
-  | Mint8signed => v = Val.sign_ext 8 v
-  | Mint8unsigned => v = Val.zero_ext 8 v
-  | Mint16signed => v = Val.sign_ext 16 v
-  | Mint16unsigned => v = Val.zero_ext 16 v
+  | Mint8 => v = Val.zero_ext 8 v
+  | Mint16 => v = Val.zero_ext 16 v
   | _ => True
   end.
 Proof.
   intros. exploit load_result; eauto.
   set (l := getN (size_chunk_nat chunk) ofs m.(mem_contents)#b).
   intros. subst v. apply decode_val_cast. 
-Qed.
-
-Theorem load_int8_signed_unsigned:
-  forall m b ofs,
-  load Mint8signed m b ofs = option_map (Val.sign_ext 8) (load Mint8unsigned m b ofs).
-Proof.
-  intros. unfold load.
-  change (size_chunk_nat Mint8signed) with (size_chunk_nat Mint8unsigned).
-  set (cl := getN (size_chunk_nat Mint8unsigned) ofs m.(mem_contents)#b).
-  destruct (valid_access_dec m Mint8signed b ofs Readable).
-  rewrite pred_dec_true; auto. unfold decode_val. 
-  destruct (proj_bytes cl); auto.
-  simpl. decEq. decEq. rewrite Int.sign_ext_zero_ext. auto. compute; auto.
-  rewrite pred_dec_false; auto.
-Qed.
-
-Theorem load_int16_signed_unsigned:
-  forall m b ofs,
-  load Mint16signed m b ofs = option_map (Val.sign_ext 16) (load Mint16unsigned m b ofs).
-Proof.
-  intros. unfold load.
-  change (size_chunk_nat Mint16signed) with (size_chunk_nat Mint16unsigned).
-  set (cl := getN (size_chunk_nat Mint16unsigned) ofs m.(mem_contents)#b).
-  destruct (valid_access_dec m Mint16signed b ofs Readable).
-  rewrite pred_dec_true; auto. unfold decode_val. 
-  destruct (proj_bytes cl); auto.
-  simpl. decEq. decEq. rewrite Int.sign_ext_zero_ext. auto. compute; auto.
-  rewrite pred_dec_false; auto.
 Qed.
 
 (** ** Properties related to [loadbytes] *)
@@ -1317,39 +1289,17 @@ Proof.
   elim n. apply valid_access_compat with chunk2; auto. omega.
 Qed.
 
-Theorem store_signed_unsigned_8:
-  forall m b ofs v,
-  store Mint8signed m b ofs v = store Mint8unsigned m b ofs v.
-Proof. intros. apply store_similar_chunks. apply encode_val_int8_signed_unsigned. auto. Qed.
-
-Theorem store_signed_unsigned_16:
-  forall m b ofs v,
-  store Mint16signed m b ofs v = store Mint16unsigned m b ofs v.
-Proof. intros. apply store_similar_chunks. apply encode_val_int16_signed_unsigned. auto. Qed.
-
 Theorem store_int8_zero_ext:
   forall m b ofs n,
-  store Mint8unsigned m b ofs (Vint (Int.zero_ext 8 n)) =
-  store Mint8unsigned m b ofs (Vint n).
+  store Mint8 m b ofs (Vint (Int.zero_ext 8 n)) =
+  store Mint8 m b ofs (Vint n).
 Proof. intros. apply store_similar_chunks. apply encode_val_int8_zero_ext. auto. Qed.
-
-Theorem store_int8_sign_ext:
-  forall m b ofs n,
-  store Mint8signed m b ofs (Vint (Int.sign_ext 8 n)) =
-  store Mint8signed m b ofs (Vint n).
-Proof. intros. apply store_similar_chunks. apply encode_val_int8_sign_ext. auto. Qed.
 
 Theorem store_int16_zero_ext:
   forall m b ofs n,
-  store Mint16unsigned m b ofs (Vint (Int.zero_ext 16 n)) =
-  store Mint16unsigned m b ofs (Vint n).
+  store Mint16 m b ofs (Vint (Int.zero_ext 16 n)) =
+  store Mint16 m b ofs (Vint n).
 Proof. intros. apply store_similar_chunks. apply encode_val_int16_zero_ext. auto. Qed.
-
-Theorem store_int16_sign_ext:
-  forall m b ofs n,
-  store Mint16signed m b ofs (Vint (Int.sign_ext 16 n)) =
-  store Mint16signed m b ofs (Vint n).
-Proof. intros. apply store_similar_chunks. apply encode_val_int16_sign_ext. auto. Qed.
 
 (*
 Theorem store_float64al32:
@@ -3361,8 +3311,8 @@ Proof.
   assert (Q: Zabs al <= Zabs sz). apply Zdivide_bounds; auto. omega.
   rewrite Zabs_eq in Q; try omega. rewrite Zabs_eq in Q; try omega.
   assert (R: exists chunk, al = align_chunk chunk /\ al = size_chunk chunk).
-    destruct H0. subst; exists Mint8unsigned; auto.
-    destruct H0. subst; exists Mint16unsigned; auto.
+    destruct H0. subst; exists Mint8; auto.
+    destruct H0. subst; exists Mint16; auto.
     destruct H0. subst; exists Mint32; auto.
     subst; exists Mint64; auto.
   destruct R as [chunk [A B]].
