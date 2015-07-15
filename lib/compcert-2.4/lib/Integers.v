@@ -3840,6 +3840,20 @@ Proof.
   exists (two_p (32-5)); reflexivity. 
 Qed.
 
+Module Wordsize_1.
+  Definition wordsize := 1%nat.
+  Remark wordsize_not_zero: wordsize <> 0%nat.
+  Proof. unfold wordsize; congruence. Qed.
+End Wordsize_1.
+
+Strategy opaque [Wordsize_1.wordsize].
+
+Module Int1 := Make(Wordsize_1).
+
+Strategy 0 [Wordsize_1.wordsize].
+
+Notation int1 := Int1.int.
+
 Module Wordsize_8.
   Definition wordsize := 8%nat.
   Remark wordsize_not_zero: wordsize <> 0%nat.
@@ -3853,6 +3867,20 @@ Module Byte := Make(Wordsize_8).
 Strategy 0 [Wordsize_8.wordsize].
 
 Notation byte := Byte.int.
+
+Module Wordsize_16.
+  Definition wordsize := 16%nat.
+  Remark wordsize_not_zero: wordsize <> 0%nat.
+  Proof. unfold wordsize; congruence. Qed.
+End Wordsize_16.
+
+Strategy opaque [Wordsize_16.wordsize].
+
+Module Int16 := Make(Wordsize_16).
+
+Strategy 0 [Wordsize_16.wordsize].
+
+Notation int16 := Int16.int.
 
 Module Wordsize_64.
   Definition wordsize := 64%nat.
