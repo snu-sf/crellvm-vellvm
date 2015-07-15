@@ -3,24 +3,6 @@
 
 ./lib/cpdtlib/CpdtTactics.v
 
-./lib/compcert-1.9/Iteration.v
-./lib/compcert-1.9/AST.v
-./lib/compcert-1.9/Maps.v
-./lib/compcert-1.9/Coqlib.v
-./lib/compcert-1.9/Intv.v
-./lib/compcert-1.9/Floats.v
-./lib/compcert-1.9/Axioms.v
-./lib/compcert-1.9/Memtype.v
-./lib/compcert-1.9/Values.v
-./lib/compcert-1.9/Ordered.v
-./lib/compcert-1.9/alist.v
-./lib/compcert-1.9/Errors.v
-./lib/compcert-1.9/Lattice.v
-./lib/compcert-1.9/Kildall.v
-./lib/compcert-1.9/Memdata.v
-./lib/compcert-1.9/Memory.v
-./lib/compcert-1.9/Integers.v
-
 ./lib/GraphBasics/Sets.v
 ./lib/GraphBasics/Dipaths.v
 ./lib/GraphBasics/Degrees.v
@@ -47,12 +29,14 @@
 ./src/Vellvm/ott/ott_list.v
 
 ./src/Vellvm/analysis.v
+./src/Vellvm/datatype_base.v
 ./src/Vellvm/dopsem.v
 ./src/Vellvm/events.v
 ./src/Vellvm/external_intrinsics.v
 ./src/Vellvm/genericvalues_inject.v
 ./src/Vellvm/genericvalues_props.v
 ./src/Vellvm/genericvalues.v
+./src/Vellvm/infrastructure.v
 ./src/Vellvm/infrastructure_props.v
 ./src/Vellvm/memory_sim.v
 ./src/Vellvm/ndopsem.v
@@ -61,8 +45,13 @@
 ./src/Vellvm/opsem_props.v
 ./src/Vellvm/opsem.v
 ./src/Vellvm/opsem_wf.v
+./src/Vellvm/ott_list_core.v
+./src/Vellvm/ott_list_eq_dec.v
 ./src/Vellvm/static.v
+./src/Vellvm/syntax.v
+./src/Vellvm/syntax_base.v
 ./src/Vellvm/tactics.v
+./src/Vellvm/targetdata.v
 ./src/Vellvm/targetdata_props.v
 ./src/Vellvm/trace.v
 ./src/Vellvm/typing_rules.v
@@ -89,6 +78,7 @@
 ./src/Vellvm/Dominators/dom_list_tree_wf.v
 ./src/Vellvm/Dominators/dom_list_df.v
 
+./src/Vellvm/extraction_core.v
+./src/Vellvm/extraction_dom.v
 
-./src/Extraction/extraction_core.v
-./src/Extraction/extraction_dom.v
+

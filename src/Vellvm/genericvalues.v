@@ -26,7 +26,7 @@ Import LLVMtd.
 (******************************************************************************)
 (* We first define a generic value that is a list of memory values with memory 
    chunks. *)
-Definition moffset := Int.int 31.
+(* Definition moffset := Int.int 31. Not used anywhere *)
 Definition mem := Mem.mem.
 Definition GenericValue := list (val*memory_chunk).
 Definition GVMap := list (id*GenericValue).
@@ -34,7 +34,7 @@ Definition GVMap := list (id*GenericValue).
 Definition mblock := Values.block.
 Definition mptr := GenericValue.
 Definition null : GenericValue :=
-  (Vptr Mem.nullptr (Int.repr 31 0), Mint 31)::nil.
+  (Vptr Mem.nullptr (Int.repr 0), Mint32)::nil. (* TODO: is Mint32 okay? *)
 
 (******************************************************************************)
 (* Predicate of generic values. *)
@@ -66,7 +66,7 @@ end.
 Fixpoint eq_gv (gv1 gv2:GenericValue) : bool :=
 match gv1, gv2 with
 | nil, nil => true
-| (v1,c1)::gv1', (v2,c2)::gv2' => Val.eq v1 v2 &&
+| (v1,c1)::gv1', (v2,c2)::gv2' => Val.eqb v1 v2 &&
                                   memory_chunk_eq c1 c2 &&
                                   eq_gv gv1' gv2'
 | _, _ => false
@@ -74,7 +74,7 @@ end.
 
 (* a list of undefined memory chunks with size n. *)
 Definition uninitMCs (n:nat) : list memory_chunk :=
-  Coqlib.list_repeat n (Mint 7).
+  Coqlib.list_repeat n Mint8unsigned.
 
 (* a list of repeated memory chunks. *)
 Fixpoint repeatMC (mcs:list memory_chunk) (n:nat) : list memory_chunk :=
@@ -110,11 +110,21 @@ match lt with
   end
 end.
 
+Print typ.
+
+(* FIXME: not sure about correctness. not proper size int -> None *)
 Fixpoint flatten_typ_aux (TD:TargetData)
   (acc:list (id*option (list memory_chunk))) (t:typ)
   : option (list memory_chunk) :=
 match t with
-| typ_int sz => Some (Mint (Size.to_nat sz - 1) :: nil)
+| typ_int sz =>
+  match Size.to_nat sz with
+  | 8 => Some (Mint8unsigned::nil)
+  | 16 => Some (Mint16unsigned::nil)
+  | 32 => Some (Mint32::nil)
+  | 64 => Some (Mint64::nil)
+  | _ => None
+  end
 | typ_floatpoint fp =>
   match fp with
   | fp_float => Some (Mfloat32 :: nil)
@@ -145,7 +155,7 @@ match t with
   | Some gv0 => Some gv0
   | None => None
   end
-| typ_pointer t' => Some (Mint 31::nil)
+| typ_pointer t' => Some (Mint32::nil)
 | typ_function _ _ _ => None
 | typ_namedt nid => 
   match lookupAL _ acc nid with
@@ -217,7 +227,7 @@ end.
 
 (* a list of undefined memory values with size n. *)
 Definition uninits (n:nat) : GenericValue :=
-   Coqlib.list_repeat n (Vundef, Mint 7).
+   Coqlib.list_repeat n (Vundef, Mint8unsigned).
 
 (* Generate an undefined generic values in terms of memory chunks. *)
 Definition mc2undefs (mc:list memory_chunk) : GenericValue :=
@@ -238,12 +248,10 @@ match gv with
 | _ => Some Vundef
 end.
 
-Definition GV2int (TD:TargetData) (bsz:sz) (gv:GenericValue) : option Z :=
+Definition GV2int (TD:TargetData) (gv:GenericValue) : option Z :=
 match gv with
-| (Vint wz i,c)::nil =>
-  if eq_nat_dec (wz+1) (Size.to_nat bsz)
-  then Some (Int.signed wz i)
-  else None
+| (Vint i,c)::nil =>
+  Some (Int.signed i)
 | _ => None
 end.
 
@@ -255,11 +263,11 @@ end.
 Definition val2GV (TD:TargetData) (v:val) (c:memory_chunk) : GenericValue :=
 (v,c)::nil.
 Definition ptr2GV (TD:TargetData) (ptr:val) : GenericValue :=
-val2GV TD ptr (Mint (Size.mul Size.Eight (getPointerSize TD)-1)).
+val2GV TD ptr Mint32.
 Definition blk2GV (TD:TargetData) (b:mblock) : GenericValue :=
-ptr2GV TD (Vptr b (Int.repr 31 0)).
+ptr2GV TD (Vptr b (Int.repr 0)).
 Definition isGVZero (TD:TargetData) (gv:GenericValue) : bool :=
-match (GV2int TD Size.One gv) with
+match (GV2int TD gv) with
 | Some z => if Coqlib.zeq z 0 then true else false
 | _ => false
 end.
@@ -272,7 +280,7 @@ match ma with
   | nil => None
   | _ =>
     match (mgetoffset TD (typ_array 0%nat t) idxs) with
-    | Some (offset, _) => Some (Vptr b (Int.add 31 ofs (Int.repr 31 offset)))
+    | Some (offset, _) => Some (Vptr b (Int.add ofs (Int.repr offset)))
     | _ => None
     end
   end
@@ -351,7 +359,7 @@ Fixpoint GVs2Nats (TD:TargetData) (lgv:list GenericValue) : option (list Z):=
 match lgv with
 | nil => Some nil
 | gv::lgv' =>
-    match (GV2int TD Size.ThirtyTwo gv) with
+    match (GV2int TD gv) with
     | Some z =>
         match (GVs2Nats TD lgv') with
         | Some ns => Some (z::ns)

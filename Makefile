@@ -1,9 +1,11 @@
 OTT ?= ott
 
-COQLIBS=-I src/Vellvm -I src/Vellvm/ott -I src/Vellvm/Dominators -I src/Extraction \
-	-I lib/GraphBasics -I lib/compcert-1.9 -I lib/cpdtlib -I lib/metalib-20090714 \
+COQLIBS=-I src/Vellvm -I src/Vellvm/ott -I src/Vellvm/Dominators \
+	-I lib/GraphBasics -I lib/cpdtlib -I lib/metalib-20090714 \
 	-R lib/Coq-Equations-8.4/theories Equations -I lib/Coq-Equations-8.4/src \
- -I src/Syntax/compcert -I src/Syntax
+	-I lib/compcert-2.4/backend -I lib/compcert-2.4/common -I lib/compcert-2.4/flocq/Appli/ \
+	-I lib/compcert-2.4/flocq/Calc -I lib/compcert-2.4/flocq/Core -I lib/compcert-2.4/flocq/Prop \
+	-I lib/compcert-2.4/ia32 -I lib/compcert-2.4/lib -I lib/compcert-2.4/old
 MAKECOQ=make -f Makefile.coq COQLIBS="$(COQLIBS)"
 
 all: theories
@@ -27,6 +29,7 @@ Makefile.coq: Make
 clean:
 	rm -f src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v 
 	make -f Makefile.coq clean
+	rm -f Makefile.coq
 
 src/Vellvm/syntax_base.v: src/Vellvm/syntax_base.ott
 	cd src/Vellvm && \
