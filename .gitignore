@@ -10,6 +10,7 @@
 /src/Vellvm/typing_rules.v
 
 /lib/*
+!/lib/compcert-2.4/*
 
 Makefile.coq
 .coqrc

@@ -1,0 +1,9 @@
+coq_makefile \
+*.v \
+-arg -impredicative-set \
+-I ../Appli \
+-I ../Calc \
+-I ../Core \
+-I ./ \
+-I ../ \
+> Makefile

@@ -11,6 +11,8 @@ Require Import targetdata.
 Require Export vellvm_tactics.
 Require Export util.
 
+Require Import Coqlib_old.
+
 Import LLVMsyntax.
 Import LLVMinfra.
 

@@ -1,0 +1,11 @@
+coq_makefile \
+*.v \
+-arg -impredicative-set \
+-I ../common/ \
+-I ../flocq/Prop \
+-I ../flocq/Appli \
+-I ../flocq/Calc \
+-I ../flocq/Core \
+-I ../flocq/ \
+-I ../lib/ \
+> Makefile
