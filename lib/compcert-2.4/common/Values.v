@@ -33,44 +33,20 @@ Definition eq_block := peq.
   value of an uninitialized variable.
 *)
 
-Definition vint (sz:nat): Type :=
-  match sz with
-  | 1%nat => int1
-  | 8%nat => byte
-  | 16%nat => int16
-  | 32%nat => int
-  | 64%nat => int64
-  | _ => Empty_set
-  end.
-
 Inductive val: Type :=
   | Vundef: val
-  | Vint1: vint 1 -> val
-  | Vint8: vint 8 -> val
-  | Vint16: vint 16 -> val
-  | Vint32: vint 32 -> val
-  | Vint64: vint 64 -> val
-  | Vinterr: Empty_set -> val
+  | Vint: int -> val
+  | Vlong: int64 -> val
   | Vfloat: float -> val
   | Vsingle: float32 -> val
   | Vptr: block -> int -> val.
 
-Definition Vint (sz:nat) : vint sz -> val :=
-  match sz with
-  | 1%nat => Vint1
-  | 8%nat => Vint8
-  | 16%nat => Vint16
-  | 32%nat => Vint32
-  | 64%nat => Vint64
-  | _ => Vinterr
-  end.
+Definition Vzero: val := Vint Int.zero.
+Definition Vone: val := Vint Int.one.
+Definition Vmone: val := Vint Int.mone.
 
-Definition Vzero: val := Vint 32 Int.zero.
-Definition Vone: val := Vint 32 Int.one.
-Definition Vmone: val := Vint 32 Int.mone.
-
-Definition Vtrue: val := Vint 1 Int1.one.
-Definition Vfalse: val := Vint 1 Int1.zero.
+Definition Vtrue: val := Vint Int.one.
+Definition Vfalse: val := Vint Int.zero.
 
 (** * Operations over values *)
 
@@ -82,13 +58,9 @@ Module Val.
 
 Definition eq (x y: val): {x=y} + {x<>y}.
 Proof.
-  decide equality.
-  apply Int1.eq_dec.
-  apply Byte.eq_dec.
-  apply Int16.eq_dec.
+  decide equality. 
   apply Int.eq_dec.
   apply Int64.eq_dec.
-  inversion e.
   apply Float.eq_dec.
   apply Float32.eq_dec.
   apply Int.eq_dec.
@@ -99,15 +71,12 @@ Global Opaque eq.
 Definition has_type (v: val) (t: typ) : Prop :=
   match v, t with
   | Vundef, _ => True
-  | Vint1  _, Tint => True
-  | Vint8 _, Tint => True
-  | Vint16 _, Tint => True
-  | Vint32 _, Tint => True
-  | Vint64 _, Tint => True
+  | Vint _, Tint => True
+  | Vlong _, Tlong => True
   | Vfloat _, Tfloat => True
   | Vsingle _, Tsingle => True
   | Vptr _ _, Tint => True
-  | (Vint1 _ | Vint8 _ | Vint16 _ | Vint32 _ | Vptr _ _ | Vsingle _), Tany32 => True
+  | (Vint _ | Vptr _ _ | Vsingle _), Tany32 => True
   | _, Tany64 => True
   | _, _ => False
   end.
@@ -125,8 +94,6 @@ Definition has_opttype (v: val) (ot: option typ) : Prop :=
   | Some t => has_type v t
   end.
 
-(*
- * TODO: re-define typ and subtype (Tlong should be removed)
 Lemma has_subtype:
   forall ty1 ty2 v,
   subtype ty1 ty2 = true -> has_type v ty1 -> has_type v ty2.
@@ -143,23 +110,14 @@ Proof.
   red; auto.
   simpl in *. InvBooleans. destruct H0. split; auto. eapply has_subtype; eauto.
 Qed.
-*)
 
 (** Truth values.  Pointers and non-zero integers are treated as [True].
   The integer 0 (also used to represent the null pointer) is [False].
   [Vundef] and floats are neither true nor false. *)
 
 Inductive bool_of_val: val -> bool -> Prop :=
-  | bool_of_val_int1:
-      forall n, bool_of_val (Vint 1 n) (negb (Int1.eq n Int1.zero))
-  | bool_of_val_int8:
-      forall n, bool_of_val (Vint 8 n) (negb (Byte.eq n Byte.zero))
-  | bool_of_val_int16:
-      forall n, bool_of_val (Vint 16 n) (negb (Int16.eq n Int16.zero))
-  | bool_of_val_int32:
-      forall n, bool_of_val (Vint 32 n) (negb (Int.eq n Int.zero))
-  | bool_of_val_int64:
-      forall n, bool_of_val (Vint 64 n) (negb (Int64.eq n Int64.zero))
+  | bool_of_val_int:
+      forall n, bool_of_val (Vint n) (negb (Int.eq n Int.zero))
   | bool_of_val_ptr:
       forall b ofs, bool_of_val (Vptr b ofs) true.
 
@@ -167,10 +125,7 @@ Inductive bool_of_val: val -> bool -> Prop :=
 
 Definition neg (v: val) : val :=
   match v with
-  | Vint8 n => Vint 8 (Byte.neg n)
-  | Vint16 n => Vint 16 (Int16.neg n)
-  | Vint32 n => Vint 32 (Int.neg n)
-  | Vint64 n => Vint 64 (Int64.neg n)
+  | Vint n => Vint (Int.neg n)
   | _ => Vundef
   end.
 
@@ -203,68 +158,61 @@ Definition maketotal (ov: option val) : val :=
 
 Definition intoffloat (v: val) : option val :=
   match v with
-  | Vfloat f => option_map Vint32 (Float.to_int f)
+  | Vfloat f => option_map Vint (Float.to_int f)
   | _ => None
   end.
 
 Definition intuoffloat (v: val) : option val :=
   match v with
-  | Vfloat f => option_map Vint32 (Float.to_intu f)
+  | Vfloat f => option_map Vint (Float.to_intu f)
   | _ => None
   end.
 
 Definition floatofint (v: val) : option val :=
   match v with
-  | Vint32 n => Some (Vfloat (Float.of_int n))
+  | Vint n => Some (Vfloat (Float.of_int n))
   | _ => None
   end.
 
 Definition floatofintu (v: val) : option val :=
   match v with
-  | Vint32 n => Some (Vfloat (Float.of_intu n))
+  | Vint n => Some (Vfloat (Float.of_intu n))
   | _ => None
   end.
 
 Definition intofsingle (v: val) : option val :=
   match v with
-  | Vsingle f => option_map Vint32 (Float32.to_int f)
+  | Vsingle f => option_map Vint (Float32.to_int f)
   | _ => None
   end.
 
 Definition intuofsingle (v: val) : option val :=
   match v with
-  | Vsingle f => option_map Vint32 (Float32.to_intu f)
+  | Vsingle f => option_map Vint (Float32.to_intu f)
   | _ => None
   end.
 
 Definition singleofint (v: val) : option val :=
   match v with
-  | Vint32 n => Some (Vsingle (Float32.of_int n))
+  | Vint n => Some (Vsingle (Float32.of_int n))
   | _ => None
   end.
 
 Definition singleofintu (v: val) : option val :=
   match v with
-  | Vint32 n => Some (Vsingle (Float32.of_intu n))
+  | Vint n => Some (Vsingle (Float32.of_intu n))
   | _ => None
   end.
 
 Definition negint (v: val) : val :=
   match v with
-  | Vint8 n => Vint 8 (Byte.neg n)
-  | Vint16 n => Vint 16 (Int16.neg n)
-  | Vint32 n => Vint 32 (Int.neg n)
-  | Vint64 n => Vint 64 (Int64.neg n)
+  | Vint n => Vint (Int.neg n)
   | _ => Vundef
   end.
 
 Definition notint (v: val) : val :=
   match v with
-  | Vint1 n => Vint 1 (Int1.not n)
-  | Vint8 n => Vint 8 (Byte.not n)
-  | Vint16 n => Vint 16 (Int16.not n)
-  | Vint32 n => Vint 32 (Int.not n)
-  | Vint64 n => Vint 64 (Int64.not n)
+  | Vint n => Vint (Int.not n)
   | _ => Vundef
   end.
 
@@ -272,72 +220,29 @@ Definition of_bool (b: bool): val := if b then Vtrue else Vfalse.
 
 Definition boolval (v: val) : val :=
   match v with
-  | Vint1 n => of_bool (negb (Int1.eq n Int1.zero))
-  | Vint8 n => of_bool (negb (Byte.eq n Byte.zero))
-  | Vint16 n => of_bool (negb (Int16.eq n Int16.zero))
-  | Vint32 n => of_bool (negb (Int.eq n Int.zero))
-  | Vint64 n => of_bool (negb (Int64.eq n Int64.zero))
+  | Vint n => of_bool (negb (Int.eq n Int.zero))
   | Vptr b ofs => Vtrue
   | _ => Vundef
   end.
 
 Definition notbool (v: val) : val :=
   match v with
-  | Vint1 n => of_bool (Int1.eq n Int1.zero)
-  | Vint8 n => of_bool (Byte.eq n Byte.zero)
-  | Vint16 n => of_bool (Int16.eq n Int16.zero)
-  | Vint32 n => of_bool (Int.eq n Int.zero)
-  | Vint64 n => of_bool (Int64.eq n Int64.zero)
+  | Vint n => of_bool (Int.eq n Int.zero)
   | Vptr b ofs => Vfalse
   | _ => Vundef
   end.
 
 Definition zero_ext (nbits: Z) (v: val) : val :=
   match v with
-  | Vint8 n => Vint 8 (Byte.zero_ext nbits n)
-  | Vint16 n => Vint 16 (Int16.zero_ext nbits n)
-  | Vint32 n => Vint 32 (Int.zero_ext nbits n)
-  | Vint64 n => Vint 64 (Int64.zero_ext nbits n)
+  | Vint n => Vint(Int.zero_ext nbits n)
   | _ => Vundef
   end.
 
-(* removed in vellvm
 Definition sign_ext (nbits: Z) (v: val) : val :=
   match v with
   | Vint n => Vint(Int.sign_ext nbits n)
   | _ => Vundef
-  end.*)
-
-(* If v is wz m-bit of int,
-   zero_ext' v first converts v to v' that is of nbits bits,
-   then zeros the wz-to-(nbits-1) bits *)
-(* TODO: included in vellvm. definition will be verbose without
-   dependent type. ??? should be changed to nbits integer module.
-Definition zero_ext' (nbits: nat) (v: val) : val :=
-  match v with
-  | Vint1 n =>
-      Vint nbits
-        (???.zero_ext 1
-          (???.repr (Int1.unsigned n)))
-  | Vint8 n =>
-      Vint 8 nbits
-        (???.zero_ext nbits 8
-          (???.repr (Byte.unsigned n)))
-  | Vint16 n =>
-      Vint 16 nbits
-        (???.zero_ext nbits 16
-          (???.repr (Int16.unsigned n)))
-  | Vint32 n =>
-      Vint 32 nbits
-        (???.zero_ext nbits 32
-          (???.repr (Int.unsigned n)))
-  | Vint64 n =>
-      Vint 64 nbits
-        (???.zero_ext nbits 64
-          (???.repr (Int64.unsigned n)))
-  | _ => Vundef
   end.
-*)
 
 Definition singleoffloat (v: val) : val :=
   match v with
@@ -351,323 +256,167 @@ Definition floatofsingle (v: val) : val :=
   | _ => Vundef
   end.
 
-(* TODO: need to check.
-   only 32bit int can be add/sub with pointer. right? *)
 Definition add (v1 v2: val): val :=
   match v1, v2 with
-  | Vint8 n1, Vint8 n2 => Vint 8 (Byte.add n1 n2)
-  | Vint16 n1, Vint16 n2 => Vint 16 (Int16.add n1 n2)
-  | Vint32 n1, Vint32 n2 => Vint 32 (Int.add n1 n2)
-  | Vint64 n1, Vint64 n2 => Vint 64 (Int64.add n1 n2)
-  | Vptr b1 ofs1, Vint32 n2 => Vptr b1 (Int.add ofs1 n2)
-  | Vint32 n1, Vptr b2 ofs2 => Vptr b2 (Int.add ofs2 n1)
+  | Vint n1, Vint n2 => Vint(Int.add n1 n2)
+  | Vptr b1 ofs1, Vint n2 => Vptr b1 (Int.add ofs1 n2)
+  | Vint n1, Vptr b2 ofs2 => Vptr b2 (Int.add ofs2 n1)
   | _, _ => Vundef
   end.
 
 Definition sub (v1 v2: val): val :=
   match v1, v2 with
-  | Vint8 n1, Vint8 n2 => Vint 8 (Byte.sub n1 n2)
-  | Vint16 n1, Vint16 n2 => Vint 16 (Int16.sub n1 n2)
-  | Vint32 n1, Vint32 n2 => Vint 32 (Int.sub n1 n2)
-  | Vint64 n1, Vint64 n2 => Vint 64 (Int64.sub n1 n2)
-  | Vptr b1 ofs1, Vint32 n2 => Vptr b1 (Int.sub ofs1 n2)
+  | Vint n1, Vint n2 => Vint(Int.sub n1 n2)
+  | Vptr b1 ofs1, Vint n2 => Vptr b1 (Int.sub ofs1 n2)
   | Vptr b1 ofs1, Vptr b2 ofs2 =>
-      if eq_block b1 b2 then Vint 32 (Int.sub ofs1 ofs2) else Vundef
+      if eq_block b1 b2 then Vint(Int.sub ofs1 ofs2) else Vundef
   | _, _ => Vundef
   end.
 
 Definition mul (v1 v2: val): val :=
   match v1, v2 with
-  | Vint8 n1, Vint8 n2 => Vint 8 (Byte.mul n1 n2)
-  | Vint16 n1, Vint16 n2 => Vint 16 (Int16.mul n1 n2)
-  | Vint32 n1, Vint32 n2 => Vint 32 (Int.mul n1 n2)
-  | Vint64 n1, Vint64 n2 => Vint 64 (Int64.mul n1 n2)
+  | Vint n1, Vint n2 => Vint(Int.mul n1 n2)
   | _, _ => Vundef
   end.
 
 Definition mulhs (v1 v2: val): val :=
   match v1, v2 with
-  | Vint8 n1, Vint8 n2 => Vint 8 (Byte.mulhs n1 n2)
-  | Vint16 n1, Vint16 n2 => Vint 16 (Int16.mulhs n1 n2)
-  | Vint32 n1, Vint32 n2 => Vint 32 (Int.mulhs n1 n2)
-  | Vint64 n1, Vint64 n2 => Vint 64 (Int64.mulhs n1 n2)
+  | Vint n1, Vint n2 => Vint(Int.mulhs n1 n2)
   | _, _ => Vundef
   end.
 
 Definition mulhu (v1 v2: val): val :=
   match v1, v2 with
-  | Vint8 n1, Vint8 n2 => Vint 8 (Byte.mulhu n1 n2)
-  | Vint16 n1, Vint16 n2 => Vint 16 (Int16.mulhu n1 n2)
-  | Vint32 n1, Vint32 n2 => Vint 32 (Int.mulhu n1 n2)
-  | Vint64 n1, Vint64 n2 => Vint 64 (Int64.mulhu n1 n2)
+  | Vint n1, Vint n2 => Vint(Int.mulhu n1 n2)
   | _, _ => Vundef
   end.
 
 Definition divs (v1 v2: val): option val :=
   match v1, v2 with
-  | Vint8 n1, Vint8 n2 =>
-      if Byte.eq n2 Byte.zero
-      || Byte.eq n1 (Byte.repr Byte.min_signed) && Byte.eq n2 Byte.mone
-      then None
-      else Some(Vint 8 (Byte.divs n1 n2))
-  | Vint16 n1, Vint16 n2 =>
-      if Int16.eq n2 Int16.zero
-      || Int16.eq n1 (Int16.repr Int16.min_signed) && Int16.eq n2 Int16.mone
-      then None
-      else Some(Vint 16 (Int16.divs n1 n2))
-  | Vint32 n1, Vint32 n2 =>
+  | Vint n1, Vint n2 =>
       if Int.eq n2 Int.zero
       || Int.eq n1 (Int.repr Int.min_signed) && Int.eq n2 Int.mone
       then None
-      else Some(Vint 32 (Int.divs n1 n2))
-  | Vint64 n1, Vint64 n2 =>
-      if Int64.eq n2 Int64.zero
-      || Int64.eq n1 (Int64.repr Int64.min_signed) && Int64.eq n2 Int64.mone
-      then None
-      else Some(Vint 64 (Int64.divs n1 n2))
+      else Some(Vint(Int.divs n1 n2))
   | _, _ => None
   end.
 
 Definition mods (v1 v2: val): option val :=
   match v1, v2 with
-  | Vint8 n1, Vint8 n2 =>
-      if Byte.eq n2 Byte.zero
-      || Byte.eq n1 (Byte.repr Byte.min_signed) && Byte.eq n2 Byte.mone
-      then None
-      else Some(Vint 8 (Byte.mods n1 n2))
-  | Vint16 n1, Vint16 n2 =>
-      if Int16.eq n2 Int16.zero
-      || Int16.eq n1 (Int16.repr Int16.min_signed) && Int16.eq n2 Int16.mone
-      then None
-      else Some(Vint 16 (Int16.mods n1 n2))
-  | Vint32 n1, Vint32 n2 =>
+  | Vint n1, Vint n2 =>
       if Int.eq n2 Int.zero
       || Int.eq n1 (Int.repr Int.min_signed) && Int.eq n2 Int.mone
       then None
-      else Some(Vint 32 (Int.mods n1 n2))
-  | Vint64 n1, Vint64 n2 =>
-      if Int64.eq n2 Int64.zero
-      || Int64.eq n1 (Int64.repr Int64.min_signed) && Int64.eq n2 Int64.mone
-      then None
-      else Some(Vint 64 (Int64.mods n1 n2))
+      else Some(Vint(Int.mods n1 n2))
   | _, _ => None
   end.
 
 Definition divu (v1 v2: val): option val :=
   match v1, v2 with
-  | Vint8 n1, Vint8 n2 =>
-      if Byte.eq n2 Byte.zero then None else Some(Vint 8 (Byte.divu n1 n2))
-  | Vint16 n1, Vint16 n2 =>
-      if Int16.eq n2 Int16.zero then None else Some(Vint 16 (Int16.divu n1 n2))
-  | Vint32 n1, Vint32 n2 =>
-      if Int.eq n2 Int.zero then None else Some(Vint 32 (Int.divu n1 n2))
-  | Vint64 n1, Vint64 n2 =>
-      if Int64.eq n2 Int64.zero then None else Some(Vint 64 (Int64.divu n1 n2))
+  | Vint n1, Vint n2 =>
+      if Int.eq n2 Int.zero then None else Some(Vint(Int.divu n1 n2))
   | _, _ => None
   end.
 
 Definition modu (v1 v2: val): option val :=
   match v1, v2 with
-  | Vint8 n1, Vint8 n2 =>
-      if Byte.eq n2 Byte.zero then None else Some(Vint 8 (Byte.modu n1 n2))
-  | Vint16 n1, Vint16 n2 =>
-      if Int16.eq n2 Int16.zero then None else Some(Vint 16 (Int16.modu n1 n2))
-  | Vint32 n1, Vint32 n2 =>
-      if Int.eq n2 Int.zero then None else Some(Vint 32 (Int.modu n1 n2))
-  | Vint64 n1, Vint64 n2 =>
-      if Int64.eq n2 Int64.zero then None else Some(Vint 64 (Int64.modu n1 n2))
+  | Vint n1, Vint n2 =>
+      if Int.eq n2 Int.zero then None else Some(Vint(Int.modu n1 n2))
   | _, _ => None
   end.
 
 Definition add_carry (v1 v2 cin: val): val :=
   match v1, v2, cin with
-  | Vint8 n1, Vint8 n2, Vint8 c => Vint 8 (Byte.add_carry n1 n2 c)
-  | Vint16 n1, Vint16 n2, Vint16 c => Vint 16 (Int16.add_carry n1 n2 c)
-  | Vint32 n1, Vint32 n2, Vint32 c => Vint 32 (Int.add_carry n1 n2 c)
-  | Vint64 n1, Vint64 n2, Vint64 c => Vint 64 (Int64.add_carry n1 n2 c)
+  | Vint n1, Vint n2, Vint c => Vint(Int.add_carry n1 n2 c)
   | _, _, _ => Vundef
   end.
 
 Definition sub_overflow (v1 v2: val) : val :=
   match v1, v2 with
-  | Vint8 n1, Vint8 n2 => Vint 8 (Byte.sub_overflow n1 n2 Byte.zero)
-  | Vint16 n1, Vint16 n2 => Vint 16 (Int16.sub_overflow n1 n2 Int16.zero)
-  | Vint32 n1, Vint32 n2 => Vint 32 (Int.sub_overflow n1 n2 Int.zero)
-  | Vint64 n1, Vint64 n2 => Vint 64 (Int64.sub_overflow n1 n2 Int64.zero)
+  | Vint n1, Vint n2 => Vint(Int.sub_overflow n1 n2 Int.zero)
   | _, _ => Vundef
   end.
 
 Definition negative (v: val) : val :=
   match v with
-  | Vint8 n => Vint 8 (Byte.negative n)
-  | Vint16 n => Vint 16 (Int16.negative n)
-  | Vint32 n => Vint 32 (Int.negative n)
-  | Vint64 n => Vint 64 (Int64.negative n)
+  | Vint n => Vint (Int.negative n)
   | _ => Vundef
   end.
 
 Definition and (v1 v2: val): val :=
   match v1, v2 with
-  | Vint1 n1, Vint1 n2 => Vint 1 (Int1.and n1 n2)
-  | Vint8 n1, Vint8 n2 => Vint 8 (Byte.and n1 n2)
-  | Vint16 n1, Vint16 n2 => Vint 16 (Int16.and n1 n2)
-  | Vint32 n1, Vint32 n2 => Vint 32 (Int.and n1 n2)
-  | Vint64 n1, Vint64 n2 => Vint 64 (Int64.and n1 n2)
+  | Vint n1, Vint n2 => Vint(Int.and n1 n2)
   | _, _ => Vundef
   end.
 
 Definition or (v1 v2: val): val :=
   match v1, v2 with
-  | Vint1 n1, Vint1 n2 => Vint 1 (Int1.or n1 n2)
-  | Vint8 n1, Vint8 n2 => Vint 8 (Byte.or n1 n2)
-  | Vint16 n1, Vint16 n2 => Vint 16 (Int16.or n1 n2)
-  | Vint32 n1, Vint32 n2 => Vint 32 (Int.or n1 n2)
-  | Vint64 n1, Vint64 n2 => Vint 64 (Int64.or n1 n2)
+  | Vint n1, Vint n2 => Vint(Int.or n1 n2)
   | _, _ => Vundef
   end.
 
 Definition xor (v1 v2: val): val :=
   match v1, v2 with
-  | Vint1 n1, Vint1 n2 => Vint 1 (Int1.xor n1 n2)
-  | Vint8 n1, Vint8 n2 => Vint 8 (Byte.xor n1 n2)
-  | Vint16 n1, Vint16 n2 => Vint 16 (Int16.xor n1 n2)
-  | Vint32 n1, Vint32 n2 => Vint 32 (Int.xor n1 n2)
-  | Vint64 n1, Vint64 n2 => Vint 64 (Int64.xor n1 n2)
+  | Vint n1, Vint n2 => Vint(Int.xor n1 n2)
   | _, _ => Vundef
   end.
 
 Definition shl (v1 v2: val): val :=
   match v1, v2 with
-  | Vint8 n1, Vint8 n2 =>
-     if Byte.ltu n2 Byte.iwordsize
-     then Vint 8 (Byte.shl n1 n2)
-     else Vundef
-  | Vint16 n1, Vint16 n2 =>
-     if Int16.ltu n2 Int16.iwordsize
-     then Vint 16 (Int16.shl n1 n2)
-     else Vundef
-  | Vint32 n1, Vint32 n2 =>
+  | Vint n1, Vint n2 =>
      if Int.ltu n2 Int.iwordsize
-     then Vint 32 (Int.shl n1 n2)
-     else Vundef
-  | Vint64 n1, Vint64 n2 =>
-     if Int64.ltu n2 Int64.iwordsize
-     then Vint 64 (Int64.shl n1 n2)
+     then Vint(Int.shl n1 n2)
      else Vundef
   | _, _ => Vundef
   end.
 
 Definition shr (v1 v2: val): val :=
   match v1, v2 with
-  | Vint8 n1, Vint8 n2 =>
-     if Byte.ltu n2 Byte.iwordsize
-     then Vint 8 (Byte.shr n1 n2)
-     else Vundef
-  | Vint16 n1, Vint16 n2 =>
-     if Int16.ltu n2 Int16.iwordsize
-     then Vint 16 (Int16.shr n1 n2)
-     else Vundef
-  | Vint32 n1, Vint32 n2 =>
+  | Vint n1, Vint n2 =>
      if Int.ltu n2 Int.iwordsize
-     then Vint 32 (Int.shr n1 n2)
-     else Vundef
-  | Vint64 n1, Vint64 n2 =>
-     if Int64.ltu n2 Int64.iwordsize
-     then Vint 64 (Int64.shr n1 n2)
+     then Vint(Int.shr n1 n2)
      else Vundef
   | _, _ => Vundef
   end.
 
 Definition shr_carry (v1 v2: val): val :=
   match v1, v2 with
-  | Vint8 n1, Vint8 n2 =>
-     if Byte.ltu n2 Byte.iwordsize
-     then Vint 8 (Byte.shr_carry n1 n2)
-     else Vundef
-  | Vint16 n1, Vint16 n2 =>
-     if Int16.ltu n2 Int16.iwordsize
-     then Vint 16 (Int16.shr_carry n1 n2)
-     else Vundef
-  | Vint32 n1, Vint32 n2 =>
+  | Vint n1, Vint n2 =>
      if Int.ltu n2 Int.iwordsize
-     then Vint 32 (Int.shr_carry n1 n2)
-     else Vundef
-  | Vint64 n1, Vint64 n2 =>
-     if Int64.ltu n2 Int64.iwordsize
-     then Vint 64 (Int64.shr_carry n1 n2)
+     then Vint(Int.shr_carry n1 n2)
      else Vundef
   | _, _ => Vundef
   end.
 
 Definition shrx (v1 v2: val): option val :=
   match v1, v2 with
-  | Vint8 n1, Vint8 n2 =>
-     if Byte.ltu n2 (Byte.repr 31)
-     then Some(Vint 8 (Byte.shrx n1 n2))
-     else None
-  | Vint16 n1, Vint16 n2 =>
-     if Int16.ltu n2 (Int16.repr 31)
-     then Some(Vint 16 (Int16.shrx n1 n2))
-     else None
-  | Vint32 n1, Vint32 n2 =>
+  | Vint n1, Vint n2 =>
      if Int.ltu n2 (Int.repr 31)
-     then Some(Vint 32 (Int.shrx n1 n2))
-     else None
-  | Vint64 n1, Vint64 n2 =>
-     if Int64.ltu n2 (Int64.repr 31)
-     then Some(Vint 64 (Int64.shrx n1 n2))
+     then Some(Vint(Int.shrx n1 n2))
      else None
   | _, _ => None
   end.
 
 Definition shru (v1 v2: val): val :=
   match v1, v2 with
-  | Vint8 n1, Vint8 n2 =>
-     if Byte.ltu n2 Byte.iwordsize
-     then Vint 8 (Byte.shru n1 n2)
-     else Vundef
-  | Vint16 n1, Vint16 n2 =>
-     if Int16.ltu n2 Int16.iwordsize
-     then Vint 16 (Int16.shru n1 n2)
-     else Vundef
-  | Vint32 n1, Vint32 n2 =>
+  | Vint n1, Vint n2 =>
      if Int.ltu n2 Int.iwordsize
-     then Vint 32 (Int.shru n1 n2)
-     else Vundef
-  | Vint64 n1, Vint64 n2 =>
-     if Int64.ltu n2 Int64.iwordsize
-     then Vint 64 (Int64.shru n1 n2)
+     then Vint(Int.shru n1 n2)
      else Vundef
   | _, _ => Vundef
   end.
 
-(* NOTE: (amount mask: int) -> (amount mask: val) changed *)
-Definition rolm (v: val) (amount mask: val): val :=
-  match v, amount, mask with
-  | Vint8 n, Vint8 a, Vint8 m => Vint 8 (Byte.rolm n a m)
-  | Vint16 n, Vint16 a, Vint16 m => Vint 16 (Int16.rolm n a m)
-  | Vint32 n, Vint32 a, Vint32 m => Vint 32 (Int.rolm n a m)
-  | Vint64 n, Vint64 a, Vint64 m => Vint 64 (Int64.rolm n a m)
-  | _, _, _ => Vundef
+Definition rolm (v: val) (amount mask: int): val :=
+  match v with
+  | Vint n => Vint(Int.rolm n amount mask)
+  | _ => Vundef
   end.
 
 Definition ror (v1 v2: val): val :=
   match v1, v2 with
-  | Vint8 n1, Vint8 n2 =>
-     if Byte.ltu n2 Byte.iwordsize
-     then Vint 8 (Byte.ror n1 n2)
-     else Vundef
-  | Vint16 n1, Vint16 n2 =>
-     if Int16.ltu n2 Int16.iwordsize
-     then Vint 16 (Int16.ror n1 n2)
-     else Vundef
-  | Vint32 n1, Vint32 n2 =>
+  | Vint n1, Vint n2 =>
      if Int.ltu n2 Int.iwordsize
-     then Vint 32 (Int.ror n1 n2)
-     else Vundef
-  | Vint64 n1, Vint64 n2 =>
-     if Int64.ltu n2 Int64.iwordsize
-     then Vint 64 (Int64.ror n1 n2)
+     then Vint(Int.ror n1 n2)
      else Vundef
   | _, _ => Vundef
   end.
@@ -698,7 +447,7 @@ Definition divf (v1 v2: val): val :=
 
 Definition floatofwords (v1 v2: val) : val :=
   match v1, v2 with
-  | Vint32 n1, Vint32 n2 => Vfloat (Float.from_words n1 n2)
+  | Vint n1, Vint n2 => Vfloat (Float.from_words n1 n2)
   | _, _ => Vundef
   end.
 
@@ -727,9 +476,7 @@ Definition divfs (v1 v2: val): val :=
   end.
 
 (** Operations on 64-bit integers *)
-(* TODO: need to check. 64-bit operations are not special
-  in our setting. right? *)
-(*
+
 Definition longofwords (v1 v2: val) : val :=
   match v1, v2 with
   | Vint n1, Vint n2 => Vlong (Int64.ofwords n1 n2)
@@ -922,7 +669,7 @@ Definition shrlu (v1 v2: val): val :=
      else Vundef
   | _, _ => Vundef
   end.
-*)
+
 (** Comparisons *)
 
 Section COMPARISONS.
@@ -932,11 +679,7 @@ Let weak_valid_ptr (b: block) (ofs: Z) := valid_ptr b ofs || valid_ptr b (ofs - 
 
 Definition cmp_bool (c: comparison) (v1 v2: val): option bool :=
   match v1, v2 with
-  | Vint1 n1, Vint1 n2 => Some (Int1.cmp c n1 n2)
-  | Vint8 n1, Vint8 n2 => Some (Byte.cmp c n1 n2)
-  | Vint16 n1, Vint16 n2 => Some (Int16.cmp c n1 n2)
-  | Vint32 n1, Vint32 n2 => Some (Int.cmp c n1 n2)
-  | Vint64 n1, Vint64 n2 => Some (Int64.cmp c n1 n2)
+  | Vint n1, Vint n2 => Some (Int.cmp c n1 n2)
   | _, _ => None
   end.
 
@@ -947,20 +690,11 @@ Definition cmp_different_blocks (c: comparison): option bool :=
   | _   => None
   end.
 
-(* TODO: check whether ptr + non-32bit integer can exist *)
 Definition cmpu_bool (c: comparison) (v1 v2: val): option bool :=
   match v1, v2 with
-  | Vint1 n1, Vint1 n2 =>
-      Some (Int1.cmpu c n1 n2)
-  | Vint8 n1, Vint8 n2 =>
-      Some (Byte.cmpu c n1 n2)
-  | Vint16 n1, Vint16 n2 =>
-      Some (Int16.cmpu c n1 n2)
-  | Vint32 n1, Vint32 n2 =>
+  | Vint n1, Vint n2 =>
       Some (Int.cmpu c n1 n2)
-  | Vint64 n1, Vint64 n2 =>
-      Some (Int64.cmpu c n1 n2)
-  | Vint32 n1, Vptr b2 ofs2 =>
+  | Vint n1, Vptr b2 ofs2 =>
       if Int.eq n1 Int.zero then cmp_different_blocks c else None
   | Vptr b1 ofs1, Vptr b2 ofs2 =>
       if eq_block b1 b2 then
@@ -973,7 +707,7 @@ Definition cmpu_bool (c: comparison) (v1 v2: val): option bool :=
            && valid_ptr b2 (Int.unsigned ofs2)
         then cmp_different_blocks c
         else None
-  | Vptr b1 ofs1, Vint32 n2 =>
+  | Vptr b1 ofs1, Vint n2 =>
       if Int.eq n2 Int.zero then cmp_different_blocks c else None
   | _, _ => None
   end.
@@ -990,9 +724,6 @@ Definition cmpfs_bool (c: comparison) (v1 v2: val): option bool :=
   | _, _ => None
   end.
 
-(* TODO: need to check. 64-bit operations are not special
-  in our setting. right? *)
-(*
 Definition cmpl_bool (c: comparison) (v1 v2: val): option bool :=
   match v1, v2 with
   | Vlong n1, Vlong n2 => Some (Int64.cmp c n1 n2)
@@ -1004,7 +735,7 @@ Definition cmplu_bool (c: comparison) (v1 v2: val): option bool :=
   | Vlong n1, Vlong n2 => Some (Int64.cmpu c n1 n2)
   | _, _ => None
   end.
-*)
+
 Definition of_optbool (ob: option bool): val :=
   match ob with Some true => Vtrue | Some false => Vfalse | None => Vundef end.
 
@@ -1020,24 +751,16 @@ Definition cmpf (c: comparison) (v1 v2: val): val :=
 Definition cmpfs (c: comparison) (v1 v2: val): val :=
   of_optbool (cmpfs_bool c v1 v2).
 
-(* TODO: need to check. 64-bit operations are not special
-  in our setting. right? *)
-(*
 Definition cmpl (c: comparison) (v1 v2: val): option val :=
   option_map of_bool (cmpl_bool c v1 v2).
 
 Definition cmplu (c: comparison) (v1 v2: val): option val :=
   option_map of_bool (cmplu_bool c v1 v2).
-*)
 
-(* NOTE: (mask: int) -> (mask: val) changed *)
-Definition maskzero_bool (v: val) (mask: val): option bool :=
-  match v, mask with
-  | Vint8 n, Vint8 m => Some (Byte.eq (Byte.and n m) Byte.zero)
-  | Vint16 n, Vint16 m => Some (Int16.eq (Int16.and n m) Int16.zero)
-  | Vint32 n, Vint32 m => Some (Int.eq (Int.and n m) Int.zero)
-  | Vint64 n, Vint64 m => Some (Int64.eq (Int64.and n m) Int64.zero)
-  | _, _ => None
+Definition maskzero_bool (v: val) (mask: int): option bool :=
+  match v with
+  | Vint n => Some (Int.eq (Int.and n mask) Int.zero)
+  | _ => None
   end.
 
 End COMPARISONS.
@@ -1052,88 +775,54 @@ End COMPARISONS.
   performed and [0xFFFFFFFF] is returned.
   fixed: vellvm does not need signedness *)
 
-(* NOTE: in vellvm context, integer should be truncated wrt chunk size.
-   main point is, the size of result should be equal to chunk size.
-   TODO: need to check. Many64 case? (not in vellvm) *)
 Definition load_result (chunk: memory_chunk) (v: val) :=
   match chunk, v with
-  | Mint8, Vint8 n => Vint 8 n
-  | Mint16, Vint8 n => Vint 16 (Int16.repr (Byte.unsigned n))
-  | Mint32, Vint8 n => Vint 32 (Int.repr (Byte.unsigned n))
-  | Mint64, Vint8 n => Vint 64 (Int64.repr (Byte.unsigned n))
-  | Mint8, Vint16 n => Vint 8 (Byte.repr (Int16.unsigned n))
-  | Mint16, Vint16 n => Vint 16 n
-  | Mint32, Vint16 n => Vint 32 (Int.repr (Int16.unsigned n))
-  | Mint64, Vint16 n => Vint 64 (Int64.repr (Int16.unsigned n))
-  | Mint8, Vint32 n => Vint 8 (Byte.repr (Int.unsigned n))
-  | Mint16, Vint32 n => Vint 16 (Int16.repr (Int.unsigned n))
-  | Mint32, Vint32 n => Vint 32 n
-  | Mint64, Vint32 n => Vint 64 (Int64.repr (Int.unsigned n))
-  | Mint8, Vint64 n => Vint 8 (Byte.repr (Int64.unsigned n))
-  | Mint16, Vint64 n => Vint 16 (Int16.repr (Int64.unsigned n))
-  | Mint32, Vint64 n => Vint 32 (Int.repr (Int64.unsigned n))
-  | Mint64, Vint64 n => Vint 64 n
+  | Mint8, Vint n => Vint (Int.zero_ext 8 n)
+  | Mint16, Vint n => Vint (Int.zero_ext 16 n)
+  | Mint32, Vint n => Vint n
   | Mint32, Vptr b ofs => Vptr b ofs
+  | Mint64, Vlong n => Vlong n
   | Mfloat32, Vsingle f => Vsingle f
   | Mfloat64, Vfloat f => Vfloat f
-  | Many32, (Vint32 _ | Vptr _ _ | Vsingle _) => v
+  | Many32, (Vint _ | Vptr _ _ | Vsingle _) => v
   | Many64, _ => v
   | _, _ => Vundef
   end.
 
-(* NOTE: Theorem, Lemma will be marked... is it in (old)compcert and vellvm? *)
-
-(* TODO: Compcert1.9: X, Vellvm: X *)
-(*
 Lemma load_result_type:
   forall chunk v, has_type (load_result chunk v) (type_of_chunk chunk).
 Proof.
   intros. destruct chunk; destruct v; simpl; auto.
 Qed.
-*)
 
-(* TODO: Compcert1.9: X, Vellvm: X *)
-(*
 Lemma load_result_same:
   forall v ty, has_type v ty -> load_result (chunk_of_type ty) v = v.
 Proof.
   unfold has_type; intros. destruct v; destruct ty; try contradiction; auto.
 Qed.
-*)
 
 (** Theorems on arithmetic operations. *)
 
-(* TODO: Compcert1.9: O, Vellvm: O *)
-(*
 Theorem cast8unsigned_and:
-  forall x, zero_ext 8 x = and x (Vint 32 (Int.repr 255)).
+  forall x, zero_ext 8 x = and x (Vint(Int.repr 255)).
 Proof.
   destruct x; simpl; auto. decEq. 
-  change 255 with (two_p 8 - 1). apply Int32.zero_ext_and. omega. 
+  change 255 with (two_p 8 - 1). apply Int.zero_ext_and. omega. 
 Qed.
-*)
 
-(* TODO: Compcert1.9: O, Vellvm: O *)
-(*
 Theorem cast16unsigned_and:
   forall x, zero_ext 16 x = and x (Vint(Int.repr 65535)).
 Proof.
   destruct x; simpl; auto. decEq. 
   change 65535 with (two_p 16 - 1). apply Int.zero_ext_and. omega.
 Qed.
-*)
 
-(* TODO: Compcert1.9: X, Vellvm: X *)
-(*
 Theorem bool_of_val_of_bool:
   forall b1 b2, bool_of_val (of_bool b1) b2 -> b1 = b2.
 Proof.
   intros. destruct b1; simpl in H; inv H; auto.
 Qed.
-*)
 
-(* TODO: Compcert1.9: X, Vellvm: X *)
-(*
 Theorem bool_of_val_of_optbool:
   forall ob b, bool_of_val (of_optbool ob) b -> ob = Some b.
 Proof.
@@ -1141,7 +830,6 @@ Proof.
   destruct b0; simpl in H; inv H; auto.
   inv H.
 Qed.
-*)
 
 Theorem notbool_negb_1:
   forall b, of_bool (negb b) = notbool (of_bool b).
@@ -1167,15 +855,12 @@ Proof.
   destruct b; reflexivity.
 Qed.
 
-(* TODO: Compcert1.9: O, Vellvm: O *)
-(*
 Theorem notbool_idem3:
   forall x, notbool(notbool(notbool x)) = notbool x.
 Proof.
   destruct x; simpl; auto. 
   case (Int.eq i Int.zero); reflexivity.
 Qed.
-*)
 
 Theorem notbool_idem4:
   forall ob, notbool (notbool (of_optbool ob)) = of_optbool ob.
@@ -1183,16 +868,12 @@ Proof.
   destruct ob; auto. destruct b; auto.
 Qed.
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem add_commut: forall x y, add x y = add y x.
 Proof.
   destruct x; destruct y; simpl; auto.
   decEq. apply Int.add_commut.
 Qed.
-*)
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
+
 Theorem add_assoc: forall x y z, add (add x y) z = add x (add y z).
 Proof.
   destruct x; destruct y; destruct z; simpl; auto.
@@ -1203,69 +884,45 @@ Proof.
   decEq. apply Int.add_commut.
   decEq. rewrite Int.add_assoc. auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem add_permut: forall x y z, add x (add y z) = add y (add x z).
 Proof.
   intros. rewrite (add_commut y z). rewrite <- add_assoc. apply add_commut.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem add_permut_4:
   forall x y z t, add (add x y) (add z t) = add (add x z) (add y t).
 Proof.
   intros. rewrite add_permut. rewrite add_assoc. 
   rewrite add_permut. symmetry. apply add_assoc. 
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem neg_zero: neg Vzero = Vzero.
 Proof.
   reflexivity.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem neg_add_distr: forall x y, neg(add x y) = add (neg x) (neg y).
 Proof.
   destruct x; destruct y; simpl; auto. decEq. apply Int.neg_add_distr.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem sub_zero_r: forall x, sub Vzero x = neg x.
 Proof.
   destruct x; simpl; auto. 
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem sub_add_opp: forall x y, sub x (Vint y) = add x (Vint (Int.neg y)).
 Proof.
   destruct x; intro y; simpl; auto; rewrite Int.sub_add_opp; auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem sub_opp_add: forall x y, sub x (Vint (Int.neg y)) = add x (Vint y).
 Proof.
   intros. unfold sub, add.
   destruct x; auto; rewrite Int.sub_add_opp; rewrite Int.neg_involutive; auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem sub_add_l:
   forall v1 v2 i, sub (add v1 (Vint i)) v2 = add (sub v1 v2) (Vint i).
 Proof.
@@ -1274,10 +931,7 @@ Proof.
   rewrite Int.sub_add_l. auto.
   case (eq_block b b0); intro. rewrite Int.sub_add_l. auto. reflexivity.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem sub_add_r:
   forall v1 v2 i, sub v1 (add v2 (Vint i)) = add (sub v1 v2) (Vint (Int.neg i)).
 Proof.
@@ -1292,47 +946,33 @@ Proof.
   apply Int.neg_add_distr.
   reflexivity.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem mul_commut: forall x y, mul x y = mul y x.
 Proof.
   destruct x; destruct y; simpl; auto. decEq. apply Int.mul_commut.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem mul_assoc: forall x y z, mul (mul x y) z = mul x (mul y z).
 Proof.
   destruct x; destruct y; destruct z; simpl; auto.
   decEq. apply Int.mul_assoc.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem mul_add_distr_l:
   forall x y z, mul (add x y) z = add (mul x z) (mul y z).
 Proof.
   destruct x; destruct y; destruct z; simpl; auto.
   decEq. apply Int.mul_add_distr_l.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
+
 Theorem mul_add_distr_r:
   forall x y z, mul x (add y z) = add (mul x y) (mul x z).
 Proof.
   destruct x; destruct y; destruct z; simpl; auto.
   decEq. apply Int.mul_add_distr_r.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem mul_pow2:
   forall x n logn,
   Int.is_power2 n = Some logn ->
@@ -1342,10 +982,7 @@ Proof.
   change 32 with Int.zwordsize.
   rewrite (Int.is_power2_range _ _ H). decEq. apply Int.mul_pow2. auto.
 Qed.  
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem mods_divs:
   forall x y z,
   mods x y = Some z -> exists v, divs x y = Some v /\ z = sub x (mul v y).
@@ -1356,10 +993,7 @@ Proof.
   exists (Vint (Int.divs i i0)); split; auto. 
   simpl. rewrite Int.mods_divs. auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem modu_divu:
   forall x y z,
   modu x y = Some z -> exists v, divu x y = Some v /\ z = sub x (mul v y).
@@ -1370,10 +1004,7 @@ Proof.
   simpl. rewrite Int.modu_divu. auto.
   generalize (Int.eq_spec i0 Int.zero). rewrite Heqb; auto. 
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem divs_pow2:
   forall x n logn y,
   Int.is_power2 n = Some logn -> Int.ltu logn (Int.repr 31) = true ->
@@ -1385,10 +1016,7 @@ Proof.
          || Int.eq i (Int.repr Int.min_signed) && Int.eq n Int.mone); inv H3.
   simpl. rewrite H0. decEq. decEq. symmetry. apply Int.divs_pow2. auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem divu_pow2:
   forall x n logn y,
   Int.is_power2 n = Some logn ->
@@ -1401,10 +1029,7 @@ Proof.
   rewrite (Int.is_power2_range _ _ H).
   decEq. symmetry. apply Int.divu_pow2. auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem modu_pow2:
   forall x n logn y,
   Int.is_power2 n = Some logn ->
@@ -1415,79 +1040,52 @@ Proof.
   destruct (Int.eq n Int.zero); inv H2. 
   simpl. decEq. symmetry. eapply Int.modu_and; eauto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem and_commut: forall x y, and x y = and y x.
 Proof.
   destruct x; destruct y; simpl; auto. decEq. apply Int.and_commut.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem and_assoc: forall x y z, and (and x y) z = and x (and y z).
 Proof.
   destruct x; destruct y; destruct z; simpl; auto.
   decEq. apply Int.and_assoc.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem or_commut: forall x y, or x y = or y x.
 Proof.
   destruct x; destruct y; simpl; auto. decEq. apply Int.or_commut.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem or_assoc: forall x y z, or (or x y) z = or x (or y z).
 Proof.
   destruct x; destruct y; destruct z; simpl; auto.
   decEq. apply Int.or_assoc.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem xor_commut: forall x y, xor x y = xor y x.
 Proof.
   destruct x; destruct y; simpl; auto. decEq. apply Int.xor_commut.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem xor_assoc: forall x y z, xor (xor x y) z = xor x (xor y z).
 Proof.
   destruct x; destruct y; destruct z; simpl; auto.
   decEq. apply Int.xor_assoc.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Theorem not_xor: forall x, notint x = xor x (Vint Int.mone).
 Proof.
   destruct x; simpl; auto. 
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem shl_mul: forall x y, mul x (shl Vone y) = shl x y.
 Proof.
   destruct x; destruct y; simpl; auto. 
   case (Int.ltu i0 Int.iwordsize); auto.
   decEq. symmetry. apply Int.shl_mul.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem shl_rolm:
   forall x n,
   Int.ltu n Int.iwordsize = true ->
@@ -1496,10 +1094,7 @@ Proof.
   intros; destruct x; simpl; auto.
   rewrite H. decEq. apply Int.shl_rolm. exact H.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem shru_rolm:
   forall x n,
   Int.ltu n Int.iwordsize = true ->
@@ -1508,10 +1103,7 @@ Proof.
   intros; destruct x; simpl; auto.
   rewrite H. decEq. apply Int.shru_rolm. exact H.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem shrx_carry:
   forall x y z,
   shrx x y = Some z ->
@@ -1524,10 +1116,7 @@ Proof.
     unfold Int.ltu. apply zlt_true. change (Int.unsigned Int.iwordsize) with 32. omega. 
   simpl. rewrite H0. simpl. decEq. rewrite Int.shrx_carry; auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Theorem shrx_shr:
   forall x y z,
   shrx x y = Some z ->
@@ -1543,10 +1132,7 @@ Proof.
   exists i; exists i0; intuition. 
   rewrite Int.shrx_shr; auto. destruct (Int.lt i Int.zero); simpl; rewrite H0; auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem or_rolm:
   forall x n m1 m2,
   or (rolm x n m1) (rolm x n m2) = rolm x n (Int.or m1 m2).
@@ -1554,10 +1140,7 @@ Proof.
   intros; destruct x; simpl; auto.
   decEq. apply Int.or_rolm.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem rolm_rolm:
   forall x n1 m1 n2 m2,
   rolm (rolm x n1 m1) n2 m2 =
@@ -1568,29 +1151,20 @@ Proof.
   decEq. 
   apply Int.rolm_rolm. apply int_wordsize_divides_modulus.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem rolm_zero:
   forall x m,
   rolm x Int.zero m = and x (Vint m).
 Proof.
   intros; destruct x; simpl; auto. decEq. apply Int.rolm_zero.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Theorem negate_cmp_bool:
   forall c x y, cmp_bool (negate_comparison c) x y = option_map negb (cmp_bool c x y).
 Proof.
   destruct x; destruct y; simpl; auto. rewrite Int.negate_cmp. auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Theorem negate_cmpu_bool:
   forall valid_ptr c x y,
   cmpu_bool valid_ptr (negate_comparison c) x y = option_map negb (cmpu_bool valid_ptr c x y).
@@ -1609,29 +1183,20 @@ Proof.
   auto.
   destruct (valid_ptr b (Int.unsigned i) && valid_ptr b0 (Int.unsigned i0)); auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Lemma not_of_optbool:
   forall ob, of_optbool (option_map negb ob) = notbool (of_optbool ob).
 Proof.
   destruct ob; auto. destruct b; auto. 
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem negate_cmp:
   forall c x y,
   cmp (negate_comparison c) x y = notbool (cmp c x y).
 Proof.
   intros. unfold cmp. rewrite negate_cmp_bool. apply not_of_optbool.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem negate_cmpu:
   forall valid_ptr c x y,
   cmpu valid_ptr (negate_comparison c) x y =
@@ -1639,20 +1204,14 @@ Theorem negate_cmpu:
 Proof.
   intros. unfold cmpu. rewrite negate_cmpu_bool. apply not_of_optbool.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Theorem swap_cmp_bool:
   forall c x y,
   cmp_bool (swap_comparison c) x y = cmp_bool c y x.
 Proof.
   destruct x; destruct y; simpl; auto. rewrite Int.swap_cmp. auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Theorem swap_cmpu_bool:
   forall valid_ptr c x y,
   cmpu_bool valid_ptr (swap_comparison c) x y =
@@ -1674,30 +1233,21 @@ Proof.
   destruct (valid_ptr b (Int.unsigned i));
     destruct (valid_ptr b0 (Int.unsigned i0)); simpl; auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem negate_cmpf_eq:
   forall v1 v2, notbool (cmpf Cne v1 v2) = cmpf Ceq v1 v2.
 Proof.
   destruct v1; destruct v2; auto. unfold cmpf, cmpf_bool. 
   rewrite Float.cmp_ne_eq. destruct (Float.cmp Ceq f f0); auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem negate_cmpf_ne:
   forall v1 v2, notbool (cmpf Ceq v1 v2) = cmpf Cne v1 v2.
 Proof.
   destruct v1; destruct v2; auto. unfold cmpf, cmpf_bool. 
   rewrite Float.cmp_ne_eq. destruct (Float.cmp Ceq f f0); auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem cmpf_le:
   forall v1 v2, cmpf Cle v1 v2 = or (cmpf Clt v1 v2) (cmpf Ceq v1 v2).
 Proof.
@@ -1705,10 +1255,7 @@ Proof.
   rewrite Float.cmp_le_lt_eq.
   destruct (Float.cmp Clt f f0); destruct (Float.cmp Ceq f f0); auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Theorem cmpf_ge:
   forall v1 v2, cmpf Cge v1 v2 = or (cmpf Cgt v1 v2) (cmpf Ceq v1 v2).
 Proof.
@@ -1716,86 +1263,59 @@ Proof.
   rewrite Float.cmp_ge_gt_eq.
   destruct (Float.cmp Cgt f f0); destruct (Float.cmp Ceq f f0); auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Theorem cmp_ne_0_optbool:
   forall ob, cmp Cne (of_optbool ob) (Vint Int.zero) = of_optbool ob.
 Proof.
   intros. destruct ob; simpl; auto. destruct b; auto. 
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Theorem cmp_eq_1_optbool:
   forall ob, cmp Ceq (of_optbool ob) (Vint Int.one) = of_optbool ob.
 Proof.
   intros. destruct ob; simpl; auto. destruct b; auto. 
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Theorem cmp_eq_0_optbool:
   forall ob, cmp Ceq (of_optbool ob) (Vint Int.zero) = of_optbool (option_map negb ob).
 Proof.
   intros. destruct ob; simpl; auto. destruct b; auto. 
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Theorem cmp_ne_1_optbool:
   forall ob, cmp Cne (of_optbool ob) (Vint Int.one) = of_optbool (option_map negb ob).
 Proof.
   intros. destruct ob; simpl; auto. destruct b; auto. 
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Theorem cmpu_ne_0_optbool:
   forall valid_ptr ob,
   cmpu valid_ptr Cne (of_optbool ob) (Vint Int.zero) = of_optbool ob.
 Proof.
   intros. destruct ob; simpl; auto. destruct b; auto. 
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Theorem cmpu_eq_1_optbool:
   forall valid_ptr ob,
   cmpu valid_ptr Ceq (of_optbool ob) (Vint Int.one) = of_optbool ob.
 Proof.
   intros. destruct ob; simpl; auto. destruct b; auto. 
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Theorem cmpu_eq_0_optbool:
   forall valid_ptr ob,
   cmpu valid_ptr Ceq (of_optbool ob) (Vint Int.zero) = of_optbool (option_map negb ob).
 Proof.
   intros. destruct ob; simpl; auto. destruct b; auto. 
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Theorem cmpu_ne_1_optbool:
   forall valid_ptr ob,
   cmpu valid_ptr Cne (of_optbool ob) (Vint Int.one) = of_optbool (option_map negb ob).
 Proof.
   intros. destruct ob; simpl; auto. destruct b; auto. 
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Lemma zero_ext_and:
   forall n v, 
   0 < n < Int.zwordsize ->
@@ -1803,10 +1323,7 @@ Lemma zero_ext_and:
 Proof.
   intros. destruct v; simpl; auto. decEq. apply Int.zero_ext_and; auto. omega.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Lemma rolm_lt_zero:
   forall v, rolm v Int.one Int.one = cmp Clt v (Vint Int.zero).
 Proof.
@@ -1815,10 +1332,7 @@ Proof.
   decEq. symmetry. rewrite Int.shru_rolm. auto. auto. 
   rewrite Int.shru_lt_zero. destruct (Int.lt i Int.zero); auto. 
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Lemma rolm_ge_zero:
   forall v,
   xor (rolm v Int.one Int.one) (Vint Int.one) = cmp Cge v (Vint Int.zero).
@@ -1826,7 +1340,6 @@ Proof.
   intros. rewrite rolm_lt_zero. destruct v; simpl; auto.
   unfold cmp; simpl. destruct (Int.lt i Int.zero); auto.
 Qed.
-*)
 
 (** The ``is less defined'' relation between values. 
     A value is less defined than itself, and [Vundef] is
@@ -1882,36 +1395,25 @@ Proof.
   intros; inv H; simpl; auto.
 Qed.
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Lemma sign_ext_lessdef:
   forall n v1 v2, lessdef v1 v2 -> lessdef (sign_ext n v1) (sign_ext n v2).
 Proof.
   intros; inv H; simpl; auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Lemma singleoffloat_lessdef:
   forall v1 v2, lessdef v1 v2 -> lessdef (singleoffloat v1) (singleoffloat v2).
 Proof.
   intros; inv H; simpl; auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Lemma add_lessdef:
   forall v1 v1' v2 v2',
   lessdef v1 v1' -> lessdef v2 v2' -> lessdef (add v1 v2) (add v1' v2').
 Proof.
   intros. inv H. inv H0. auto. destruct v1'; simpl; auto. simpl; auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Lemma cmpu_bool_lessdef:
   forall valid_ptr valid_ptr' c v1 v1' v2 v2' b,
   (forall b ofs, valid_ptr b ofs = true -> valid_ptr' b ofs = true) ->
@@ -1934,10 +1436,7 @@ Proof.
   destruct (valid_ptr b1 (Int.unsigned i0)) eqn:?; try discriminate.
   erewrite !H by eauto. auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Lemma of_optbool_lessdef:
   forall ob ob',
   (forall b, ob = Some b -> ob' = Some b) ->
@@ -1945,35 +1444,25 @@ Lemma of_optbool_lessdef:
 Proof.
   intros. destruct ob; simpl; auto. rewrite (H b); auto. 
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Lemma longofwords_lessdef:
   forall v1 v2 v1' v2',
   lessdef v1 v1' -> lessdef v2 v2' -> lessdef (longofwords v1 v2) (longofwords v1' v2').
 Proof.
   intros. unfold longofwords. inv H; auto. inv H0; auto. destruct v1'; auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Lemma loword_lessdef:
   forall v v', lessdef v v' -> lessdef (loword v) (loword v').
 Proof.
   intros. inv H; auto. 
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Lemma hiword_lessdef:
   forall v v', lessdef v v' -> lessdef (hiword v) (hiword v').
 Proof.
   intros. inv H; auto. 
 Qed.
-*)
 
 End Val.
 
@@ -1996,7 +1485,9 @@ Definition meminj : Type := block -> option (block * Z).
 
 Inductive val_inject (mi: meminj): val -> val -> Prop :=
   | val_inject_int:
-      forall wz i, val_inject mi (Vint wz i) (Vint wz i)
+      forall i, val_inject mi (Vint i) (Vint i)
+  | val_inject_long:
+      forall i, val_inject mi (Vlong i) (Vlong i)
   | val_inject_float:
       forall f, val_inject mi (Vfloat f) (Vfloat f)
   | val_inject_single:
@@ -2024,8 +1515,6 @@ Section VAL_INJ_OPS.
 
 Variable f: meminj.
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Lemma val_load_result_inject:
   forall chunk v1 v2,
   val_inject f v1 v2 ->
@@ -2033,10 +1522,7 @@ Lemma val_load_result_inject:
 Proof.
   intros. inv H; destruct chunk; simpl; econstructor; eauto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Remark val_add_inject:
   forall v1 v1' v2 v2',
   val_inject f v1 v1' ->
@@ -2047,10 +1533,7 @@ Proof.
   repeat rewrite Int.add_assoc. decEq. apply Int.add_commut.
   repeat rewrite Int.add_assoc. decEq. apply Int.add_commut.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Remark val_sub_inject:
   forall v1 v1' v2 v2',
   val_inject f v1 v1' ->
@@ -2062,10 +1545,7 @@ Proof.
   destruct (eq_block b1 b0); auto. subst. rewrite H1 in H. inv H. rewrite dec_eq_true. 
   rewrite Int.sub_shifted. auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Lemma val_cmp_bool_inject:
   forall c v1 v2 v1' v2' b,
   val_inject f v1 v1' ->
@@ -2075,7 +1555,6 @@ Lemma val_cmp_bool_inject:
 Proof.
   intros. inv H; simpl in H1; try discriminate; inv H0; simpl in H1; try discriminate; simpl; auto.
 Qed.
-*)
 
 Variable (valid_ptr1 valid_ptr2 : block -> Z -> bool).
 
@@ -2110,8 +1589,6 @@ Hypothesis valid_different_ptrs_inj:
   b1' <> b2' \/
   Int.unsigned (Int.add ofs1 (Int.repr delta1)) <> Int.unsigned (Int.add ofs2 (Int.repr delta2)).
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Lemma val_cmpu_bool_inject:
   forall c v1 v2 v1' v2' b,
   val_inject f v1 v1' ->
@@ -2143,35 +1620,25 @@ Proof.
   simpl; decEq. rewrite Int.eq_false; auto. congruence.
   now erewrite !valid_ptr_inj by eauto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Lemma val_longofwords_inject:
   forall v1 v2 v1' v2',
   val_inject f v1 v1' -> val_inject f v2 v2' -> val_inject f (Val.longofwords v1 v2) (Val.longofwords v1' v2').
 Proof.
   intros. unfold Val.longofwords. inv H; auto. inv H0; auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Lemma val_loword_inject:
   forall v v', val_inject f v v' -> val_inject f (Val.loword v) (Val.loword v').
 Proof.
   intros. unfold Val.loword; inv H; auto. 
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Lemma val_hiword_inject:
   forall v v', val_inject f v v' -> val_inject f (Val.hiword v) (Val.hiword v').
 Proof.
   intros. unfold Val.hiword; inv H; auto. 
 Qed.
-*)
 
 End VAL_INJ_OPS.
 
@@ -2211,8 +1678,6 @@ Qed.
 
 Hint Resolve inject_incr_refl val_inject_incr val_list_inject_incr.
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Lemma val_inject_lessdef:
   forall v1 v2, Val.lessdef v1 v2 <-> val_inject (fun b => Some(b, 0)) v1 v2.
 Proof.
@@ -2220,10 +1685,7 @@ Proof.
   inv H; auto. destruct v2; econstructor; eauto. rewrite Int.add_zero; auto. 
   inv H; auto. inv H0. rewrite Int.add_zero; auto.
 Qed.
-*)
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Lemma val_list_inject_lessdef:
   forall vl1 vl2, Val.lessdef_list vl1 vl2 <-> val_list_inject (fun b => Some(b, 0)) vl1 vl2.
 Proof.
@@ -2231,14 +1693,11 @@ Proof.
   induction 1; constructor; auto. apply val_inject_lessdef; auto.
   induction 1; constructor; auto. apply val_inject_lessdef; auto.
 Qed.
-*)
 
 (** The identity injection gives rise to the "less defined than" relation. *)
 
 Definition inject_id : meminj := fun b => Some(b, 0).
 
-(* TODO: Compcert 1.9: O, Vellvm: O *)
-(*
 Lemma val_inject_id:
   forall v1 v2,
   val_inject inject_id v1 v2 <-> Val.lessdef v1 v2.
@@ -2249,7 +1708,6 @@ Proof.
   inv H. destruct v2; econstructor. unfold inject_id; reflexivity. rewrite Int.add_zero; auto.
   constructor.
 Qed.
-*)
 
 (** Composing two memory injections *)
 
@@ -2264,8 +1722,6 @@ Definition compose_meminj (f f': meminj) : meminj :=
         end
     end.
 
-(* TODO: Compcert 1.9: X, Vellvm: X *)
-(*
 Lemma val_inject_compose:
   forall f f' v1 v2 v3,
   val_inject f v1 v2 -> val_inject f' v2 v3 ->
@@ -2274,5 +1730,4 @@ Proof.
   intros. inv H; auto; inv H0; auto. econstructor.
   unfold compose_meminj; rewrite H1; rewrite H3; eauto. 
   rewrite Int.add_assoc. decEq. unfold Int.add. apply Int.eqm_samerepr. auto with ints.
-Qed.
-*)
+Qed. 
