@@ -86,9 +86,11 @@ End OrderedZ.
 
 Module OrderedInt <: OrderedType.
 
-Definition t := int.
+Variable wordsize_one: nat.
+Definition t := Int.int wordsize_one.
 Definition eq (x y: t) := x = y.
-Definition lt (x y: t) := Int.unsigned x < Int.unsigned y.
+Definition lt (x y: t) :=
+  Int.unsigned wordsize_one x < Int.unsigned wordsize_one y.
 
 Lemma eq_refl : forall x : t, eq x x.
 Proof (@refl_equal t). 
@@ -106,17 +108,17 @@ Proof.
 Qed.
 Lemma compare : forall x y : t, Compare lt eq x y.
 Proof.
-  intros. destruct (zlt (Int.unsigned x) (Int.unsigned y)).
+  intros. destruct (zlt (Int.unsigned wordsize_one x) (Int.unsigned wordsize_one y)).
   apply LT. auto.
-  destruct (Int.eq_dec x y).
+  destruct (Int.eq_dec wordsize_one x y).
   apply EQ. auto.
   apply GT.
-  assert (Int.unsigned x <> Int.unsigned y).
-    red; intros. rewrite <- (Int.repr_unsigned x) in n. rewrite <- (Int.repr_unsigned y) in n. congruence.
+  assert (Int.unsigned wordsize_one x <> Int.unsigned wordsize_one y).
+    red; intros. rewrite <- (Int.repr_unsigned wordsize_one x) in n. rewrite <- (Int.repr_unsigned wordsize_one y) in n. congruence.
   red. omega.
 Defined.
 
-Definition eq_dec : forall x y, { eq x y } + { ~ eq x y } := Int.eq_dec.
+Definition eq_dec : forall x y, { eq x y } + { ~ eq x y } := Int.eq_dec wordsize_one.
 
 End OrderedInt.
 
