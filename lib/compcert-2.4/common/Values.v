@@ -16,6 +16,7 @@
 (** This module defines the type of values that is used in the dynamic
   semantics of all our intermediate languages. *)
 
+Require Import Program.
 Require Import Coqlib.
 Require Import AST.
 Require Import Integers.
@@ -109,7 +110,8 @@ Definition has_type (v: val) (t: typ) : Prop :=
   | Vfloat _, Tfloat => True
   | Vsingle _, Tsingle => True
   | Vptr _ _, Tint => True
-  | (Vint _ _ | Vptr _ _ | Vsingle _), Tany32 => True
+  | Vinttoptr _, Tint => True
+  | (Vint _ _ | Vptr _ _ | Vinttoptr _ | Vsingle _), Tany32 => True
   | _, Tany64 => True
   | _, _ => False
   end.
@@ -279,7 +281,7 @@ Definition boolval (v: val) : val :=
 Definition notbool (v: val) : val :=
   match v with
   | Vint wz n => of_bool (Int.eq wz n (Int.zero wz))
-  | Vptr b ofs => Vfalse
+  | Vptr _ _ | Vinttoptr _ => Vfalse
   | _ => Vundef
   end.
 
@@ -380,7 +382,7 @@ Definition sub (v1 v2: val): val :=
   | Vptr b1 ofs1, Vptr b2 ofs2 =>
     if peq b1 b2 then Vint 31 (Int.sub 31 ofs1 ofs2) else Vundef
   | Vinttoptr n1, Vint wz2 n2 =>
-        match wz2 return Int.int wz2 -> val with
+    match wz2 return Int.int wz2 -> val with
     | 31%nat => fun n2 => Vinttoptr (Int.sub 31 n1 n2)
     | _ => fun _ => Vundef
     end n2
@@ -734,6 +736,8 @@ Definition cmpu_bool (c: comparison) (v1 v2: val): option bool :=
         else None
     | _ => fun _ => None
     end n2
+  | Vinttoptr n1, Vinttoptr n2 => Some (Int.cmpu 31 c n1 n2)
+(* FIXME: Vptr and Vinttoptr are not compariable. *)
   | _, _ => None
   end.
 
@@ -764,6 +768,7 @@ Definition cmpf (c: comparison) (v1 v2: val): val :=
 Definition cmpfs (c: comparison) (v1 v2: val): val :=
   of_optbool (cmpfs_bool c v1 v2).
 
+(* NOTE: Vellvm Context *)
 Definition maskzero_bool (v: val) (mask: int32): option bool :=
   match v with
   | Vint 31 n => Some (Int.eq 31 (Int.and 31 n mask) (Int.zero 31))
@@ -794,6 +799,7 @@ Definition load_result (chunk: memory_chunk) (v: val) :=
   | _, _ => Vundef
   end.
 
+(* NOTE: Vellvm Context - load_result_type, load_result_same_type removed *)
 (** Theorems on arithmetic operations. *)
 
 Section ArithOperations.
@@ -1594,7 +1600,7 @@ Inductive val_inject (mi: meminj): val -> val -> Prop :=
       val_inject mi Vundef v.
 
 Hint Constructors val_inject.
-Hint Resolve val_inject_int val_inject_float val_inject_ptr val_inject_inttoptr 
+Hint Resolve val_inject_int val_inject_float val_inject_ptr val_inject_inttoptr
              val_inject_undef.
 
 Inductive val_list_inject (mi: meminj): list val -> list val-> Prop:= 
@@ -1809,14 +1815,13 @@ Lemma val_inject_compose:
   val_inject f v1 v2 -> val_inject f' v2 v3 ->
   val_inject (compose_meminj f f') v1 v3.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  intros.c inv H; auto; inv H0; auto. econstructor.
+  intros. inv H; auto; inv H0; auto. dependent destruction H2; auto. econstructor.
   unfold compose_meminj; rewrite H1; rewrite H3; eauto. 
   rewrite Int.add_assoc. decEq. unfold Int.add. apply Int.eqm_samerepr. auto with ints.
-*)
 Qed.
 
 (** More properties for Val. *)
+(* NOTE: Vellvm Context *)
 
 Lemma add_isnt_ptr : forall wz i0 wz0 i1 b ofs,
   Val.add (Vint wz i0) (Vint wz0 i1) <> Vptr b ofs.

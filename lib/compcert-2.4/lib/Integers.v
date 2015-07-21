@@ -3831,6 +3831,30 @@ Qed.
 
 End Integers.
 
+Hint Resolve modulus_pos: ints.
+Hint Resolve eqm_refl: ints.
+Hint Resolve eqm_refl2: ints.
+Hint Resolve eqm_sym: ints.
+Hint Resolve eqm_trans: ints.
+Hint Resolve eqm_small_eq: ints.
+Hint Resolve eqm_add: ints.
+Hint Resolve eqm_neg: ints.
+Hint Resolve eqm_sub: ints.
+Hint Resolve eqm_mult: ints.
+Hint Resolve eqm_unsigned_repr: ints.
+Hint Resolve eqm_unsigned_repr_l: ints.
+Hint Resolve eqm_unsigned_repr_r: ints.
+Hint Resolve unsigned_range: ints.
+Hint Resolve unsigned_range_2: ints.
+Hint Resolve repr_unsigned: ints.
+Hint Resolve repr_signed: ints.
+Hint Resolve unsigned_repr: ints.
+Hint Rewrite bits_zero bits_mone : ints.
+Hint Rewrite bits_and bits_or bits_xor bits_not: ints.
+Hint Rewrite bits_shl bits_shru bits_shr: ints.
+Hint Rewrite bits_rol bits_ror: ints.
+Hint Rewrite bits_zero_ext bits_sign_ext: ints.
+
 End Int.
 
 (** * Specialization to integers of size 8, 32, and 64 bits *)

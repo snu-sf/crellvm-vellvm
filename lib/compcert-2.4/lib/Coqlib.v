@@ -610,6 +610,343 @@ Proof.
   unfold nat_of_Z; intros. apply Z2Nat.inj_add; omega. 
 Qed.
 
+(* NOTE: Vellvm Context *)
+Lemma nat_of_Z_inj_ge : forall a b, (a >= b)%Z ->
+  (nat_of_Z a >= nat_of_Z b)%nat.
+Proof.
+  induction a; destruct b; intros; simpl;
+    try solve [auto | contradict H; auto | omega].
+  apply nat_compare_le.
+  rewrite <- nat_of_P_compare_morphism.
+
+  assert (p >= p0)%positive as J. auto with zarith.
+  unfold Pge in J.
+  remember ((p0 ?= p)%positive) as R.
+  destruct R; try solve [congruence].
+  symmetry in HeqR. apply Pos.compare_nle_iff in HeqR.
+  contradict HeqR.
+  apply Pos.compare_ge_iff in J. auto.
+Qed.
+
+Lemma nat_of_Z_inj_gt : forall a b, (a > b)%Z -> (b >= 0)%Z ->
+  (nat_of_Z a > nat_of_Z b)%nat.
+Proof.
+  induction a; destruct b; intros; simpl;
+    try solve [auto | contradict H; auto | omega].
+
+  assert (J:=@ZL4 p).
+  destruct J as [h J]. rewrite J. omega.
+
+  apply nat_compare_lt.
+  rewrite <- nat_of_P_compare_morphism.
+  assert (p > p0)%positive as J. auto with zarith.
+  unfold Pgt in J.
+  remember ((p ?= p0)%positive) as R.
+  destruct R; try solve [congruence].
+    symmetry in HeqR. apply ZC1 in HeqR. rewrite HeqR. congruence.
+
+  apply Zgt_compare in H. inversion H.
+Qed.
+
+Lemma S_eq_nat_of_P_o_P_of_succ_nat :
+  forall n, S n = nat_of_P (P_of_succ_nat n).
+Proof.
+  induction n; auto.
+    simpl. rewrite nat_of_P_succ_morphism. rewrite IHn. auto.
+Qed.
+
+Lemma Z_of_nat_eq:
+  forall (n:nat), nat_of_Z (Z_of_nat n) = n.
+Proof.
+  induction n; auto.
+    simpl. rewrite <- S_eq_nat_of_P_o_P_of_succ_nat; auto.
+Qed.
+
+Lemma Z_of_Sn_add_z__eq__Z_of_n_add_sz : forall n z,
+  Z_of_nat (S n) + z = Z_of_nat n + Zsucc z.
+Proof.
+  intros. rewrite inj_S. auto with zarith.
+Qed.
+
+Lemma O_lt_Z_of_S : forall n, 0 < Z_of_nat (S n).
+Proof.
+  intros. rewrite <- inj_0. apply inj_lt. omega.
+Qed.
+
+Lemma Z_of_S_gt_O : forall n, Z_of_nat (S n) > 0.
+Proof.
+  intros.
+  assert (J:=@O_lt_Z_of_S n).
+  auto with zarith.
+Qed.
+
+Lemma nat_of_Z_pos:
+  forall n, n > 0 -> (nat_of_Z n > O)%nat.
+Proof.
+  intros.
+  destruct n; unfold Zle; simpl; try omega.
+    assert (J:=@lt_O_nat_of_P p). auto.
+
+    assert (J:=@Zlt_neg_0 p).
+    contradict H; omega.
+Qed.
+
+Lemma nat_of_Z_inj : forall z1 z2,
+  z1 >= 0 ->
+  z2 >= 0 ->
+  nat_of_Z z1 = nat_of_Z z2 ->
+  z1 = z2.
+Proof.
+  induction z1; destruct z2; intros H H0 H1;
+  try solve [
+    auto |
+    assert (J:=@Zlt_neg_0 p); contradict H; omega |
+    assert (J:=@Zlt_neg_0 p0); contradict H0; omega |
+    simpl in H1;
+    assert (J:=@lt_O_nat_of_P p);
+    rewrite <- H1 in J; contradict J; omega
+    ].
+
+    simpl in H1.
+    apply nat_of_P_inj in H1.
+    subst. auto.
+Qed.
+
+Lemma Zpos_P_of_succ_nat_mono : forall m n,
+  (m <= n)%nat ->
+  Zpos (P_of_succ_nat m) <= Zpos (P_of_succ_nat n).
+Proof.
+  induction m; destruct n; simpl; intros; auto with zarith.
+    rewrite Zpos_succ_morphism. simpl.
+    rewrite Zpos_plus_distr.
+    assert (Zpos (P_of_succ_nat n) > 0) as F.
+      auto with zarith.
+    auto with zarith.
+
+    rewrite Zpos_succ_morphism.
+    rewrite Zpos_succ_morphism.
+    unfold Zsucc.
+    assert (Zpos (P_of_succ_nat m) <= Zpos (P_of_succ_nat n)) as J.
+      apply IHm; auto with zarith.
+    auto with zarith.
+Qed.
+
+(** * zdiv zmod *)
+
+Lemma mod_prop1 : forall wz,
+  Z_of_nat (S wz) mod 8 >= 0.
+Proof.
+  intro wz.
+  destruct (Z_mod_lt (Z_of_nat (S wz)) 8);
+    auto with zarith.
+Qed.
+
+Lemma zdiv_zmod_prop1 : forall a1 a2 b,
+  b <> 0 ->
+  a1 / b = a2 / b ->
+  a1 mod b = a2 mod b ->
+  a1 = a2.
+Proof.
+  intros.
+  rewrite (@Z_div_mod_eq_full a1 b H).
+  rewrite (@Z_div_mod_eq_full a2 b H).
+  rewrite H0. rewrite H1.
+  auto.
+Qed.
+
+(** * ZRdiv *)
+
+Definition ZRdiv (a b:Z) : Z :=
+  if zeq (a mod b) 0
+  then a / b
+  else a / b + 1.
+
+Lemma ZRdiv_prop1 : forall a b, b >0 -> b * (ZRdiv a b) >= a.
+Proof.
+  intros. unfold ZRdiv.
+  destruct (zeq (a mod b) 0).
+    rewrite <- Z_div_exact_full_2; auto with zarith.
+
+    rewrite Zmult_plus_distr_r.
+    rewrite (Zmult_comm b 1) .
+    rewrite Zmult_1_l.
+    assert (J:=@Z_mod_lt a b H).
+    assert (J':=@Z_div_mod_eq_full a b).
+    auto with zarith.
+Qed.
+
+Lemma ZRdiv_prop2 : forall a b, a >=0 -> b > 0 -> ZRdiv a b >= 0.
+Proof.
+  intros.
+  unfold ZRdiv.
+  destruct (zeq (a mod b) 0).
+    apply Z_div_ge0; auto.
+    assert (J:=@Z_div_ge0 a b H0 H). auto with zarith.
+Qed.
+
+Lemma Zpos_Zneg_Zmul : forall a b, a > 0 -> b < 0 -> a * b < 0.
+Proof.
+  intros a b Ha Hb.
+  destruct a as [|a|a]; try discriminate.
+  destruct b as [|b|b]; try discriminate.
+  trivial.
+Qed.
+
+Lemma Z_of_nat_ge_0 : forall n, Z_of_nat n >= 0.
+Proof.
+  induction n.
+    simpl. auto with zarith.
+    assert (J:=@Z_of_S_gt_O n). auto with zarith.
+Qed.
+
+Lemma two_power_nat_le_zero : forall n, two_power_nat n >= 0.
+Proof.
+  induction n; simpl.
+    unfold two_power_nat. unfold shift_nat. simpl. auto with zarith.
+    rewrite two_power_nat_S. auto with zarith.
+Qed.
+
+Lemma roundup_is_correct : forall a b, b >0 -> (a + b) / b * b >= a.
+Proof.
+  intros.
+  assert (b<>0). auto with zarith.
+  assert (J:=@Z_div_mod_eq_full (a+b) b H0).
+  assert (b * ((a + b) / b) = a + b - (a + b) mod b) as EQ.
+    auto with zarith.
+  assert (b * ((a + b) / b) = (a + b) / b * b) as EQ'.
+    auto with zarith.
+  rewrite <- EQ'.
+  rewrite EQ.
+  assert (J1:=@Z_mod_lt a b H).
+  assert (J2:=@Z_mod_plus_full a 1 b).
+  rewrite Zmult_1_l in J2.
+  rewrite J2.
+  clear - J1.
+  auto with zarith.
+Qed.
+
+Lemma ZRdiv_prop3 : forall a b, a > 0 -> b > 0 -> ZRdiv a b > 0.
+Proof.
+  intros.
+  unfold ZRdiv.
+  assert (J:=@Z_div_mod_eq a b H0).
+  destruct (zeq (a mod b) 0).
+    rewrite e in J.
+    ring_simplify in J.
+    destruct (a / b).
+      ring_simplify in J.
+      subst. contradict H; auto with zarith.
+
+      auto with zarith.
+      rewrite J in H.
+      assert (Zneg p <0) as Hneg. unfold Zlt. simpl. auto.
+      assert (b * Zneg p < 0) as J'.
+        eapply Zpos_Zneg_Zmul; eauto.
+      contradict J'; auto with zarith.
+
+    assert (a / b >= 0) as J'.
+      eapply Z_div_ge0; eauto with zarith.
+    auto with zarith.
+Qed.
+
+Lemma ZRdiv_prop4 : forall wz,
+  ZRdiv (Z_of_nat (S wz)) 8 >= 0.
+Proof.
+  intro.
+  apply ZRdiv_prop2; try solve [auto with zarith | apply Z_of_S_gt_O].
+Qed.
+
+Lemma ZRdiv_prop5 : forall wz,
+  ZRdiv (Z_of_nat (S wz)) 8 > 0.
+Proof.
+  intro.
+  apply ZRdiv_prop3;try solve [auto with zarith].
+    apply Z_of_S_gt_O.
+Qed.
+
+Lemma ZRdiv_prop6 : forall wz,
+  (nat_of_Z (ZRdiv (Z_of_nat (S wz)) 8) > 0)%nat.
+Proof.
+  intro.
+  apply nat_of_Z_pos.
+  apply ZRdiv_prop5.
+Qed.
+
+Lemma ZRdiv_prop7 : forall z1 z2 (A : z1 <= z2) (C: z1 > 0),
+   (if zeq (z1 mod 8) 0 then z1 / 8 else z1 / 8 + 1) <=
+   (if zeq (z2 mod 8) 0 then z2 / 8 else z2 / 8 + 1).
+Proof.
+  intros.
+  assert (z1 / 8 <= z2 / 8) as B.
+    apply Z_div_le; auto with zarith.
+  destruct (zeq (z1 mod 8) 0).
+    destruct (zeq (z2 mod 8) 0); auto with zarith.
+    destruct (zeq (z2 mod 8) 0); auto with zarith.
+      assert (z1 = 8*(z1/8) + (z1 mod 8)) as Z1.
+        apply Z_div_mod_eq; auto with zarith.
+      assert (z2 = 8*(z2/8) + (z2 mod 8)) as Z2.
+        apply Z_div_mod_eq; auto with zarith.
+      rewrite e in Z2.
+      assert (0 <= z1 mod 8 < 8) as D.
+        apply Z_mod_lt; auto with zarith.
+      destruct (Z_le_dec (z1 / 8 + 1) (z2 / 8)); auto.
+        contradict A.
+        rewrite Z1. rewrite Z2.
+        clear Z1 Z2 e. auto with zarith.
+Qed.
+
+Lemma ZRdiv_prop8 : forall (a c:nat),
+  nat_of_Z (ZRdiv (Z_of_nat (a * 8 * c)) 8) = (a * c)%nat.
+Proof.
+  intros.
+  assert (a * 8 * c = a * c * 8)%nat as J5.
+    rewrite mult_assoc_reverse.
+    assert (8*c = c*8)%nat as EQ. apply mult_comm; auto.
+    rewrite EQ. rewrite mult_assoc. auto.
+  rewrite J5. clear J5.
+  unfold ZRdiv. rewrite inj_mult. rewrite Z_mod_mult. simpl.
+  rewrite Z_div_mult_full; try solve [auto with zarith].
+  rewrite Z_of_nat_eq; auto.
+Qed.
+
+Lemma ZRdiv_prop9 : forall sz1 R4,
+  nat_of_Z (ZRdiv (Z_of_nat (sz1 + R4 * 8)) 8) =
+    (nat_of_Z (ZRdiv (Z_of_nat sz1) 8) + R4)%nat.
+Proof.
+  intros.
+  unfold ZRdiv. rewrite inj_plus. rewrite inj_mult. simpl.
+  rewrite Z_mod_plus; try solve [omega].
+  rewrite Z_div_plus; try solve [omega].
+  assert (Z_of_nat sz1 / 8 >= 0) as G1.
+    apply Z_div_ge0; auto using Z_of_nat_ge_0 with zarith.
+  assert (Z_of_nat R4 >= 0) as G2.
+    apply Z_of_nat_ge_0.
+  destruct (zeq (Z_of_nat sz1 mod 8) 0).
+    rewrite nat_of_Z_plus; auto.
+      rewrite Z_of_nat_eq; auto.
+
+    rewrite nat_of_Z_plus; try solve [omega].
+    rewrite nat_of_Z_plus; try solve [omega].
+    rewrite nat_of_Z_plus; try solve [omega].
+    rewrite Z_of_nat_eq; try solve [omega].
+Qed.
+
+Lemma zrdiv_zmod_prop1 : forall a1 a2 b,
+  b <> 0 ->
+  ZRdiv a1 b = ZRdiv a2 b ->
+  a1 mod b = a2 mod b ->
+  a1 = a2.
+Proof.
+  intros.
+  unfold ZRdiv in H0.
+  rewrite H1 in H0.
+  destruct (zeq (a2 mod b) 0).
+    eapply zdiv_zmod_prop1; eauto.
+    apply zdiv_zmod_prop1 with (b:=b); auto.
+      eauto with zarith.
+Qed.
+
+(* NOTE: End of Vellvm Context *)
 
 (** Alignment: [align n amount] returns the smallest multiple of [amount]
   greater than or equal to [n]. *)
