@@ -22,6 +22,8 @@ Require Import AST.
 Require Import Integers.
 Require Import Floats.
 
+Arguments eq_nat_dec _ _ : simpl never.
+
 Definition block : Type := positive.
 Definition eq_block := peq.
 
@@ -65,34 +67,18 @@ Definition eq_Vbool (wz:nat) (v v':val) :=
 
 Module Val.
 
-Definition eq (v1 v2:val) : bool :=
-match v1, v2 with
-| Vundef, _ => false
-| _, Vundef => false
-| Vint wz1 i1, Vint wz2 i2 => zeq (Int.unsigned wz1 i1) (Int.unsigned wz2 i2)
-| Vint wz1 i1, Vfloat f2 =>
-    match Float.to_int f2 with
-    | None => false
-    | Some fi =>
-      zeq (Int.unsigned wz1 i1) (Int.unsigned 31 fi)
-    end
-| Vfloat f1, Vint wz2 i2 =>
-    match Float.to_int f1 with
-    | None => false
-    | Some fi =>
-      zeq (Int.unsigned 31 fi) (Int.unsigned wz2 i2)
-    end
-| Vfloat f1, Vfloat f2 => match (Float.eq_dec f1 f2) with
-                          | left _ => true
-                          | right _ => false
-                          end
-| Vptr b1 o1, Vptr b2 o2 => eq_block b1 b2 && 
-                            zeq (Int.unsigned 31 o1) (Int.unsigned 31 o2)
-| Vinttoptr i1, Vinttoptr i2 => 
-    (* FIXME: Should we compare Vinttoptr and Vptr? *)
-    zeq (Int.unsigned 31 i1) (Int.unsigned 31 i2)
-| _, _ => false
-end.
+Definition eq (x y: val): {x=y} + {x<>y}.
+Proof.
+  destruct x, y; 
+  try (destruct (Float.eq_dec f f0)); 
+  try (destruct (Float32.eq_dec f f0)); 
+  try (destruct (eq_block b b0)); 
+  try (destruct (eq_nat_dec wz wz0)); subst;
+  try (destruct (Int.eq_dec _ i i0)); subst;
+  auto; 
+  try (now right; intro H; dependent destruction H; auto).
+Defined.
+Global Opaque eq.
 
 Definition get_wordsize (v : val) : option nat :=
   match v with
@@ -337,6 +323,13 @@ Definition floatofsingle (v: val) : val :=
 
 Definition hcast {U : Type} (Sig : U -> Type) (u:U) {v : U} (pf : u = v) (a : Sig u) : Sig v := @eq_rect U u Sig a v pf. 
 
+Lemma hcast_eq: forall T S u pf x,
+  @hcast T S u u pf x = x.
+Proof.
+  intros; unfold hcast.
+  rewrite <- eq_rect_eq. auto.
+Qed.
+
 Definition add (v1 v2: val): val :=
   match v1, v2 with
   | Vint wz1 n1, Vint wz2 n2 =>
@@ -345,27 +338,29 @@ Definition add (v1 v2: val): val :=
     | right _ => Vundef
     end
   | Vptr b1 ofs1, Vint wz2 n2 =>
-    match wz2 return Int.int wz2 -> val with
-    | 31%nat => fun n2 => Vptr b1 (Int.add 31 ofs1 n2)
-    | _ => fun _ => Vundef
-    end n2
+    match eq_nat_dec 31 wz2 with
+    | left pfeq => Vptr b1 (Int.add 31 ofs1 (hcast Int.int _ (eq_sym pfeq) n2))
+    | right _ => Vundef
+    end
   | Vint wz1 n1, Vptr b2 ofs2 =>
-      match wz1 return Int.int wz1 -> val with
-    | 31%nat => fun n1 => Vptr b2 (Int.add 31 ofs2 n1)
-    | _ => fun _ => Vundef
-    end n1
+    match eq_nat_dec 31 wz1 with
+    | left pfeq => Vptr b2 (Int.add 31 ofs2 (hcast Int.int _ (eq_sym pfeq) n1))
+    | right _ => Vundef
+    end
   | Vinttoptr n1, Vint wz2 n2 =>
-    match wz2 return Int.int wz2 -> val with
-    | 31%nat => fun n2 => Vinttoptr (Int.add 31 n1 n2)
-    | _ => fun _ => Vundef
-    end n2
+    match eq_nat_dec 31 wz2 with
+    | left pfeq => Vinttoptr (Int.add 31 n1 (hcast Int.int _ (eq_sym pfeq) n2))
+    | right _ => Vundef
+    end
   | Vint wz1 n1, Vinttoptr n2 =>
-    match wz1 return Int.int wz1 -> val with
-    | 31%nat => fun n1 => Vinttoptr (Int.add 31 n1 n2)
-    | _ => fun _ => Vundef
-    end n1
+    match eq_nat_dec 31 wz1 with
+    | left pfeq => Vinttoptr (Int.add 31 n2 (hcast Int.int _ (eq_sym pfeq) n1))
+    | right _ => Vundef
+    end
   | _, _ => Vundef
   end.
+
+Arguments add _ _ : simpl never.
 
 Definition sub (v1 v2: val): val :=
   match v1, v2 with
@@ -375,21 +370,23 @@ Definition sub (v1 v2: val): val :=
     | right _ => Vundef
     end
   | Vptr b1 ofs1, Vint wz2 n2 =>
-    match wz2 return Int.int wz2 -> val with
-    | 31%nat => fun n2 => Vptr b1 (Int.sub 31 ofs1 n2)
-    | _ => fun _ => Vundef
-    end n2
+    match eq_nat_dec 31 wz2 with
+    | left pfeq => Vptr b1 (Int.sub 31 ofs1 (hcast Int.int _ (eq_sym pfeq) n2))
+    | right _ => Vundef
+    end
   | Vptr b1 ofs1, Vptr b2 ofs2 =>
     if peq b1 b2 then Vint 31 (Int.sub 31 ofs1 ofs2) else Vundef
   | Vinttoptr n1, Vint wz2 n2 =>
-    match wz2 return Int.int wz2 -> val with
-    | 31%nat => fun n2 => Vinttoptr (Int.sub 31 n1 n2)
-    | _ => fun _ => Vundef
-    end n2
+    match eq_nat_dec 31 wz2 with
+    | left pfeq => Vinttoptr (Int.sub 31 n1 (hcast Int.int _ (eq_sym pfeq) n2))
+    | right _ => Vundef
+    end
   | Vinttoptr n1, Vinttoptr n2 =>
     Vint 31 (Int.sub 31 n1 n2)
   | _, _ => Vundef
   end.
+
+Arguments sub _ _ : simpl never.
 
 Definition mul (v1 v2: val): val :=
   match v1, v2 with
@@ -426,7 +423,8 @@ Definition divs (v1 v2: val): option val :=
   | Vint wz1 n1, Vint wz2 n2 =>
     match eq_nat_dec wz1 wz2 with
     | left pfeq =>
-      if Int.eq wz1 (hcast Int.int _ (eq_sym pfeq) n2) (Int.zero wz1) 
+      if Int.eq wz1 (hcast Int.int _ (eq_sym pfeq) n2) (Int.zero wz1)
+      || Int.eq wz1 n1 (Int.repr wz1 (Int.min_signed wz1)) && Int.eq wz1 (hcast Int.int _ (eq_sym pfeq) n2) (Int.mone wz1)
       then None
       else Some (Vint wz1 (Int.divs wz1 n1 (hcast Int.int _ (eq_sym pfeq) n2)))
     | right _ => None
@@ -577,7 +575,9 @@ Definition shrx (v1 v2: val): option val :=
   | Vint wz1 n1, Vint wz2 n2 =>
     match eq_nat_dec wz1 wz2 with
     | left pfeq =>
-      if Int.ltu wz2 n2 (Int.repr wz2 31)
+      if Int.ltu wz1
+        (hcast Int.int _ (eq_sym pfeq) n2)
+        (Int.repr wz1 (Int.zwordsize wz1 - 1))
       then Some (Vint wz1 (Int.shrx wz1 n1 (hcast Int.int _ (eq_sym pfeq) n2)))
       else None
     | right _ => None
@@ -600,7 +600,11 @@ Definition shru (v1 v2: val): val :=
 
 Definition rolm (v: val) (amount mask: int32): val :=
   match v with
-  | Vint 31 n => Vint 31 (Int.rolm 31 n amount mask)
+  | Vint wz n =>
+    match eq_nat_dec 31 wz with
+    | left pfeq => Vint 31 (Int.rolm 31 (hcast Int.int _ (eq_sym pfeq) n) amount mask)
+    | right _ => Vundef
+    end
   | _ => Vundef
   end.
 
@@ -708,14 +712,13 @@ Definition cmpu_bool (c: comparison) (v1 v2: val): option bool :=
     | right _ => None
     end
   | Vint wz1 n1, Vptr b2 ofs2 =>
-    match wz1 return Int.int wz1 -> option bool with
-    | 31%nat =>
-      fun n1 =>
-        if Int.eq 31 n1 (Int.zero 31)
+    match eq_nat_dec 31 wz1 with
+    | left pfeq =>
+        if Int.eq 31 (hcast Int.int _ (eq_sym pfeq) n1) (Int.zero 31)
         then cmp_different_blocks c
         else None
-    | _ => fun _ => None
-    end n1
+    | right _ => None
+    end
   | Vptr b1 ofs1, Vptr b2 ofs2 =>
       if eq_block b1 b2 then
         if weak_valid_ptr b1 (Int.unsigned 31 ofs1)
@@ -728,14 +731,13 @@ Definition cmpu_bool (c: comparison) (v1 v2: val): option bool :=
         then cmp_different_blocks c
         else None
   | Vptr b1 ofs1, Vint wz2 n2 =>
-    match wz2 return Int.int wz2 -> option bool with
-    | 31%nat =>
-      fun n2 =>
-        if Int.eq 31 n2 (Int.zero 31)
+    match eq_nat_dec 31 wz2 with
+    | left pfeq =>
+        if Int.eq 31 (hcast Int.int _ (eq_sym pfeq) n2) (Int.zero 31)
         then cmp_different_blocks c
         else None
-    | _ => fun _ => None
-    end n2
+    | right _ => None
+    end
   | Vinttoptr n1, Vinttoptr n2 => Some (Int.cmpu 31 c n1 n2)
 (* FIXME: Vptr and Vinttoptr are not compariable. *)
   | _, _ => None
@@ -777,6 +779,15 @@ Definition maskzero_bool (v: val) (mask: int32): option bool :=
 
 End COMPARISONS.
 
+Ltac simplify_op :=
+  let HEQ := fresh "_Heqdec_" in
+  simpl
+  ; repeat match goal with [|- context[eq_nat_dec ?a ?b]] => 
+      destruct (eq_nat_dec a b) eqn: HEQ; subst; try clear HEQ 
+    end
+  ; simpl; auto; try tauto
+  ; repeat rewrite hcast_eq.
+
 (** [load_result] reflects the effect of storing a value with a given
   memory chunk, then reading it back with the same chunk.  Depending
   on the chunk and the type of the value, some normalization occurs.
@@ -811,19 +822,17 @@ Hypothesis x_is_int : get_wordsize x = Some 31%nat.
 Theorem cast8unsigned_and:
   zero_ext 8 x = and x (Vint 31 (Int.repr 31 255)).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
   destruct x; simpl; auto. decEq. 
-  change 255 with (two_p 8 - 1). apply Int.zero_ext_and. omega.
-*)
+  change 255 with (two_p 8 - 1).
+  inv x_is_int. simpl. rewrite Int.zero_ext_and. auto. omega.
 Qed.
 
 Theorem cast16unsigned_and:
   zero_ext 16 x = and x (Vint 31 (Int.repr 31 65535)).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
   destruct x; simpl; auto. decEq. 
-  change 65535 with (two_p 16 - 1). apply Int.zero_ext_and. omega.
-*)
+  change 65535 with (two_p 16 - 1).
+  inv x_is_int. simpl. rewrite Int.zero_ext_and. auto. omega.
 Qed.
 
 End ArithOperations. 
@@ -833,17 +842,17 @@ Theorem bool_of_val_of_bool:
 Proof.
   intros. destruct b1; simpl in H; inv H; auto.
   exfalso;apply H3.
-  admit. (* TODO: skip for upgrade *)
+  dependent destruction H2;auto.
 Qed.
 
 Theorem bool_of_val_of_optbool:
   forall ob b, bool_of_val (of_optbool ob) b -> ob = Some b.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
   intros. destruct ob; simpl in H. 
   destruct b0; simpl in H; inv H; auto.
+  dependent destruction H2; auto.
+  exfalso;auto.
   inv H.
-  *)
 Qed.
 
 Theorem notbool_negb_1:
@@ -885,23 +894,28 @@ Qed.
 
 Theorem add_commut: forall x y, add x y = add y x.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  destruct x; destruct y; simpl; auto.
-  decEq. apply Int.add_commut.
-*)
+  destruct x; destruct y; unfold add; simpl; auto; simplify_op;
+  rewrite Int.add_commut; auto.
+Qed.
+
+Lemma add_undef_left: forall x y, x = Vundef -> add x y = Vundef.
+Proof.
+  induction x; intros; simpl; inv H; auto.
+Qed.
+
+Lemma add_undef_right: forall x y, y = Vundef -> add x y = Vundef.
+Proof.
+  intros. rewrite add_commut. revert H. revert x. revert y. apply add_undef_left.
 Qed.
 
 Theorem add_assoc: forall x y z, add (add x y) z = add x (add y z).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  destruct x; destruct y; destruct z; simpl; auto.
-  rewrite Int.add_assoc; auto.
-  rewrite Int.add_assoc; auto.
-  decEq. decEq. apply Int.add_commut.
-  decEq. rewrite Int.add_commut. rewrite <- Int.add_assoc. 
-  decEq. apply Int.add_commut.
-  decEq. rewrite Int.add_assoc. auto.
-*)
+  destruct x; destruct y; destruct z; simpl; auto; unfold add 
+  ; simplify_op; decEq; rewrite Int.add_assoc; auto.
+  - decEq; apply Int.add_commut.
+  - decEq; apply Int.add_commut.
+  - rewrite Int.add_assoc; decEq; apply Int.add_commut.
+  - rewrite Int.add_assoc. decEq; apply Int.add_commut.
 Qed.
 
 Theorem add_permut: forall x y z, add x (add y z) = add y (add x z).
@@ -923,35 +937,35 @@ Qed.
 
 Theorem neg_add_distr: forall x y, neg(add x y) = add (neg x) (neg y).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  destruct x; destruct y; simpl; auto. decEq. apply Int.neg_add_distr.
-*)
+  destruct x; destruct y; unfold add; simplify_op; auto.
+  decEq. apply Int.neg_add_distr.
 Qed.
 
-Theorem sub_zero_r: forall x wz, sub (Vzero wz) x = neg x.
+Theorem sub_zero_r: forall x wz,
+  get_wordsize x = Some wz -> sub (Vzero wz) x = neg x.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  destruct x; simpl; auto. 
-*)
+  destruct x; unfold sub; simpl; auto.
+  intro wz0; destruct (eq_nat_dec wz0 wz) eqn:Heq.
+  - subst; reflexivity.
+  - intros. inv H. exfalso;apply n;auto.
 Qed.
 
 Theorem sub_add_opp: forall x wz y,
   get_wordsize x = Some wz -> 
   sub x (Vint wz y) = add x (Vint wz (Int.neg wz y)).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  destruct x; intro y; simpl; auto; rewrite Int.sub_add_opp; auto.
-*)
+  intros; destruct x; inv H;
+  unfold sub, add; simplify_op; auto;
+  rewrite Int.sub_add_opp; auto.
 Qed.
 
 Theorem sub_opp_add: forall x wz y,
   get_wordsize x = Some wz -> 
   sub x (Vint wz (Int.neg wz y)) = add x (Vint wz y).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  intros. unfold sub, add.
-  destruct x; auto; rewrite Int.sub_add_opp; rewrite Int.neg_involutive; auto.
-*)
+  intros. unfold sub, add;
+  destruct x; simplify_op; auto;
+  rewrite Int.sub_add_opp; rewrite Int.neg_involutive; auto.
 Qed.
 
 Theorem sub_add_l:
@@ -959,12 +973,10 @@ Theorem sub_add_l:
   get_wordsize v1 = Some wz -> 
   sub (add v1 (Vint wz i)) v2 = add (sub v1 v2) (Vint wz i).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  destruct v1; destruct v2; intros; simpl; auto.
-  rewrite Int.sub_add_l. auto.
-  rewrite Int.sub_add_l. auto.
-  case (eq_block b b0); intro. rewrite Int.sub_add_l. auto. reflexivity.
-*)
+  intros; unfold sub, add;
+  destruct v1; destruct v2; inversion H; simplify_op;
+  try rewrite Int.sub_add_l; auto.
+  case (peq b b0); intro; reflexivity.
 Qed.
 
 Theorem sub_add_r:
@@ -972,51 +984,47 @@ Theorem sub_add_r:
   get_wordsize v1 = Some wz -> 
   sub v1 (add v2 (Vint wz i)) = add (sub v1 v2) (Vint wz (Int.neg wz i)).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  destruct v1; destruct v2; intros; simpl; auto.
-  rewrite Int.sub_add_r. auto.
-  repeat rewrite Int.sub_add_opp. decEq. 
-  repeat rewrite Int.add_assoc. decEq. apply Int.add_commut.
-  decEq. repeat rewrite Int.sub_add_opp. 
-  rewrite Int.add_assoc. decEq. apply Int.neg_add_distr.
-  case (eq_block b b0); intro. simpl. decEq. 
-  repeat rewrite Int.sub_add_opp. rewrite Int.add_assoc. decEq.
-  apply Int.neg_add_distr.
-  reflexivity.
-*)
+  intros; unfold sub, add;
+  destruct v1; destruct v2; inversion H; simplify_op.
+  - rewrite Int.sub_add_r. rewrite Int.sub_add_opp.
+    rewrite Int.add_assoc. rewrite (Int.add_commut wz (Int.neg wz i) (Int.neg wz i1)).
+    rewrite <- Int.add_assoc. rewrite Int.sub_add_opp. auto.
+  - repeat rewrite Int.sub_add_opp. decEq. 
+    repeat rewrite Int.add_assoc. decEq. apply Int.neg_add_distr.
+  - case (peq b b0); intro; simpl. decEq. 
+    repeat rewrite Int.sub_add_opp. rewrite Int.add_assoc. decEq.
+    apply Int.neg_add_distr.
+    reflexivity.
+  - repeat rewrite Int.sub_add_opp. decEq. 
+    repeat rewrite Int.add_assoc. decEq. apply Int.neg_add_distr.
+  - repeat rewrite Int.sub_add_opp. decEq. 
+    repeat rewrite Int.add_assoc. decEq. apply Int.neg_add_distr.
 Qed.
 
 Theorem mul_commut: forall x y, mul x y = mul y x.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  destruct x; destruct y; simpl; auto. decEq. apply Int.mul_commut.
-  *)
+  destruct x; destruct y; simpl; auto; simplify_op.
+  rewrite Int.mul_commut. auto.
 Qed.
 
 Theorem mul_assoc: forall x y z, mul (mul x y) z = mul x (mul y z).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  destruct x; destruct y; destruct z; simpl; auto.
+  destruct x; destruct y; destruct z; unfold mul; simpl; auto; simplify_op;
   decEq. apply Int.mul_assoc.
-  *)
 Qed.
 
 Theorem mul_add_distr_l:
   forall x y z, mul (add x y) z = add (mul x z) (mul y z).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  destruct x; destruct y; destruct z; simpl; auto.
+  destruct x; destruct y; destruct z; unfold add, mul; simpl; auto; simplify_op;
   decEq. apply Int.mul_add_distr_l.
-*)
 Qed.
 
 Theorem mul_add_distr_r:
   forall x y z, mul x (add y z) = add (mul x y) (mul x z).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  destruct x; destruct y; destruct z; simpl; auto.
+  destruct x; destruct y; destruct z; unfold add, mul; simpl; auto; simplify_op.
   decEq. apply Int.mul_add_distr_r.
-*)
 Qed.
 
 Theorem mul_pow2:
@@ -1025,52 +1033,49 @@ Theorem mul_pow2:
   Int.is_power2 wz n = Some logn ->
   mul x (Vint wz n) = shl x (Vint wz logn).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  intros; destruct x; simpl; auto.
+  intros; destruct x; simpl; auto; simplify_op;
   change 32 with Int.zwordsize.
-  rewrite (Int.is_power2_range _ _ H). decEq. apply Int.mul_pow2. auto.
-*)
+  Check Int.is_power2_range.
+  rewrite (Int.is_power2_range _ _ _ H0). decEq. apply Int.mul_pow2. auto.
 Qed.
 
 Theorem mods_divs:
   forall x y z,
   mods x y = Some z -> exists v, divs x y = Some v /\ z = sub x (mul v y).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  intros. destruct x; destruct y; simpl in *; try discriminate.
-  destruct (Int.eq i0 Int.zero
-        || Int.eq i (Int.repr Int.min_signed) && Int.eq i0 Int.mone); inv H.
-  exists (Vint (Int.divs i i0)); split; auto. 
-  simpl. rewrite Int.mods_divs. auto.
-*)
+  intros; destruct x; destruct y; unfold sub; simpl in *; simplify_op; try discriminate.
+  destruct (Int.eq wz0 i0 (Int.zero wz0)
+        || Int.eq wz0 i (Int.repr wz0 (Int.min_signed wz0)) && Int.eq wz0 i0 (Int.mone wz0)) eqn:Heqn; inv H.
+  exists (Vint wz0 (Int.divs wz0 i i0)); split; auto. 
+  simpl. rewrite Int.mods_divs. simplify_op. auto.
 Qed.
 
 Theorem modu_divu:
   forall x y z,
   modu x y = Some z -> exists v, divu x y = Some v /\ z = sub x (mul v y).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  intros. destruct x; destruct y; simpl in *; try discriminate.
-  destruct (Int.eq i0 Int.zero) eqn:?; inv H. 
-  exists (Vint (Int.divu i i0)); split; auto. 
-  simpl. rewrite Int.modu_divu. auto.
-  generalize (Int.eq_spec i0 Int.zero). rewrite Heqb; auto. 
-*)
+  intros. destruct x; destruct y; unfold sub; simpl in *; simplify_op; try discriminate.
+  destruct (Int.eq wz0 i0 (Int.zero wz0)) eqn:?; inv H. 
+  exists (Vint wz0 (Int.divu wz0 i i0)); split; auto. 
+  simpl. rewrite Int.modu_divu. simplify_op. auto.
+  generalize (Int.eq_spec wz0 i0 (Int.zero wz0)). rewrite Heqb; auto. 
 Qed.
 
 Theorem divs_pow2:
   forall x wz n logn y,
   get_wordsize x = Some wz ->
-  Int.is_power2 wz n = Some logn -> Int.ltu wz logn (Int.repr wz 31) = true ->
+  Int.is_power2 wz n = Some logn ->
+  Int.ltu wz logn (Int.repr wz (Int.zwordsize wz - 1)) = true ->
   divs x (Vint wz n) = Some y ->
   shrx x (Vint wz logn) = Some y.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  intros; destruct x; simpl in H1; inv H1.
-  destruct (Int.eq n Int.zero
-         || Int.eq i (Int.repr Int.min_signed) && Int.eq n Int.mone); inv H3.
-  simpl. rewrite H0. decEq. decEq. symmetry. apply Int.divs_pow2. auto.
-*)
+  Arguments Zminus: simpl never.
+  intros x wz n logn y Hwz Hp2 Hltu Hdiv
+  ; destruct x; simpl in Hdiv; inv Hdiv; simplify_op.
+  rewrite hcast_eq in *.
+  destruct (Int.eq wz n (Int.zero wz)
+         || Int.eq wz i (Int.repr wz (Int.min_signed wz)) && Int.eq wz n (Int.mone wz)); inv H0.
+  rewrite Hltu. decEq. Check Int.divs_pow2. rewrite (Int.divs_pow2 wz i n logn); auto.
 Qed.
 
 Theorem divu_pow2:
@@ -1080,13 +1085,11 @@ Theorem divu_pow2:
   divu x (Vint wz n) = Some y ->
   shru x (Vint wz logn) = y.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  intros; destruct x; simpl in H0; inv H0.
-  destruct (Int.eq n Int.zero); inv H2. 
-  simpl. 
-  rewrite (Int.is_power2_range _ _ H).
+  intros x wz n logn y Hwz Hpw Hdiv; destruct x; simpl in Hdiv; inv Hdiv.
+  simplify_op; inv H0.
+  destruct (Int.eq wz n (Int.zero wz)); inv H1.
+  rewrite (Int.is_power2_range wz _ _ Hpw).
   decEq. symmetry. apply Int.divu_pow2. auto.
-*)
 Qed.
 
 Theorem modu_pow2:
@@ -1096,98 +1099,81 @@ Theorem modu_pow2:
   modu x (Vint wz n) = Some y ->
   and x (Vint wz (Int.sub wz n (Int.one wz))) = y.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  intros; destruct x; simpl in H0; inv H0.
-  destruct (Int.eq n Int.zero); inv H2. 
+  intros x wz n logn y Hwz Hpw Hmod; destruct x; simpl in Hmod; inv Hmod.
+  simplify_op; inv H0.
+  destruct (Int.eq wz n (Int.zero wz)); inv H1. 
   simpl. decEq. symmetry. eapply Int.modu_and; eauto.
-*)
 Qed.
 
 Theorem and_commut: forall x y, and x y = and y x.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  destruct x; destruct y; simpl; auto. decEq. apply Int.and_commut.
-*)
+  destruct x; destruct y; simplify_op.
+  simplify_op. decEq. apply Int.and_commut.
 Qed.
 
 Theorem and_assoc: forall x y z, and (and x y) z = and x (and y z).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  destruct x; destruct y; destruct z; simpl; auto.
+  destruct x; destruct y; destruct z; simplify_op; simplify_op.
   decEq. apply Int.and_assoc.
-*)
 Qed.
 
 Theorem or_commut: forall x y, or x y = or y x.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  destruct x; destruct y; simpl; auto. decEq. apply Int.or_commut.
-*)
+  destruct x; destruct y; simplify_op.
+  decEq. apply Int.or_commut.
 Qed.
 
 Theorem or_assoc: forall x y z, or (or x y) z = or x (or y z).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  destruct x; destruct y; destruct z; simpl; auto.
+  destruct x; destruct y; destruct z; simplify_op; simplify_op.
   decEq. apply Int.or_assoc.
-*)
 Qed.
 
 Theorem xor_commut: forall x y, xor x y = xor y x.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  destruct x; destruct y; simpl; auto. decEq. apply Int.xor_commut.
-*)
+  destruct x; destruct y; simplify_op.
+  decEq. apply Int.xor_commut.
 Qed.
 
 Theorem xor_assoc: forall x y z, xor (xor x y) z = xor x (xor y z).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  destruct x; destruct y; destruct z; simpl; auto.
+  destruct x; destruct y; destruct z; simplify_op; simplify_op.
   decEq. apply Int.xor_assoc.
-*)
 Qed.
 
-Theorem not_xor: forall wz x, notint x = xor x (Vint wz (Int.mone wz)).
+Theorem not_xor: forall wz x
+  (Hwz: get_wordsize x = Some wz), notint x = xor x (Vint wz (Int.mone wz)).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  destruct x; simpl; auto. 
-*)
+  intros; destruct x; inv Hwz; simplify_op; auto.
 Qed.
 
-Theorem shl_mul: forall wz x y,
-  get_wordsize x = Some wz ->
+Theorem shl_mul: forall wz x y
+  (Hwz: get_wordsize x = Some wz),
   mul x (shl (Vone wz) y) = shl x y.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  destruct x; destruct y; simpl; auto. 
-  case (Int.ltu i0 Int.iwordsize); auto.
+  intros; destruct x; destruct y; inv Hwz; simplify_op; auto. 
+  case (Int.ltu wz1 i0 (Int.iwordsize wz1)); simplify_op.
   decEq. symmetry. apply Int.shl_mul.
-*)
 Qed.
 
 Theorem shl_rolm:
-  forall x n,
-  get_wordsize x = Some 31%nat ->
+  forall x n
+  (Hwz: get_wordsize x = Some 31%nat),
   Int.ltu 31 n (Int.iwordsize 31) = true ->
   shl x (Vint 31 n) = rolm x n (Int.shl 31 (Int.mone 31) n).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  intros; destruct x; simpl; auto.
+  intros; destruct x; inv Hwz; simpl; auto.
   rewrite H. decEq. apply Int.shl_rolm. exact H.
-*)
 Qed.
 
 Theorem shru_rolm:
-  forall x n,
-  get_wordsize x = Some 31%nat ->
+  forall x n
+  (Hwz: get_wordsize x = Some 31%nat),
   Int.ltu 31 n (Int.iwordsize 31) = true ->
   shru x (Vint 31 n) = rolm x (Int.sub 31 (Int.iwordsize 31) n) (Int.shru 31 (Int.mone 31) n).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  intros; destruct x; simpl; auto.
+  intros; destruct x; inv Hwz; simpl; auto.
   rewrite H. decEq. apply Int.shru_rolm. exact H.
-*)
 Qed.
 
 Theorem shrx_carry:
@@ -1195,11 +1181,30 @@ Theorem shrx_carry:
   shrx x y = Some z ->
   add (shr x y) (shr_carry x y) = z.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
+
   intros. destruct x; destruct y; simpl in H; inv H. 
-  destruct (Int.ltu i0 (Int.repr 31)) eqn:?; inv H1.
-  exploit Int.ltu_inv; eauto. change (Int.unsigned (Int.repr 31)) with 31. intros.
-  assert (Int.ltu i0 Int.iwordsize = true). 
+  destruct (Int.ltu wz0 i0 (Int.repr wz0 (Int.zwordsize wz0 - 1))) eqn:?; inv H1.
+  exploit Int.ltu_inv; eauto.
+  intros.
+admit. admit. (* TODO: skip for upgrade *) (*
+(*  change (Int.unsigned wz0 (Int.repr wz0 (Int.zwordsize wz0 - 1))) with (Int.zwordsize wz0 - 1). *)
+  assert (Int.ltu wz0 i0 (Int.iwordsize wz0) = true). 
+    unfold Int.ltu. apply zlt_true. change (Int.unsigned wz0 (Int.iwordsize wz0)) with wz0. omega. 
+  simpl. rewrite H0. simpl. decEq. rewrite Int.shrx_carry; auto.
+
+
+  intros. destruct x; destruct y; simplify_op; inv H
+  ; destruct (eq_nat_dec _ _); inv H1; rewrite hcast_eq in *.
+  - destruct (Int.ltu wz0 i0 (Int.repr wz0 (Int.zwordsize wz0 -1))) eqn:Hltu.
+    + unfold add; simplify_op.
+      exploit (Int.ltu_inv wz0 i0 (Int.repr wz0 (Int.zwordsize wz0 - 1))); eauto.
+      rewrite <- Int.shrx_carry.
+      
+  - exfalso; apply n; auto.
+  rewrite Hltu in H0. inv H0.
+  decEq. symmetry. apply Int.shrx_carry. unfold Int.iwordsize in Hltu.
+  apply Int.ltu_inv in Hltu.
+  assert (Int.ltu wz0 i0 (Int.iwordsize wz0) = true). 
     unfold Int.ltu. apply zlt_true. change (Int.unsigned Int.iwordsize) with 32. omega. 
   simpl. rewrite H0. simpl. decEq. rewrite Int.shrx_carry; auto.
 *)
@@ -1213,79 +1218,68 @@ Theorem shrx_shr:
     x = Vint 31 p /\ y = Vint 31 q /\
     z = shr (if Int.lt 31 p (Int.zero 31) then add x (Vint 31 (Int.sub 31 (Int.shl 31 (Int.one 31) q) (Int.one 31))) else x) (Vint 31 q).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  intros. destruct x; destruct y; simpl in H; inv H. 
-  destruct (Int.ltu i0 (Int.repr 31)) eqn:?; inv H1.
-  exploit Int.ltu_inv; eauto. change (Int.unsigned (Int.repr 31)) with 31. intros.
-  assert (Int.ltu i0 Int.iwordsize = true). 
-    unfold Int.ltu. apply zlt_true. change (Int.unsigned Int.iwordsize) with 32. omega. 
+  destruct x; destruct y; simplify_op; intros; inv H0; inv H; subst.
+  destruct (Int.ltu 31 i0 (Int.repr 31 (Int.zwordsize 31 - 1))) eqn:?; inv H2.
+  exploit Int.ltu_inv; eauto. change (Int.unsigned 31 (Int.repr 31 (Int.zwordsize 31 - 1))) with 31. intros.
+  assert (Int.ltu 31 i0 (Int.iwordsize 31) = true). 
+    unfold Int.ltu. apply zlt_true. change (Int.unsigned 31 (Int.iwordsize 31)) with 32. omega. 
   exists i; exists i0; intuition. 
-  rewrite Int.shrx_shr; auto. destruct (Int.lt i Int.zero); simpl; rewrite H0; auto.
-*)
+  rewrite Int.shrx_shr; auto. destruct (Int.lt 31 i (Int.zero 31)); simpl; rewrite H0; auto.
 Qed.
 
 Theorem or_rolm:
-  forall x n m1 m2,
-  get_wordsize x = Some 31%nat ->
+  forall x n m1 m2
+  (Hwz: get_wordsize x = Some 31%nat),
   or (rolm x n m1) (rolm x n m2) = rolm x n (Int.or 31 m1 m2).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  intros; destruct x; simpl; auto.
+  intros; destruct x; inv Hwz; simplify_op.
   decEq. apply Int.or_rolm.
-*)
 Qed.
 
 Theorem rolm_rolm:
-  forall x n1 m1 n2 m2,
-  get_wordsize x = Some 31%nat ->
+  forall x n1 m1 n2 m2
+  (Hwz: get_wordsize x = Some 31%nat),
   rolm (rolm x n1 m1) n2 m2 =
     rolm x (Int.modu 31 (Int.add 31 n1 n2) (Int.iwordsize 31))
            (Int.and 31 (Int.rol 31 m1 n2) m2).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  intros; destruct x; simpl; auto.
+  intros; destruct x; inv Hwz; simplify_op.
   decEq. 
-  apply Int.rolm_rolm. apply int_wordsize_divides_modulus.
-*)
+  apply Int.rolm_rolm. apply int32_wordsize_divides_modulus.
 Qed.
 
 Theorem rolm_zero:
-  forall x m,
-  get_wordsize x = Some 31%nat ->
+  forall x m
+  (Hwz: get_wordsize x = Some 31%nat),
   rolm x (Int.zero 31) m = and x (Vint 31 m).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  intros; destruct x; simpl; auto. decEq. apply Int.rolm_zero.
-*)
+  intros; destruct x; inv Hwz; simplify_op. decEq. apply Int.rolm_zero.
 Qed.
 
 Theorem negate_cmp_bool:
   forall c x y, cmp_bool (negate_comparison c) x y = option_map negb (cmp_bool c x y).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  destruct x; destruct y; simpl; auto. rewrite Int.negate_cmp. auto.
-*)
+  destruct x; destruct y; simplify_op. rewrite Int.negate_cmp. auto.
 Qed.
 
 Theorem negate_cmpu_bool:
   forall valid_ptr c x y,
   cmpu_bool valid_ptr (negate_comparison c) x y = option_map negb (cmpu_bool valid_ptr c x y).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
   assert (forall c,
-    cmp_different_blocks (negate_comparison c) = option_map negb (cmp_different_blocks c)).
-  destruct c; auto. 
-  destruct x; destruct y; simpl; auto.
-  rewrite Int.negate_cmpu. auto.
-  destruct (Int.eq i Int.zero); auto. 
-  destruct (Int.eq i0 Int.zero); auto.
-  destruct (eq_block b b0).
-  destruct ((valid_ptr b (Int.unsigned i) || valid_ptr b (Int.unsigned i - 1)) &&
-            (valid_ptr b0 (Int.unsigned i0) || valid_ptr b0 (Int.unsigned i0 - 1))).
-  rewrite Int.negate_cmpu. auto.
-  auto.
-  destruct (valid_ptr b (Int.unsigned i) && valid_ptr b0 (Int.unsigned i0)); auto.
-*)
+    cmp_different_blocks (negate_comparison c) = option_map negb (cmp_different_blocks c))
+    by (destruct c; auto). 
+  destruct x; destruct y; simplify_op.
+  - rewrite Int.negate_cmpu. auto.
+  - destruct (Int.eq 31 i (Int.zero 31)); auto. 
+  - destruct (Int.eq 31 i0 (Int.zero 31)); auto.
+  - destruct (eq_block b b0).
+    destruct ((valid_ptr b (Int.unsigned 31 i) || valid_ptr b (Int.unsigned 31 i - 1)) &&
+            (valid_ptr b0 (Int.unsigned 31 i0) || valid_ptr b0 (Int.unsigned 31 i0 - 1))).
+    rewrite Int.negate_cmpu. auto.
+    auto.
+  destruct (valid_ptr b (Int.unsigned 31 i) && valid_ptr b0 (Int.unsigned 31 i0)); auto.
+  - decEq. apply Int.negate_cmpu. 
 Qed.
 
 Lemma not_of_optbool:
@@ -1313,9 +1307,7 @@ Theorem swap_cmp_bool:
   forall c x y,
   cmp_bool (swap_comparison c) x y = cmp_bool c y x.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  destruct x; destruct y; simpl; auto. rewrite Int.swap_cmp. auto.
-*)
+  destruct x; destruct y; simplify_op; auto. rewrite Int.swap_cmp. auto.
 Qed.
 
 Theorem swap_cmpu_bool:
@@ -1323,23 +1315,22 @@ Theorem swap_cmpu_bool:
   cmpu_bool valid_ptr (swap_comparison c) x y =
     cmpu_bool valid_ptr c y x.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  assert (forall c, cmp_different_blocks (swap_comparison c) = cmp_different_blocks c).
-    destruct c; auto.
-  destruct x; destruct y; simpl; auto.
-  rewrite Int.swap_cmpu. auto.
-  case (Int.eq i Int.zero); auto.
-  case (Int.eq i0 Int.zero); auto.
-  destruct (eq_block b b0); subst.
-  rewrite dec_eq_true.
-  destruct (valid_ptr b0 (Int.unsigned i) || valid_ptr b0 (Int.unsigned i - 1));
-  destruct (valid_ptr b0 (Int.unsigned i0) || valid_ptr b0 (Int.unsigned i0 - 1));
-  simpl; auto.
-  rewrite Int.swap_cmpu. auto.
-  rewrite dec_eq_false by auto.
-  destruct (valid_ptr b (Int.unsigned i));
-    destruct (valid_ptr b0 (Int.unsigned i0)); simpl; auto.
-*)
+  assert (forall c, cmp_different_blocks (swap_comparison c) = cmp_different_blocks c)
+    by (destruct c; auto).
+  destruct x; destruct y; simplify_op.
+  - rewrite Int.swap_cmpu. auto.
+  - case (Int.eq 31 i (Int.zero 31)); auto.
+  - case (Int.eq 31 i0 (Int.zero 31)); auto.
+  - destruct (eq_block b b0); subst.
+    rewrite dec_eq_true.
+    destruct (valid_ptr b0 (Int.unsigned 31 i) || valid_ptr b0 (Int.unsigned 31 i - 1));
+    destruct (valid_ptr b0 (Int.unsigned 31 i0) || valid_ptr b0 (Int.unsigned 31 i0 - 1));
+    simpl; auto.
+    rewrite Int.swap_cmpu. auto.
+    rewrite dec_eq_false by auto.
+    destruct (valid_ptr b (Int.unsigned 31 i));
+    destruct (valid_ptr b0 (Int.unsigned 31 i0)); simpl; auto.
+  - decEq. apply Int.swap_cmpu.
 Qed.
 
 Theorem negate_cmpf_eq:
@@ -1425,38 +1416,67 @@ Proof.
 Qed.
 
 Lemma zero_ext_and:
-  forall n wz v,
-  get_wordsize v = Some wz ->
+  forall n wz v
+  (Hwz: get_wordsize v = Some wz),
   0 < n < Z_of_nat wz ->
   Val.zero_ext n v = Val.and v (Vint wz (Int.repr wz (two_p n - 1))).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  intros. destruct v; simpl; auto. decEq. apply Int.zero_ext_and; auto. omega.
-*)
+  intros. inv Hwz; destruct v; simplify_op. decEq. apply Int.zero_ext_and; auto. omega.
+  inv H1. exfalso; apply n0; auto.
+Qed.
+
+Lemma Vundef__eq_Vbool__Vundef : forall wz, eq_Vbool wz Vundef Vundef.
+Proof.
+  intros wz. unfold eq_Vbool.
+  split; split; intro J; inversion J.
+Qed.
+
+Lemma Vone__eq_Vbool__Vtrue : forall wz, eq_Vbool wz (Vone wz) Vtrue.
+Proof.
+  intros wz. unfold eq_Vbool.
+  split; split; intro J; try solve [auto | inversion J].
+Qed.
+
+Lemma Vzero__eq_Vbool__Vfalse : forall wz, eq_Vbool wz (Vzero wz) Vfalse.
+Proof.
+  intros wz. unfold eq_Vbool.
+  split; split; intro J; try solve [auto | inversion J].
 Qed.
 
 Lemma rolm_lt_zero:
   forall v,
   get_wordsize v = Some 31%nat ->
-  rolm v (Int.one 31) (Int.one 31) = cmp Clt v (Vint 31 (Int.zero 31)).
+  eq_Vbool 31 (rolm v (Int.one 31) (Int.one 31)) (cmp Clt v (Vint 31 (Int.zero 31))).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  intros. unfold cmp, cmp_bool; destruct v; simpl; auto.
-  transitivity (Vint (Int.shru i (Int.repr (Int.zwordsize - 1)))).
-  decEq. symmetry. rewrite Int.shru_rolm. auto. auto. 
-  rewrite Int.shru_lt_zero. destruct (Int.lt i Int.zero); auto.
-*)
+  intros. unfold cmp, cmp_bool; destruct v; simplify_op
+  ; try solve [apply Vundef__eq_Vbool__Vundef].
+  assert (Vint 31 (Int.shru 31 i (Int.repr 31 (Z_of_nat 32 - 1))) =
+    Vint 31 (Int.rolm 31 i (Int.one 31) (Int.one 31))) as EQ.
+    decEq. symmetry. rewrite Int.shru_rolm. auto. auto.
+  rewrite <- EQ.
+  rewrite Int.shru_lt_zero.
+  destruct (Int.lt 31 i (Int.zero 31)).
+  apply Vone__eq_Vbool__Vtrue.
+  apply Vzero__eq_Vbool__Vfalse.
 Qed.
 
 Lemma rolm_ge_zero:
   forall v,
   get_wordsize v = Some 31%nat ->
-  xor (rolm v (Int.one 31) (Int.one 31)) (Vint 31 (Int.one 31)) = cmp Cge v (Vint 31 (Int.zero 31)).
+  eq_Vbool 31 (xor (rolm v (Int.one 31) (Int.one 31)) (Vint 31 (Int.one 31))) 
+    (cmp Cge v (Vint 31 (Int.zero 31))).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  intros. rewrite rolm_lt_zero. destruct v; simpl; auto.
-  unfold cmp; simpl. destruct (Int.lt i Int.zero); auto.
-*)
+  intros. destruct v; simplify_op; try solve [apply Vundef__eq_Vbool__Vundef].
+  assert ((Int.shru 31 i (Int.repr 31 (Z_of_nat 32 - 1))) =
+    (Int.rolm 31 i (Int.one 31) (Int.one 31))) as EQ.
+    decEq. symmetry. rewrite Int.shru_rolm. auto. auto.
+  rewrite <- EQ.
+  rewrite Int.shru_lt_zero.
+  unfold cmp.
+  destruct (Int.lt 31 i (Int.zero 31)) eqn:Heqn; simpl.
+  rewrite Int.xor_one_one. rewrite Heqn. simpl. apply Vzero__eq_Vbool__Vfalse.
+  rewrite Int.xor_zero_one. rewrite Heqn. simpl. apply Vone__eq_Vbool__Vtrue.
+  inv H. exfalso; apply n; auto.
 Qed.
 
 (** The ``is less defined'' relation between values. 
@@ -1632,11 +1652,12 @@ Remark val_add_inject:
   val_inject f v2 v2' ->
   val_inject f (Val.add v1 v2) (Val.add v1' v2').
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  intros. inv H; inv H0; simpl; try econstructor; eauto.
-  repeat rewrite Int.add_assoc. decEq. apply Int.add_commut.
-  repeat rewrite Int.add_assoc. decEq. apply Int.add_commut.
-*)
+  intros. inv H; inv H0; simpl; try econstructor; eauto;
+  unfold Val.add; Val.simplify_op.
+  - econstructor. apply H.
+    repeat rewrite Int.add_assoc. decEq. rewrite Int.add_commut. auto.
+  - econstructor. apply H1.
+    repeat rewrite Int.add_assoc. decEq. rewrite Int.add_commut. auto.
 Qed.
 
 Remark val_sub_inject:
@@ -1645,12 +1666,13 @@ Remark val_sub_inject:
   val_inject f v2 v2' ->
   val_inject f (Val.sub v1 v2) (Val.sub v1' v2').
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
-  intros. inv H; inv H0; simpl; auto.
-  econstructor; eauto. rewrite Int.sub_add_l. auto.
-  destruct (eq_block b1 b0); auto. subst. rewrite H1 in H. inv H. rewrite dec_eq_true. 
-  rewrite Int.sub_shifted. auto.
-*)
+  intros. inv H; inv H0; simpl; auto;
+  unfold Val.sub; Val.simplify_op.
+  - econstructor; eauto. rewrite Int.sub_add_l. auto.
+  - destruct (peq b1 b0); auto.
+    subst. rewrite H1 in H. inv H. rewrite dec_eq_true.
+    rewrite Int.sub_shifted.
+    econstructor; eauto.
 Qed.
 
 Lemma val_cmp_bool_inject:
@@ -1826,183 +1848,107 @@ Qed.
 Lemma add_isnt_ptr : forall wz i0 wz0 i1 b ofs,
   Val.add (Vint wz i0) (Vint wz0 i1) <> Vptr b ofs.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
   intros.
-  Val.simpl_add; try congruence.
-    unfold Val.add_obligation_1. 
-    unfold DepElim.solution_left.
-    unfold eq_rect_r. simpl. congruence.
-*)
+  unfold Val.add; Val.simplify_op; try congruence.
 Qed.
 
 Lemma sub_isnt_ptr : forall wz i0 wz0 i1 b ofs,
   Val.sub (Vint wz i0) (Vint wz0 i1) <> Vptr b ofs.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
   intros.
-  Val.simpl_sub; try congruence.
-    unfold Val.sub_obligation_1. 
-    unfold DepElim.solution_left.
-    unfold eq_rect_r. simpl. congruence.
-*)
+  unfold Val.sub; Val.simplify_op; try congruence.
 Qed.
 
 Lemma mul_isnt_ptr : forall wz i0 wz0 i1 b ofs,
   Val.mul (Vint wz i0) (Vint wz0 i1) <> Vptr b ofs.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
   intros.
-  Val.simpl_mul; try congruence.
-    unfold Val.mul_obligation_1. 
-    unfold DepElim.solution_left.
-    unfold eq_rect_r. simpl. congruence.
-*)
+  Val.simplify_op; try congruence.
 Qed.
 
 Lemma divu_isnt_ptr : forall wz i0 wz0 i1 b ofs,
   Val.divu (Vint wz i0) (Vint wz0 i1) <> Some (Vptr b ofs).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
   intros.
-  Val.simpl_divu; try congruence.
-    unfold Val.divu_obligation_1. 
-    unfold DepElim.solution_left.
-    unfold eq_rect_r. simpl. 
-    destruct (Int.eq wz0 i1 (Int.zero wz0)); congruence.
-*)
+  Val.simplify_op; try congruence.
+  destruct (Int.eq wz0 i1 (Int.zero wz0)) eqn:Heqn; congruence.
 Qed.
 
 Lemma divs_isnt_ptr : forall wz i0 wz0 i1 b ofs,
   Val.divs (Vint wz i0) (Vint wz0 i1) <> Some (Vptr b ofs).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
   intros.
-  Val.simpl_divs; try congruence.
-    unfold Val.divs_obligation_1. 
-    unfold DepElim.solution_left.
-    unfold eq_rect_r. simpl. 
-    destruct (Int.eq wz0 i1 (Int.zero wz0)); congruence.
-*)
+  Val.simplify_op; try congruence.
+  destruct (Int.eq wz0 _ _ || Int.eq _ _ _ && Int.eq _ _ _ ); congruence.
 Qed.
 
 Lemma modu_isnt_ptr : forall wz i0 wz0 i1 b ofs,
   Val.modu (Vint wz i0) (Vint wz0 i1) <> Some (Vptr b ofs).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
   intros.
-  Val.simpl_modu; try congruence.
-    unfold Val.modu_obligation_1. 
-    unfold DepElim.solution_left.
-    unfold eq_rect_r. simpl. 
-    destruct (Int.eq wz0 i1 (Int.zero wz0)); congruence.
-*)
+  Val.simplify_op; try congruence.
+  destruct (Int.eq _ _ _); congruence.
 Qed.
 
 Lemma mods_isnt_ptr : forall wz i0 wz0 i1 b ofs,
   Val.mods (Vint wz i0) (Vint wz0 i1) <> Some (Vptr b ofs).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
   intros.
-  Val.simpl_mods; try congruence.
-    unfold Val.mods_obligation_1. 
-    unfold DepElim.solution_left.
-    unfold eq_rect_r. simpl. 
-    destruct (Int.eq wz0 i1 (Int.zero wz0)); congruence.
-*)
+  Val.simplify_op; try congruence.
+  destruct (Int.eq wz0 i1 _ || Int.eq _ _ _ && _); congruence.
 Qed.
 
 Lemma shl_isnt_ptr : forall wz i0 wz0 i1 b ofs,
   Val.shl (Vint wz i0) (Vint wz0 i1) <> Vptr b ofs.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
   intros.
-  Val.simpl_shl; try congruence.
-    unfold Val.shl_obligation_1. 
-    unfold DepElim.solution_left.
-    unfold eq_rect_r. simpl. 
-    destruct (Int.ltu wz0 i1 (Int.iwordsize wz0)); congruence.
-*)
+  Val.simplify_op; try congruence.
+  destruct (Int.ltu _ _ _); congruence.
 Qed.
 
 Lemma shrx_isnt_ptr : forall wz i0 wz0 i1 b ofs,
   Val.shrx (Vint wz i0) (Vint wz0 i1) <> Some (Vptr b ofs).
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
   intros.
-  Val.simpl_shrx; try congruence.
-    unfold Val.shrx_obligation_1. 
-    unfold DepElim.solution_left.
-    unfold eq_rect_r. simpl. 
-    destruct (Int.ltu wz0 i1 (Int.iwordsize wz0)); congruence.
-*)
+  Val.simplify_op; try congruence.
+  destruct (Int.ltu _ _ _); congruence.
 Qed.
 
 Lemma shr_isnt_ptr : forall wz i0 wz0 i1 b ofs,
   Val.shr (Vint wz i0) (Vint wz0 i1) <> Vptr b ofs.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
   intros.
-  Val.simpl_shr; try congruence.
-    unfold Val.shr_obligation_1. 
-    unfold DepElim.solution_left.
-    unfold eq_rect_r. simpl. 
-    destruct (Int.ltu wz0 i1 (Int.iwordsize wz0)); congruence.
-*)
+  Val.simplify_op; try congruence.
+  destruct (Int.ltu _ _ _); congruence.
 Qed.
 
 Lemma and_isnt_ptr : forall wz i0 wz0 i1 b ofs,
   Val.and (Vint wz i0) (Vint wz0 i1) <> Vptr b ofs.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
   intros.
-  Val.simpl_and; try congruence.
-    unfold Val.and_obligation_1. 
-    unfold DepElim.solution_left.
-    unfold eq_rect_r. simpl. 
-    congruence.
-*)
+  Val.simplify_op; try congruence.
 Qed.
 
 Lemma or_isnt_ptr : forall wz i0 wz0 i1 b ofs,
   Val.or (Vint wz i0) (Vint wz0 i1) <> Vptr b ofs.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
   intros.
-  Val.simpl_or; try congruence.
-    unfold Val.or_obligation_1. 
-    unfold DepElim.solution_left.
-    unfold eq_rect_r. simpl. 
-    congruence.
-*)
+  Val.simplify_op; try congruence.
 Qed.
 
 Lemma xor_isnt_ptr : forall wz i0 wz0 i1 b ofs,
   Val.xor (Vint wz i0) (Vint wz0 i1) <> Vptr b ofs.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
   intros.
-  Val.simpl_xor; try congruence.
-    unfold Val.xor_obligation_1. 
-    unfold DepElim.solution_left.
-    unfold eq_rect_r. simpl. 
-    congruence.
-*)
+  Val.simplify_op; try congruence.
 Qed.
 
 Lemma cmp_isnt_ptr : forall c wz i0 wz0 i1 b ofs,
   Val.cmp c (Vint wz i0) (Vint wz0 i1) <> Vptr b ofs.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
   intros.
-  Val.simpl_cmp; try congruence.
-    unfold Val.cmp_obligation_1. 
-    unfold DepElim.solution_left.
-    unfold eq_rect_r. simpl. 
-    unfold Val.of_bool.
-    destruct (Int.cmp wz0 c i0 i1).
-      unfold Vtrue. unfold Vone. congruence.
-      unfold Vfalse. unfold Vzero. congruence.
-*)
+  unfold Val.cmp; Val.simplify_op; try congruence.
+  destruct (Int.cmp _ _ _); unfold Vtrue, Vfalse, Vone, Vzero; congruence.
 Qed.
 
 Lemma cmpu_isnt_ptr :
@@ -2010,17 +1956,9 @@ Lemma cmpu_isnt_ptr :
          (wz1:nat) (i1: Int.int wz1) (b:block) (ofs:Int.int 31),
   Val.cmpu valid_ptr c (Vint wz0 i0) (Vint wz1 i1) <> Vptr b ofs.
 Proof.
-  admit. (* TODO: skip for upgrade *) (*
   intros.
-  Val.simpl_cmpu; try congruence.
-    unfold Val.cmpu_obligation_1. 
-    unfold DepElim.solution_left.
-    unfold eq_rect_r. simpl. 
-    unfold Val.of_bool.
-    destruct (Int.cmpu wz0 c i0 i1).
-      unfold Vtrue. unfold Vone. congruence.
-      unfold Vfalse. unfold Vzero. congruence.
-*)
+  unfold Val.cmpu; Val.simplify_op; try congruence.
+  destruct (Int.cmpu _ _ _); unfold Vtrue, Vfalse, Vone, Vzero; congruence.
 Qed.
 
 Lemma val_of_bool_isnt_ptr : forall v b ofs,
