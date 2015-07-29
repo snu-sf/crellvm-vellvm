@@ -1,5 +1,5 @@
 coq_makefile \
-*.v \
+Archi.v \
 -I ../common/ \
 -I ../flocq/Prop \
 -I ../flocq/Appli \
