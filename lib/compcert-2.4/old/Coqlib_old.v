@@ -25,6 +25,19 @@ Require Import Wf_nat.
 Require Import Psatz.
 Require Import CoqListFacts.
 
+Definition lt_wf_rect
+     : forall (n : nat) (P : nat -> Type),
+       (forall n0 : nat, (forall m : nat, (m < n0)%nat -> P m) -> P n0) ->
+       P n.
+Proof.
+  intros; revert n.
+  cut (forall n m (LT: (m < n)%nat), P m).
+  { intros. apply (X0 (S n)). auto with arith. }
+  intros n. pattern n. apply nat_rect; intros.
+  - exfalso. inversion LT.
+  - apply X. intros. apply X0. eauto with arith.
+Defined.
+
 (***
 
 (** * Logical axioms *)
@@ -1279,13 +1292,13 @@ Section InclDec.
 Variable A:Type.
 Variable Hdec: forall (x y: A), {x = y} + {x <> y}.
 
-Definition incl_dec_prop (n:nat) :=
+Definition incl_dec_prop (n:nat) : Type :=
   forall (l1 l2:list A), length l1 = n -> {incl l1 l2} + {~ incl l1 l2}.
 
 Lemma incl_dec_aux : forall n, incl_dec_prop n.
 Proof.
   intro n.
-  apply lt_wf_rec. clear n.
+  apply lt_wf_rect. clear n.
   intros n H.
   unfold incl_dec_prop in *.
   destruct l1; intros l2 Hlength.

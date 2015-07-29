@@ -97,8 +97,6 @@ Definition has_type (v: val) (t: typ) : Prop :=
   | Vsingle _, Tsingle => True
   | Vptr _ _, Tint => True
   | Vinttoptr _, Tint => True
-  | (Vint _ _ | Vptr _ _ | Vinttoptr _ | Vsingle _), Tany32 => True
-  | _, Tany64 => True
   | _, _ => False
   end.
 
@@ -645,6 +643,12 @@ Definition divf (v1 v2: val): val :=
   | _, _ => Vundef
   end.
 
+Definition modf (v1 v2: val): val :=
+  match v1, v2 with
+  | Vfloat f1, Vfloat f2 => Vfloat(Float.rem f1 f2)
+  | _, _ => Vundef
+  end.
+
 Definition floatofwords (v1 v2: val) : val :=
   match v1, v2 with
   | Vint 31 n1, Vint 31 n2 => Vfloat (Float.from_words n1 n2)
@@ -801,16 +805,22 @@ Ltac simplify_op :=
 Definition load_result (chunk: memory_chunk) (v: val) :=
   match chunk, v with
   | Mint wz1, Vint wz2 n => Vint wz1 (Int.repr wz1 (Int.unsigned wz2 n))
-  | Mint wz, Vptr b ofs => if eq_nat_dec wz 31 then Vptr b ofs else Vundef
-  | Mint wz, Vinttoptr i => if eq_nat_dec wz 31 then Vinttoptr i else Vundef
+  | Mint wz, Vptr b ofs => if eq_nat_dec 31 wz then Vptr b ofs else Vundef
+  | Mint wz, Vinttoptr i => if eq_nat_dec 31 wz then Vinttoptr i else Vundef
   | Mfloat32, Vsingle f => Vsingle f
   | Mfloat64, Vfloat f => Vfloat f
-  | Many32, (Vint _ _ | Vptr _ _ | Vsingle _) => v
-  | Many64, _ => v
   | _, _ => Vundef
   end.
 
-(* NOTE: Vellvm Context - load_result_type, load_result_same_type removed *)
+Lemma load_result_type:
+  forall chunk v, has_type (load_result chunk v) (type_of_chunk chunk).
+Proof.
+  intros. destruct chunk; destruct v; simpl; auto.
+  destruct (eq_nat_dec _ _); unfold has_type; subst; auto.
+  destruct (eq_nat_dec _ _); unfold has_type; subst; auto.
+Qed.
+
+(* NOTE: Vellvm Context - load_result_same_type removed *)
 (** Theorems on arithmetic operations. *)
 
 Section ArithOperations.
@@ -1035,7 +1045,6 @@ Theorem mul_pow2:
 Proof.
   intros; destruct x; simpl; auto; simplify_op;
   change 32 with Int.zwordsize.
-  Check Int.is_power2_range.
   rewrite (Int.is_power2_range _ _ _ H0). decEq. apply Int.mul_pow2. auto.
 Qed.
 
@@ -1075,7 +1084,7 @@ Proof.
   rewrite hcast_eq in *.
   destruct (Int.eq wz n (Int.zero wz)
          || Int.eq wz i (Int.repr wz (Int.min_signed wz)) && Int.eq wz n (Int.mone wz)); inv H0.
-  rewrite Hltu. decEq. Check Int.divs_pow2. rewrite (Int.divs_pow2 wz i n logn); auto.
+  rewrite Hltu. decEq. rewrite (Int.divs_pow2 wz i n logn); auto.
 Qed.
 
 Theorem divu_pow2:
@@ -1583,6 +1592,55 @@ Proof.
   intros. destruct ob; simpl; auto. rewrite (H b); auto. 
 Qed.
 
+(* NOTE: added for vellvm *)
+Definition has_chunk := fun (v : val) (chk : memory_chunk) =>
+match v with
+| Vundef => True
+| Vint wz i0 => match chk with
+              | Mint wz' => wz = wz' /\
+                            0 <= Int.unsigned wz i0 < Int.modulus wz
+              | _ => False
+              end
+| Vsingle f => match chk with
+              | Mfloat32 => True
+              | _ => False
+              end
+| Vfloat f => match chk with
+              | Mfloat64 => True
+              | _ => False
+              end
+| _ => match chk with
+       | Mint wz => wz = 31%nat
+       | _ => False
+       end
+end.
+
+Definition has_chunkb (v : val) (chk : AST.memory_chunk) : bool :=
+match v with
+| Vundef => true
+| Vint wz i0 => match chk with
+                | AST.Mint wz' => 
+                   eq_nat_dec wz wz' &&
+                   zle 0 (Int.unsigned wz i0) &&
+                   zlt (Int.unsigned wz i0) (Int.modulus wz)
+                | _ => false
+                end
+| Vfloat f => match chk with
+              | AST.Mint _ => false
+              | AST.Mfloat32 => false
+              | AST.Mfloat64 => true
+              end
+| Vsingle f => match chk with
+              | AST.Mint _ => false
+              | AST.Mfloat32 => true
+              | AST.Mfloat64 => false
+              end
+| _ => match chk with
+       | AST.Mint wz => eq_nat_dec wz 31%nat
+       | _ => false
+       end
+end.
+
 End Val.
 
 (** * Values and memory injections *)
@@ -1642,8 +1700,8 @@ Lemma val_load_result_inject:
   val_inject f (Val.load_result chunk v1) (Val.load_result chunk v2).
 Proof.
   intros. inv H; destruct chunk; simpl; try econstructor; eauto.
-    destruct (eq_nat_dec n 31); try econstructor; eauto.
-    destruct (eq_nat_dec n 31); try econstructor; eauto.
+    destruct (eq_nat_dec _ _); try econstructor; eauto.
+    destruct (eq_nat_dec _ _); try econstructor; eauto.
 Qed.
 
 Remark val_add_inject:

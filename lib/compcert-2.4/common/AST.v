@@ -40,9 +40,7 @@ Parameter ident_of_string : String.string -> ident.
 Inductive typ : Type :=
   | Tint                (**r 32-bit integers or pointers *)
   | Tfloat              (**r 64-bit double-precision floats *)
-  | Tsingle             (**r 32-bit single-precision floats *)
-  | Tany32              (**r any 32-bit value *)
-  | Tany64.             (**r any 64-bit value, i.e. any value *)
+  | Tsingle.             (**r 32-bit single-precision floats *)
 
 Lemma typ_eq: forall (t1 t2: typ), {t1=t2} + {t1<>t2}.
 Proof. decide equality. Defined.
@@ -59,8 +57,6 @@ Definition typesize (ty: typ) : Z :=
   | Tint => 8
   | Tfloat => 8
   | Tsingle => 4
-  | Tany32 => 4
-  | Tany64 => 8
   end.
 
 Lemma typesize_pos: forall ty, typesize ty > 0.
@@ -75,8 +71,6 @@ Definition subtype (ty1 ty2: typ) : bool :=
   | Tint, Tint => true
   | Tfloat, Tfloat => true
   | Tsingle, Tsingle => true
-  | (Tint | Tsingle | Tany32), Tany32 => true
-  | _, Tany64 => true
   | _, _ => false
   end.
 
@@ -135,16 +129,13 @@ Inductive memory_chunk : Type :=
   | Mint: nat -> memory_chunk    (**r integer or pointer *)
   | Mfloat32                     (**r 32-bit single-precision float *)
   | Mfloat64                     (**r 64-bit double-precision float *)
-  | Many32                       (**r any value that fits in 32 bits *)
-  | Many64.                      (**r any value *)
+.
 
 Definition memory_chunk_eq (c1 c2: memory_chunk) : bool := 
   match c1, c2 with
   | Mint n1, Mint n2 => beq_nat n1 n2
   | Mfloat32, Mfloat32 => true
   | Mfloat64, Mfloat64 => true
-  | Many32, Many32 => true
-  | Many64, Many64 => true
   | _, _ => false
   end.
 
@@ -159,8 +150,6 @@ Definition type_of_chunk (c: memory_chunk) : typ :=
   | Mint _ => Tint
   | Mfloat32 => Tsingle
   | Mfloat64 => Tfloat
-  | Many32 => Tany32
-  | Many64 => Tany64
   end.
 
 (** The chunk that is appropriate to store and reload a value of
@@ -171,8 +160,6 @@ Definition chunk_of_type (ty: typ) :=
   | Tint => Mint 31
   | Tfloat => Mfloat64
   | Tsingle => Mfloat32
-  | Tany32 => Many32
-  | Tany64 => Many64
   end.
 
 (** Initialization data for global variables. *)

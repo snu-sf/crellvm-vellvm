@@ -1,6 +1,5 @@
 coq_makefile \
 *.v \
--arg -impredicative-set \
 -I ../lib/ \
 -I ../ia32/ \
 -I ../flocq/Prop \

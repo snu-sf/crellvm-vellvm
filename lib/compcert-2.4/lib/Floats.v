@@ -235,6 +235,7 @@ Definition add: float -> float -> float := b64_plus binop_pl mode_NE. (**r addit
 Definition sub: float -> float -> float := b64_minus binop_pl mode_NE. (**r subtraction *)
 Definition mul: float -> float -> float := b64_mult binop_pl mode_NE. (**r multiplication *)
 Definition div: float -> float -> float := b64_div binop_pl mode_NE. (**r division *)
+Parameter  rem: float -> float -> float.
 Definition cmp (c:comparison) (f1 f2: float) : bool := (**r comparison *)
   cmp_of_comparison c (b64_compare f1 f2).
 
