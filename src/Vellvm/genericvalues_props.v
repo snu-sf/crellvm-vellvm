@@ -300,9 +300,9 @@ Proof. intros. inv H; auto. Qed.
 
 Definition const2GV_isnt_stuck_Prop S TD c t :=
   wf_const S TD c t ->
-  forall gl (Hty: uniq (snd TD)),
+  forall m gl (Hty: uniq (snd TD)),
   wf_global TD S gl ->
-  exists gv, _const2GV TD gl c = Some (gv, t).
+  exists gv, _const2GV m TD gl c = Some (gv, t).
 
 Definition consts2GV_isnt_stuck_Prop sdct :=
   wf_const_list sdct ->
@@ -310,11 +310,11 @@ Definition consts2GV_isnt_stuck_Prop sdct :=
   let '(lsdc, lt) := split lsdct in
   let '(lsd, lc) := split lsdc in
   let '(ls, ld) := split lsd in
-  forall S TD gl (Hty: uniq (snd TD)), 
+  forall m S TD gl (Hty: uniq (snd TD)), 
   wf_list_targetdata_typ S TD gl lsd ->
   (forall t, (forall t0, In t0 lt -> t0 = t) ->
-    exists gv, _list_const_arr2GV TD gl t lc = Some gv) /\
-  (exists gv, _list_const_struct2GV TD gl lc = 
+    exists gv, _list_const_arr2GV m TD gl t lc = Some gv) /\
+  (exists gv, _list_const_struct2GV m TD gl lc = 
     Some (gv, lt)).
 
 Lemma const2GV_isnt_stuck_mutind : 
@@ -342,13 +342,13 @@ Case "wfconst_array".
   simpl_split lsdc lt.
   simpl_split lsd lc.
   simpl_split ls ld.
-  destruct (@H0 system5 targetdata5 gl) as [J1 [gv2 J2]]; 
+  destruct (@H0 m system5 targetdata5 gl) as [J1 [gv2 J2]]; 
     try solve [destruct targetdata5; eauto using const2GV_typsize_mutind_array].
     assert (lc = const_list) as EQ.
       eapply make_list_const_spec2; eauto.
     rewrite H1. rewrite <- EQ. unfold Size.to_nat in *. 
     destruct (@J1 typ5) as [gv1 J3]; eauto using make_list_const_spec4.
-    fold _list_const_arr2GV. rewrite J3.
+    fold (_list_const_arr2GV m). rewrite J3.
     destruct sz5; eauto.
 
 Case "wfconst_struct".
@@ -356,12 +356,12 @@ Case "wfconst_struct".
   simpl_split lsd lc.
   simpl_split ls ld.
   erewrite <- map_list_const_typ_spec1 in H2; eauto.
-  destruct (@H0 system5 (layouts5, namedts5) gl) as [_ [gv2 J2]]; 
+  destruct (@H0 m system5 (layouts5, namedts5) gl) as [_ [gv2 J2]]; 
     try solve [eauto using const2GV_typsize_mutind_struct |
                eapply typ_eq_list_typ_spec1; eauto |
                eapply typ_eq_list_typ_spec1'; eauto].
     erewrite <- map_list_const_typ_spec2; eauto.
-    fold _list_const_struct2GV. repeat fill_ctxhole.
+    fold (_list_const_struct2GV m). repeat fill_ctxhole.
     destruct gv2; eauto.
 
 Case "wfconst_gid".
@@ -374,7 +374,7 @@ Case "wfconst_gid".
 Case "wfconst_trunc_int".
   match goal with
   | H4: wf_global _ _ _ |- _ => 
-    eapply H0 in H4; eauto; destruct H4 as [gv H4]; fill_ctxhole
+    eapply (H0 m) in H4; eauto; destruct H4 as [gv H4]; fill_ctxhole
   end.
   unfold mtrunc.
   assert (exists gv, gundef targetdata5 (typ_int sz2) = Some gv) as J.
@@ -383,16 +383,19 @@ Case "wfconst_trunc_int".
   destruct (GV2val targetdata5 gv) as [[]|]; eauto.
 Case "wfconst_trunc_fp".
   match goal with
-  | H4: wf_global _ _ _ |- _ => 
-    eapply H0 in H4; eauto; destruct H4 as [gv H4]; fill_ctxhole
+  | H4: wf_global _ _ _ |- _ =>
+    eapply (H0 m) in H4; eauto; destruct H4 as [gv H4]; fill_ctxhole
   end.
   unfold mtrunc. rewrite H1.
   assert (exists gv, gundef targetdata5 (typ_floatpoint floating_point2) = 
            Some gv) as J.
     eapply gundef__total; eauto.
-  fill_ctxhole.
+  fill_ctxhole. (* TODO: here *)
   destruct (GV2val targetdata5 gv) as [[]|]; eauto.
   destruct floating_point1; try solve [eauto | elim_wrong_wf_typ].
+  destruct floating_point1; destruct floating_point2; try solve [eauto | elim_wrong_wf_typ].
+  inv H1.
+
 Case "wfconst_zext".
   match goal with
   | H4: wf_global _ _ _ |- _ => 

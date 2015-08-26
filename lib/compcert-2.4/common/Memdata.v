@@ -97,6 +97,14 @@ Proof.
   intros; exists n; auto.
 Qed.
 
+Lemma size_chunk_nat_pos':
+  forall chunk, (size_chunk_nat chunk > 0)%nat.
+Proof.
+  intros.
+  destruct (@size_chunk_nat_pos chunk) as [n J].
+  rewrite J. omega.
+Qed.
+
 (** Memory reads and writes must respect alignment constraints:
   the byte offset of the location being addressed should be an exact
   multiple of the natural alignment for the chunk being addressed.

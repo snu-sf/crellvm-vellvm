@@ -21,6 +21,7 @@ Require Import Lattice.
 Require Import Floats.
 Require Import AST.
 Require Import Maps.
+Require Import maps_ext.
 Require Import opsem.
 Require Import opsem_props.
 Require Import syntax.

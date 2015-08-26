@@ -937,6 +937,7 @@ Definition add: float32 -> float32 -> float32 := b32_plus binop_pl mode_NE. (**r
 Definition sub: float32 -> float32 -> float32 := b32_minus binop_pl mode_NE. (**r subtraction *)
 Definition mul: float32 -> float32 -> float32 := b32_mult binop_pl mode_NE. (**r multiplication *)
 Definition div: float32 -> float32 -> float32 := b32_div binop_pl mode_NE. (**r division *)
+Parameter  rem: float32 -> float32 -> float32.
 Definition cmp (c:comparison) (f1 f2: float32) : bool := (**r comparison *)
   cmp_of_comparison c (b32_compare f1 f2).
 

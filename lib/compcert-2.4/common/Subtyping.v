@@ -100,7 +100,7 @@ Definition initial : typenv := {| te_typ := PTree.empty _; te_sub := nil |}.
 (** Add the constraint [ty <: T(x)]. *)
 
 Definition type_def (e: typenv) (x: positive) (ty: T.t) : res typenv :=
-  match e.(te_typ)!x with
+  match e.(te_typ) ? x with
   | None =>
       let b := B ty (T.high_bound ty) (T.high_bound_sub ty) in
       OK {| te_typ := PTree.set x b e.(te_typ);
@@ -128,7 +128,7 @@ Fixpoint type_defs (e: typenv) (rl: list positive) (tyl: list T.t) {struct rl}: 
 (** Add the constraint [T(x) <: ty]. *)
 
 Definition type_use (e: typenv) (x: positive) (ty: T.t) : res typenv :=
-  match e.(te_typ)!x with
+  match e.(te_typ) ? x with
   | None =>
       let b := B (T.low_bound ty) ty (T.low_bound_sub ty) in
       OK {| te_typ := PTree.set x b e.(te_typ);
@@ -160,7 +160,7 @@ Fixpoint type_uses (e: typenv) (rl: list positive) (tyl: list T.t) {struct rl}: 
 
 Definition type_move (e: typenv) (r1 r2: positive) : res (bool * typenv) :=
   if peq r1 r2 then OK (false, e) else
-  match e.(te_typ)!r1, e.(te_typ)!r2 with
+  match e.(te_typ) ? r1, e.(te_typ) ? r2 with
   | None, None =>
       OK (false, {| te_typ := e.(te_typ); te_sub := (r1, r2) :: e.(te_sub) |})
   | Some(B lo1 hi1 s1), None =>
@@ -243,16 +243,16 @@ Lemma weight_type_move:
   forall e r1 r2 changed e',
   type_move e r1 r2 = OK(changed, e') ->
   (e'.(te_sub) = e.(te_sub) \/ e'.(te_sub) = (r1, r2) :: e.(te_sub))
-  /\ (forall r, weight_bounds e'.(te_typ)!r <= weight_bounds e.(te_typ)!r)
+  /\ (forall r, weight_bounds e'.(te_typ) ? r <= weight_bounds e.(te_typ) ? r)
   /\ (changed = true ->
-        weight_bounds e'.(te_typ)!r1 + weight_bounds e'.(te_typ)!r2 
-        < weight_bounds e.(te_typ)!r1 + weight_bounds e.(te_typ)!r2).
+        weight_bounds e'.(te_typ) ? r1 + weight_bounds e'.(te_typ) ? r2 
+        < weight_bounds e.(te_typ) ? r1 + weight_bounds e.(te_typ) ? r2).
 Proof.
   unfold type_move; intros.
   destruct (peq r1 r2).
   inv H. split; auto. split; intros. omega. discriminate.
-  destruct (te_typ e)!r1 as [[lo1 hi1 s1]|] eqn:E1;
-  destruct (te_typ e)!r2 as [[lo2 hi2 s2]|] eqn:E2.
+  destruct (te_typ e) ? r1 as [[lo1 hi1 s1]|] eqn:E1;
+  destruct (te_typ e) ? r2 as [[lo2 hi2 s2]|] eqn:E2.
 - destruct (T.sub_dec hi1 lo2).
   inv H. split; auto. split; intros. omega. discriminate.
   destruct (T.sub_dec lo1 hi2); try discriminate.
@@ -280,7 +280,7 @@ Local Opaque weight_bounds.
   assert (weight_bounds (Some b2) < weight_bounds (Some (B lo2 hi2 s2)))
   by (apply weight_bounds_2; auto with ty).
   split; auto. split; intros. 
-  rewrite ! PTree.gsspec.
+  rewrite ? PTree.gsspec.
   destruct (peq r r2). subst r. rewrite E2. omega.
   destruct (peq r r1). subst r. rewrite E1. omega. 
   omega.
@@ -306,10 +306,10 @@ Local Opaque weight_bounds.
 Qed.
 
 Definition weight_constraints (b: PTree.t bounds) (cstr: list constraint) : nat :=
-  List.fold_right (fun xy n => n + weight_bounds b!(fst xy) + weight_bounds b!(snd xy)) 0 cstr.
+  List.fold_right (fun xy n => n + weight_bounds b ? (fst xy) + weight_bounds b ? (snd xy)) 0 cstr.
 
 Remark weight_constraints_tighter:
-  forall b1 b2, (forall r, weight_bounds b1!r <= weight_bounds b2!r) ->
+  forall b1 b2, (forall r, weight_bounds b1 ? r <= weight_bounds b2 ? r) ->
   forall q, weight_constraints b1 q <= weight_constraints b2 q.
 Proof.
   induction q; simpl. omega. generalize (H (fst a)) (H (snd a)); omega.
@@ -318,7 +318,7 @@ Qed.
 Lemma weight_solve_rec:
   forall q e changed e' changed',
   solve_rec e changed q = OK(e', changed') ->
-  (forall r, weight_bounds e'.(te_typ)!r <= weight_bounds e.(te_typ)!r) /\
+  (forall r, weight_bounds e'.(te_typ) ? r <= weight_bounds e.(te_typ) ? r) /\
   weight_constraints e'.(te_typ) e'.(te_sub) + (if changed' && negb changed then 1 else 0)
      <= weight_constraints e.(te_typ) e.(te_sub) + weight_constraints e.(te_typ) q.
 Proof.
@@ -335,7 +335,7 @@ Proof.
   by (apply weight_constraints_tighter; auto).
   assert (Q: weight_constraints (te_typ e1) (te_sub e1) <=
              weight_constraints (te_typ e1) (te_sub e) + 
-             weight_bounds (te_typ e1)!r1 + weight_bounds (te_typ e1)!r2).
+             weight_bounds (te_typ e1) ? r1 + weight_bounds (te_typ e1) ? r2).
   { destruct A as [Q|Q]; rewrite Q. omega. simpl. omega. }
   assert (R: weight_constraints (te_typ e1) q <= weight_constraints (te_typ e) q)
   by (apply weight_constraints_tighter; auto).
@@ -370,7 +370,7 @@ Qed.
 Definition typassign := positive -> T.t.
 
 Definition makeassign (e: typenv) : typassign :=
-  fun x => match e.(te_typ)!x with Some(B lo hi s) => lo | None => T.default end.
+  fun x => match e.(te_typ) ? x with Some(B lo hi s) => lo | None => T.default end.
 
 Definition solve (e: typenv) : res typassign :=
   do e' <- solve_constraints e; OK(makeassign e').
@@ -378,7 +378,7 @@ Definition solve (e: typenv) : res typassign :=
 (** What it means to be a solution *)
 
 Definition satisf (te: typassign) (e: typenv) : Prop :=
-   (forall x lo hi s, e.(te_typ)!x = Some(B lo hi s) -> T.sub lo (te x) /\ T.sub (te x) hi)
+   (forall x lo hi s, e.(te_typ) ? x = Some(B lo hi s) -> T.sub lo (te x) /\ T.sub (te x) hi)
 /\ (forall x y, In (x, y) e.(te_sub) -> T.sub (te x) (te y)).
 
 Lemma satisf_initial: forall te, satisf te initial.
@@ -393,7 +393,7 @@ Qed.
 Lemma type_def_incr:
   forall te x ty e e', type_def e x ty = OK e' -> satisf te e' -> satisf te e.
 Proof.
-  unfold type_def; intros. destruct (te_typ e)!x as [[lo hi s1]|] eqn:E.
+  unfold type_def; intros. destruct (te_typ e) ? x as [[lo hi s1]|] eqn:E.
 - destruct (T.sub_dec ty hi); try discriminate.
   destruct (T.eq lo (T.lub lo ty)); monadInv H.
   subst e'; auto.
@@ -413,7 +413,7 @@ Lemma type_def_sound:
   forall te x ty e e', type_def e x ty = OK e' -> satisf te e' -> T.sub ty (te x).
 Proof.
   unfold type_def; intros. destruct H0 as [P Q].
-  destruct (te_typ e)!x as [[lo hi s1]|] eqn:E.
+  destruct (te_typ e) ? x as [[lo hi s1]|] eqn:E.
 - destruct (T.sub_dec ty hi); try discriminate.
   destruct (T.eq lo (T.lub lo ty)); monadInv H.
   + subst e'. apply T.sub_trans with lo. 
@@ -443,7 +443,7 @@ Qed.
 Lemma type_use_incr:
   forall te x ty e e', type_use e x ty = OK e' -> satisf te e' -> satisf te e.
 Proof.
-  unfold type_use; intros. destruct (te_typ e)!x as [[lo hi s1]|] eqn:E.
+  unfold type_use; intros. destruct (te_typ e) ? x as [[lo hi s1]|] eqn:E.
 - destruct (T.sub_dec lo ty); try discriminate.
   destruct (T.eq hi (T.glb hi ty)); monadInv H.
   subst e'; auto.
@@ -463,7 +463,7 @@ Lemma type_use_sound:
   forall te x ty e e', type_use e x ty = OK e' -> satisf te e' -> T.sub (te x) ty.
 Proof.
   unfold type_use; intros. destruct H0 as [P Q].
-  destruct (te_typ e)!x as [[lo hi s1]|] eqn:E.
+  destruct (te_typ e) ? x as [[lo hi s1]|] eqn:E.
 - destruct (T.sub_dec lo ty); try discriminate.
   destruct (T.eq hi (T.glb hi ty)); monadInv H.
   + subst e'. apply T.sub_trans with hi. 
@@ -496,8 +496,8 @@ Lemma type_move_incr:
 Proof.
   unfold type_move; intros. destruct H0 as [P Q].
   destruct (peq r1 r2). inv H; split; auto.
-  destruct (te_typ e)!r1 as [[lo1 hi1 s1]|] eqn:E1;
-  destruct (te_typ e)!r2 as [[lo2 hi2 s2]|] eqn:E2.
+  destruct (te_typ e) ? r1 as [[lo1 hi1 s1]|] eqn:E1;
+  destruct (te_typ e) ? r2 as [[lo2 hi2 s2]|] eqn:E2.
 - destruct (T.sub_dec hi1 lo2). inv H; split; auto.
   destruct (T.sub_dec lo1 hi2); try discriminate.
   set (lo := T.lub lo1 lo2) in *. set (hi := T.glb hi1 hi2) in *.
@@ -524,7 +524,7 @@ Proof.
     rewrite E2 in H. injection H; intros; subst lo0 hi0. 
     exploit (P r2). rewrite PTree.gss; eauto. intuition. 
     apply T.sub_trans with (T.lub lo1 lo2); auto. eapply T.lub_right; eauto.
-    eapply P. rewrite ! PTree.gso; eauto.
+    eapply P. rewrite ? PTree.gso; eauto.
 - inv H; simpl in *. split; intros.
   eapply P. rewrite PTree.gso; eauto. congruence.
   apply Q.   destruct (T.sub_dec hi1 lo1); auto with coqlib.
@@ -542,8 +542,8 @@ Lemma type_move_sound:
 Proof.
   unfold type_move; intros. destruct H0 as [P Q].
   destruct (peq r1 r2). subst r2. apply T.sub_refl.
-  destruct (te_typ e)!r1 as [[lo1 hi1 s1]|] eqn:E1;
-  destruct (te_typ e)!r2 as [[lo2 hi2 s2]|] eqn:E2.
+  destruct (te_typ e) ? r1 as [[lo1 hi1 s1]|] eqn:E1;
+  destruct (te_typ e) ? r2 as [[lo2 hi2 s2]|] eqn:E2.
 - destruct (T.sub_dec hi1 lo2). 
   inv H. apply T.sub_trans with hi1. eapply P; eauto. apply T.sub_trans with lo2; auto. eapply P; eauto.
   destruct (T.sub_dec lo1 hi2); try discriminate.
@@ -593,8 +593,8 @@ Proof.
   unfold type_move; intros. 
   destruct (peq r1 r2). inv H. split; auto. apply T.sub_refl.
   unfold makeassign;
-  destruct (te_typ e)!r1 as [[lo1 hi1 s1]|] eqn:E1;
-  destruct (te_typ e)!r2 as [[lo2 hi2 s2]|] eqn:E2.
+  destruct (te_typ e) ? r1 as [[lo1 hi1 s1]|] eqn:E1;
+  destruct (te_typ e) ? r2 as [[lo2 hi2 s2]|] eqn:E2.
 - destruct (T.sub_dec hi1 lo2). 
   inv H. split; auto. eapply T.sub_trans; eauto.
   destruct (T.sub_dec lo1 hi2); try discriminate.
@@ -657,7 +657,7 @@ Lemma type_def_complete:
   satisf te e -> T.sub ty (te x) -> exists e', type_def e x ty = OK e' /\ satisf te e'.
 Proof.
   unfold type_def; intros. destruct H as [P Q].
-  destruct (te_typ e)!x as [[lo hi s1]|] eqn:E. 
+  destruct (te_typ e) ? x as [[lo hi s1]|] eqn:E. 
 - destruct (T.sub_dec ty hi). 
   destruct (T.eq lo (T.lub lo ty)).
   exists e; split; auto. split; auto.
@@ -689,7 +689,7 @@ Lemma type_use_complete:
   satisf te e -> T.sub (te x) ty -> exists e', type_use e x ty = OK e' /\ satisf te e'.
 Proof.
   unfold type_use; intros. destruct H as [P Q].
-  destruct (te_typ e)!x as [[lo hi s1]|] eqn:E. 
+  destruct (te_typ e) ? x as [[lo hi s1]|] eqn:E. 
 - destruct (T.sub_dec lo ty). 
   destruct (T.eq hi (T.glb hi ty)).
   exists e; split; auto. split; auto.
@@ -725,8 +725,8 @@ Proof.
   assert (Q': forall x y, In (x, y) ((r1, r2) :: te_sub e) -> T.sub (te x) (te y)).
   { intros. destruct H1; auto. congruence. }
   destruct (peq r1 r2). econstructor; econstructor; eauto.
-  destruct (te_typ e)!r1 as [[lo1 hi1 s1]|] eqn:E1;
-  destruct (te_typ e)!r2 as [[lo2 hi2 s2]|] eqn:E2.
+  destruct (te_typ e) ? r1 as [[lo1 hi1 s1]|] eqn:E1;
+  destruct (te_typ e) ? r2 as [[lo2 hi2 s2]|] eqn:E2.
 - exploit (P r1); eauto. intros [L1 U1].
   exploit (P r2); eauto. intros [L2 U2].
   destruct (T.sub_dec hi1 lo2). econstructor; econstructor; eauto.
@@ -741,7 +741,7 @@ Proof.
     clear e0. inv H1. split; auto.  
     apply T.lub_min. apply T.sub_trans with (te r1); auto. auto.
     eapply P; eauto.
-  + rewrite ! PTree.gsspec in H1. destruct (peq x r2).
+  + rewrite ? PTree.gsspec in H1. destruct (peq x r2).
     inv H1. split; auto. apply T.lub_min; auto. apply T.sub_trans with (te r1); auto.
     destruct (peq x r1).
     inv H1. split; auto. apply T.glb_max; auto. apply T.sub_trans with (te r2); auto.

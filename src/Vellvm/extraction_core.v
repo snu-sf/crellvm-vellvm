@@ -10,6 +10,7 @@ Require Import Floats.
 Require Import opsem.
 Require Import interpreter.
 Require Import Maps.
+Require Import maps_ext.
 Require Import Iteration.
 
 Extract Inductive unit => "unit" [ "()" ].

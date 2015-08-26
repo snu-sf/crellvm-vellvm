@@ -22,21 +22,21 @@ Local Unset Elimination Schemes.
 Local Unset Case Analysis Schemes.
 
 (** A forward dataflow problem is a set of inequations of the form
-- [X(s) >= transf n X(n)] 
+- [X(s) >= transf n X(n)]
   if program point [s] is a successor of program point [n]
 - [X(n) >= a]
   if [n] is an entry point and [a] its minimal approximation.
 
 The unknowns are the [X(n)], indexed by program points (e.g. nodes in the
-CFG graph of a RTL function).  They range over a given ordered set that 
+CFG graph of a RTL function).  They range over a given ordered set that
 represents static approximations of the program state at each point.
-The [transf] function is the abstract transfer function: it computes an 
+The [transf] function is the abstract transfer function: it computes an
 approximation [transf n X(n)] of the program state after executing instruction
 at point [n], as a function of the approximation [X(n)] of the program state
 before executing that instruction.
 
 Symmetrically, a backward dataflow problem is a set of inequations of the form
-- [X(n) >= transf s X(s)] 
+- [X(n) >= transf s X(s)]
   if program point [s] is a successor of program point [n]
 - [X(n) >= a]
   if [n] is an entry point and [a] its minimal approximation.
@@ -86,9 +86,9 @@ Module Type DATAFLOW_SOLVER.
   Hypothesis fixpoint_solution:
     forall A (code: PTree.t A) successors transf ep ev res n instr s,
     fixpoint code successors transf ep ev = Some res ->
-    code!n = Some instr -> In s (successors instr) ->
+    code ? n = Some instr -> In s (successors instr) ->
     (forall n, L.eq (transf n L.bot) L.bot) ->
-    L.ge res!!s (transf n res!!n).
+    L.ge res ?? s (transf n res ?? n).
 
   (** The [fixpoint_entry] theorem shows that the returned solution,
     if any, satisfies the additional constraint over the entry point. *)
@@ -96,7 +96,7 @@ Module Type DATAFLOW_SOLVER.
   Hypothesis fixpoint_entry:
     forall A (code: PTree.t A) successors transf ep ev res,
     fixpoint code successors transf ep ev = Some res ->
-    L.ge res!!ep ev.
+    L.ge res ?? ep ev.
 
   (** Finally, any property that is preserved by [L.lub] and [transf]
       and that holds for [L.bot] also holds for the results of
@@ -107,11 +107,11 @@ Module Type DATAFLOW_SOLVER.
            (P: L.t -> Prop),
     P L.bot ->
     (forall x y, P x -> P y -> P (L.lub x y)) ->
-    (forall pc instr x, code!pc = Some instr -> P x -> P (transf pc x)) ->
+    (forall pc instr x, code ? pc = Some instr -> P x -> P (transf pc x)) ->
     P ev ->
     forall res pc,
     fixpoint code successors transf ep ev = Some res ->
-    P res!!pc.
+    P res ?? pc.
 
 End DATAFLOW_SOLVER.
 
@@ -142,7 +142,7 @@ Module Type NODE_SET.
     forall n', In n' s <-> n = n' \/ In n' s'.
   Hypothesis all_nodes_spec:
     forall A (code: PTree.t A) n instr,
-    code!n = Some instr -> In n (all_nodes code).
+    code ? n = Some instr -> In n (all_nodes code).
 
 End NODE_SET.
 
@@ -155,7 +155,7 @@ Context {A: Type} (code: PTree.t A) (successors: A -> list positive).
 Inductive reachable: positive -> positive -> Prop :=
   | reachable_refl: forall n, reachable n n
   | reachable_left: forall n1 n2 n3 i,
-      code!n1 = Some i -> In n2 (successors i) -> reachable n2 n3 -> 
+      code ? n1 = Some i -> In n2 (successors i) -> reachable n2 n3 -> 
       reachable n1 n3.
 
 Scheme reachable_ind := Induction for reachable Sort Prop.
@@ -170,7 +170,7 @@ Qed.
 
 Lemma reachable_right:
   forall n1 n2 n3 i,
-  reachable n1 n2 -> code!n2 = Some i -> In n3 (successors i) ->
+  reachable n1 n2 -> code ? n2 = Some i -> In n3 (successors i) ->
   reachable n1 n3.
 Proof.
   intros. apply reachable_trans with n2; auto. econstructor; eauto. constructor.
@@ -210,7 +210,7 @@ Record state : Type :=
   mkstate { aval: PTree.t L.t; worklist: NS.t; visited: positive -> Prop }.
 
 Definition abstr_value (n: positive) (s: state) : L.t :=
-  match s.(aval)!n with
+  match s.(aval) ? n with
   | None => L.bot
   | Some v => v
   end.
@@ -237,7 +237,7 @@ Definition abstr_value (n: positive) (s: state) : L.t :=
   to the body of the [for] loop iterating over all successors. *)
 
 Definition propagate_succ (s: state) (out: L.t) (n: positive) :=
-  match s.(aval)!n with
+  match s.(aval) ? n with
   | None =>
       {| aval := PTree.set n out s.(aval);
          worklist := NS.add n s.(worklist);
@@ -269,7 +269,7 @@ Definition step (s: state) : PMap.t L.t + state :=
   | None => 
       inl _ (L.bot, s.(aval))
   | Some(n, rem) =>
-      match code!n with
+      match code ? n with
       | None =>
           inr _ {| aval := s.(aval); worklist := rem; visited := s.(visited) |}
       | Some instr =>
@@ -319,7 +319,7 @@ Definition fixpoint_nodeset (enodes: NS.t) :=
 Definition start_state_allnodes :=
   {| aval := PTree.empty L.t;
      worklist := NS.all_nodes code;
-     visited := fun n => exists instr, code!n = Some instr |}.
+     visited := fun n => exists instr, code ? n = Some instr |}.
 
 Definition fixpoint_allnodes :=
   fixpoint_from start_state_allnodes.
@@ -344,7 +344,7 @@ Qed.
 
 Remark optge_abstr_value:
   forall st st' n,
-  optge st.(aval)!n st'.(aval)!n ->
+  optge st.(aval) ? n st'.(aval) ? n ->
   L.ge (abstr_value n st) (abstr_value n st').
 Proof.
   intros. unfold abstr_value. inv H. auto. apply L.ge_bot. 
@@ -353,18 +353,18 @@ Qed.
 Lemma propagate_succ_charact:
   forall st out n,
   let st' := propagate_succ st out n in
-     optge st'.(aval)!n (Some out)
-  /\ (forall s, n <> s -> st'.(aval)!s = st.(aval)!s)
-  /\ (forall s, optge st'.(aval)!s st.(aval)!s)
-  /\ (NS.In n st'.(worklist) \/ st'.(aval)!n = st.(aval)!n)
+     optge st'.(aval) ? n (Some out)
+  /\ (forall s, n <> s -> st'.(aval) ? s = st.(aval) ? s)
+  /\ (forall s, optge st'.(aval) ? s st.(aval) ? s)
+  /\ (NS.In n st'.(worklist) \/ st'.(aval) ? n = st.(aval) ? n)
   /\ (forall n', NS.In n' st.(worklist) -> NS.In n' st'.(worklist))
   /\ (forall n', NS.In n' st'.(worklist) -> n' = n \/ NS.In n' st.(worklist))
   /\ (forall n', st.(visited) n' -> st'.(visited) n')
   /\ (forall n', st'.(visited) n' -> NS.In n' st'.(worklist) \/ st.(visited) n')
-  /\ (forall n', st.(aval)!n' = None -> st'.(aval)!n' <> None -> st'.(visited) n').
+  /\ (forall n', st.(aval) ? n' = None -> st'.(aval) ? n' <> None -> st'.(visited) n').
 Proof.
   unfold propagate_succ; intros; simpl.
-  destruct st.(aval)!n as [v|] eqn:E;
+  destruct st.(aval) ? n as [v|] eqn:E;
   [predSpec L.beq L.beq_correct v (L.lub v out) | idtac].
 - (* already there, unchanged *)
   repeat split; intros.
@@ -407,15 +407,15 @@ Qed.
 Lemma propagate_succ_list_charact:
   forall out l st,
   let st' := propagate_succ_list st out l in
-     (forall n, In n l -> optge st'.(aval)!n (Some out))
-  /\ (forall n, ~In n l -> st'.(aval)!n = st.(aval)!n)
-  /\ (forall n, optge st'.(aval)!n st.(aval)!n)
-  /\ (forall n, NS.In n st'.(worklist) \/ st'.(aval)!n = st.(aval)!n)
+     (forall n, In n l -> optge st'.(aval) ? n (Some out))
+  /\ (forall n, ~In n l -> st'.(aval) ? n = st.(aval) ? n)
+  /\ (forall n, optge st'.(aval) ? n st.(aval) ? n)
+  /\ (forall n, NS.In n st'.(worklist) \/ st'.(aval) ? n = st.(aval) ? n)
   /\ (forall n', NS.In n' st.(worklist) -> NS.In n' st'.(worklist))
   /\ (forall n', NS.In n' st'.(worklist) -> In n' l \/ NS.In n' st.(worklist))
   /\ (forall n', st.(visited) n' -> st'.(visited) n')
   /\ (forall n', st'.(visited) n' -> NS.In n' st'.(worklist) \/ st.(visited) n')
-  /\ (forall n', st.(aval)!n' = None -> st'.(aval)!n' <> None -> st'.(visited) n').
+  /\ (forall n', st.(aval) ? n' = None -> st'.(aval) ? n' <> None -> st'.(visited) n').
 Proof.
   induction l; simpl; intros. 
 - repeat split; intros. 
@@ -448,7 +448,7 @@ Proof.
     exploit A6; eauto. intuition.
   + eauto.
   + specialize (B8 n'); specialize (A8 n'). intuition.
-  + destruct st1.(aval)!n' eqn:ST1.
+  + destruct st1.(aval) ? n' eqn:ST1.
     apply B7. apply A9; auto. congruence.
     apply B9; auto.
 Qed.
@@ -473,7 +473,7 @@ Proof.
   intros. destruct (step a) eqn:E. 
   exists a; split; auto. 
   unfold step in E. destruct (NS.pick (worklist a)) as [[n rem]|].
-  destruct (code!n); discriminate.
+  destruct (code ? n); discriminate.
   inv E. auto. 
   eapply steps_right; eauto. 
   constructor.
@@ -490,11 +490,11 @@ evolve monotonically:
 
 Lemma step_incr:
   forall n s1 s2, step s1 = inr s2 ->
-  optge s2.(aval)!n s1.(aval)!n /\ (s1.(visited) n -> s2.(visited) n).
+  optge s2.(aval) ? n s1.(aval) ? n /\ (s1.(visited) n -> s2.(visited) n).
 Proof.
   unfold step; intros. 
   destruct (NS.pick (worklist s1)) as [[p rem] | ]; try discriminate.
-  destruct (code!p) as [instr|]; inv H.
+  destruct (code ? p) as [instr|]; inv H.
   + generalize (propagate_succ_list_charact 
                      (transf p (abstr_value p s1))
                      (successors instr)
@@ -509,7 +509,7 @@ Qed.
 
 Lemma steps_incr:
   forall n s1 s2, steps s1 s2 ->
-  optge s2.(aval)!n s1.(aval)!n /\ (s1.(visited) n -> s2.(visited) n).
+  optge s2.(aval) ? n s1.(aval) ? n /\ (s1.(visited) n -> s2.(visited) n).
 Proof.
   induction 1.
 - split. apply optge_refl. auto.
@@ -534,10 +534,10 @@ Record good_state (st: state) : Prop := {
     st.(visited) n ->
     NS.In n st.(worklist) \/
     (forall i s,
-     code!n = Some i -> In s (successors i) ->
-     optge st.(aval)!s (Some (transf n (abstr_value n st))));
+     code ? n = Some i -> In s (successors i) ->
+     optge st.(aval) ? s (Some (transf n (abstr_value n st))));
   gs_defined: forall n v,
-    st.(aval)!n = Some v -> st.(visited) n
+    st.(aval) ? n = Some v -> st.(visited) n
 }.
 
 (** We show that the [step] function preserves this invariant. *)
@@ -545,7 +545,7 @@ Record good_state (st: state) : Prop := {
 Lemma step_state_good:
   forall st pc rem instr,
   NS.pick st.(worklist) = Some (pc, rem) ->
-  code!pc = Some instr ->
+  code ? pc = Some instr ->
   good_state st ->
   good_state (propagate_succ_list (mkstate st.(aval) rem st.(visited))
                                   (transf pc (abstr_value pc st))
@@ -573,9 +573,9 @@ Proof.
   * (* n was already on the worklist *)
     left. apply A5; auto.
 + (* n was stable before, still is *)
-  right; intros. apply optge_trans with st.(aval)!s; eauto. 
+  right; intros. apply optge_trans with st.(aval) ? s; eauto. 
 - (* defined *)
-  destruct st.(aval)!n as [v'|] eqn:ST. 
+  destruct st.(aval) ? n as [v'|] eqn:ST. 
   + apply A7. eapply GOOD2; eauto. 
   + apply A9; auto. congruence.
 Qed.
@@ -584,7 +584,7 @@ Lemma step_state_good_2:
   forall st pc rem,
   good_state st ->
   NS.pick (worklist st) = Some (pc, rem) ->
-  code!pc = None ->
+  code ? pc = None ->
   good_state (mkstate st.(aval) rem st.(visited)).
 Proof.
   intros until rem; intros [GOOD1 GOOD2] PICK CODE.
@@ -606,7 +606,7 @@ Proof.
 - auto. 
 - unfold step in e.
   destruct (NS.pick (worklist s2)) as [[n rem] | ] eqn:PICK; try discriminate.
-  destruct (code!n) as [instr|] eqn:CODE; inv e.
+  destruct (code ? n) as [instr|] eqn:CODE; inv e.
   eapply step_state_good; eauto. 
   eapply step_state_good_2; eauto.
 Qed.
@@ -661,16 +661,16 @@ Qed.
 Theorem fixpoint_solution:
   forall ep ev res n instr s,
   fixpoint ep ev = Some res ->
-  code!n = Some instr ->
+  code ? n = Some instr ->
   In s (successors instr) ->
   (forall n, L.eq (transf n L.bot) L.bot) ->
-  L.ge res!!s (transf n res!!n).
+  L.ge res ?? s (transf n res ?? n).
 Proof.
   unfold fixpoint; intros. 
   exploit fixpoint_from_charact; eauto. intros (st & STEPS & PICK & RES).
   exploit steps_state_good; eauto. apply start_state_good. intros [GOOD1 GOOD2].
   rewrite RES; unfold PMap.get; simpl.
-  destruct st.(aval)!n as [v|] eqn:STN. 
+  destruct st.(aval) ? n as [v|] eqn:STN. 
 - destruct (GOOD1 n) as [P|P]; eauto.
   eelim NS.pick_none; eauto. 
   exploit P; eauto. unfold abstr_value; rewrite STN. intros OGE; inv OGE. auto.
@@ -683,7 +683,7 @@ Qed.
 Theorem fixpoint_entry:
   forall ep ev res,
   fixpoint ep ev = Some res ->
-  L.ge res!!ep ev.
+  L.ge res ?? ep ev.
 Proof.
   unfold fixpoint; intros. 
   exploit fixpoint_from_charact; eauto. intros (st & STEPS & PICK & RES).
@@ -697,9 +697,9 @@ Qed.
 Theorem fixpoint_allnodes_solution:
   forall res n instr s,
   fixpoint_allnodes = Some res ->
-  code!n = Some instr ->
+  code ? n = Some instr ->
   In s (successors instr) ->
-  L.ge res!!s (transf n res!!n).
+  L.ge res ?? s (transf n res ?? n).
 Proof.
   unfold fixpoint_allnodes; intros. 
   exploit fixpoint_from_charact; eauto. intros (st & STEPS & PICK & RES).
@@ -719,9 +719,9 @@ Theorem fixpoint_nodeset_solution:
   fixpoint_nodeset enodes = Some res ->
   NS.In e enodes ->
   reachable code successors e n ->
-  code!n = Some instr ->
+  code ? n = Some instr ->
   In s (successors instr) ->
-  L.ge res!!s (transf n res!!n).
+  L.ge res ?? s (transf n res ?? n).
 Proof.
   unfold fixpoint_nodeset; intros. 
   exploit fixpoint_from_charact; eauto. intros (st & STEPS & PICK & RES).
@@ -743,11 +743,11 @@ Theorem fixpoint_invariant:
     (P: L.t -> Prop)
     (P_bot: P L.bot)
     (P_lub: forall x y, P x -> P y -> P (L.lub x y))
-    (P_transf: forall pc instr x, code!pc = Some instr -> P x -> P (transf pc x))
+    (P_transf: forall pc instr x, code ? pc = Some instr -> P x -> P (transf pc x))
     (P_entrypoint: P ev)
     res pc,
   fixpoint ep ev = Some res ->
-  P res!!pc.
+  P res ?? pc.
 Proof.
   intros.
   set (inv := fun st => forall x, P (abstr_value x st)).
@@ -760,7 +760,7 @@ Proof.
   assert (forall st v n, inv st -> P v -> inv (propagate_succ st v n)).
   {
     unfold inv, propagate_succ. intros.
-    destruct (aval st)!n as [oldl|] eqn:E.
+    destruct (aval st) ? n as [oldl|] eqn:E.
     destruct (L.beq oldl (L.lub oldl v)).
     auto.
     unfold abstr_value. simpl. rewrite PTree.gsspec. destruct (peq x n). 
@@ -781,13 +781,13 @@ Proof.
     induction 1; intros.
     auto.
     unfold step in e. destruct (NS.pick (worklist s2)) as [[n rem]|]; try discriminate.
-    destruct (code!n) as [instr|] eqn:INSTR; inv e.
+    destruct (code ? n) as [instr|] eqn:INSTR; inv e.
     apply H2. apply IHsteps; auto. eapply P_transf; eauto. apply IHsteps; auto. 
     apply IHsteps; auto.
   }
   unfold fixpoint in H. exploit fixpoint_from_charact; eauto. 
   intros (st & STEPS & PICK & RES). 
-  replace (res!!pc) with (abstr_value pc st). eapply H3; eauto. 
+  replace (res ?? pc) with (abstr_value pc st). eapply H3; eauto. 
   rewrite RES; auto. 
 Qed.
 
@@ -805,7 +805,7 @@ End Dataflow_Solver.
 (** ** Construction of the reversed flow graph (the predecessor relation) *)
 
 Definition successors_list (successors: PTree.t (list positive)) (pc: positive) : list positive :=
-  match successors!pc with None => nil | Some l => l end.
+  match successors ? pc with None => nil | Some l => l end.
 
 Notation "a !!! b" := (successors_list a b) (at level 1).
 
@@ -843,11 +843,11 @@ Definition make_predecessors : PTree.t (list positive) :=
 
 Lemma make_predecessors_correct_1:
   forall n instr s,
-  code!n = Some instr -> In s (successors instr) ->
+  code ? n = Some instr -> In s (successors instr) ->
   In n make_predecessors!!!s.
 Proof.
   intros until s. 
-  set (P := fun m p => m!n = Some instr -> In s (successors instr) ->
+  set (P := fun m p => m ? n = Some instr -> In s (successors instr) ->
                        In n p!!!s).
   unfold make_predecessors.
   apply PTree_Properties.fold_rec with (P := P); unfold P; intros.
@@ -864,11 +864,11 @@ Qed.
 
 Lemma make_predecessors_correct_2:
   forall n instr s,
-  code!n = Some instr -> In s (successors instr) ->
-  exists l, make_predecessors!s = Some l /\ In n l.
+  code ? n = Some instr -> In s (successors instr) ->
+  exists l, make_predecessors ? s = Some l /\ In n l.
 Proof.
   intros. exploit make_predecessors_correct_1; eauto. 
-  unfold successors_list. destruct (make_predecessors!s); simpl; intros.
+  unfold successors_list. destruct (make_predecessors ? s); simpl; intros.
   exists l; auto.
   contradiction.
 Qed.
@@ -911,9 +911,9 @@ Module Type BACKWARD_DATAFLOW_SOLVER.
   Hypothesis fixpoint_solution:
     forall A (code: PTree.t A) successors transf res n instr s,
     fixpoint code successors transf = Some res ->
-    code!n = Some instr -> In s (successors instr) ->
-    (forall n a, code!n = None -> L.eq (transf n a) L.bot) ->
-    L.ge res!!n (transf s res!!s).
+    code ? n = Some instr -> In s (successors instr) ->
+    (forall n a, code ? n = None -> L.eq (transf n a) L.bot) ->
+    L.ge res ?? n (transf s res ?? s).
 
   (** [fixpoint_allnodes] is a variant of [fixpoint], less algorithmically
     efficient, but correct without any hypothesis on the transfer function. *)
@@ -926,8 +926,8 @@ Module Type BACKWARD_DATAFLOW_SOLVER.
   Hypothesis fixpoint_allnodes_solution:
     forall A (code: PTree.t A) successors transf res n instr s,
     fixpoint_allnodes code successors transf = Some res ->
-    code!n = Some instr -> In s (successors instr) ->
-    L.ge res!!n (transf s res!!s).
+    code ? n = Some instr -> In s (successors instr) ->
+    L.ge res ?? n (transf s res ?? s).
 
 End BACKWARD_DATAFLOW_SOLVER.
 
@@ -964,7 +964,7 @@ Section Exit_points.
   for exploring the reverse CFG. *)
 
 Definition sequential_node (pc: positive) (instr: A): bool :=
-  existsb (fun s => match code!s with None => false | Some _ => plt s pc end)
+  existsb (fun s => match code ? s with None => false | Some _ => plt s pc end)
           (successors instr).
 
 Definition exit_points : NS.t :=
@@ -977,7 +977,7 @@ Definition exit_points : NS.t :=
 
 Lemma exit_points_charact:
   forall n, 
-  NS.In n exit_points <-> exists i, code!n = Some i /\ sequential_node n i = false.
+  NS.In n exit_points <-> exists i, code ? n = Some i /\ sequential_node n i = false.
 Proof.
   intros n. unfold exit_points. eapply PTree_Properties.fold_rec. 
 - (* extensionality *)
@@ -999,14 +999,14 @@ Qed.
 
 Lemma reachable_exit_points:
   forall pc i,
-  code!pc = Some i -> exists x, NS.In x exit_points /\ reachable code successors pc x.
+  code ? pc = Some i -> exists x, NS.In x exit_points /\ reachable code successors pc x.
 Proof.
   intros pc0. pattern pc0. apply (well_founded_ind Plt_wf).
   intros pc HR i CODE. 
   destruct (sequential_node pc i) eqn:SN. 
 - (* at least one successor that decreases the pc *)
   unfold sequential_node in SN. rewrite existsb_exists in SN. 
-  destruct SN as [s [P Q]]. destruct (code!s) as [i'|] eqn:CS; try discriminate. InvBooleans.
+  destruct SN as [s [P Q]]. destruct (code ? s) as [i'|] eqn:CS; try discriminate. InvBooleans.
   exploit (HR s); eauto. intros [x [U V]]. 
   exists x; split; auto. eapply reachable_left; eauto. 
 - (* otherwise we are an exit point *)
@@ -1019,7 +1019,7 @@ Qed.
 
 Lemma reachable_exit_points_predecessor:
   forall pc i,
-  code!pc = Some i ->
+  code ? pc = Some i ->
   exists x, NS.In x exit_points /\ reachable (make_predecessors code successors) (fun l => l) x pc.
 Proof.
   intros. exploit reachable_exit_points; eauto. intros [x [P Q]].
@@ -1038,13 +1038,13 @@ Definition fixpoint :=
 Theorem fixpoint_solution:
   forall res n instr s,
   fixpoint = Some res ->
-  code!n = Some instr -> In s (successors instr) ->
-  (forall n a, code!n = None -> L.eq (transf n a) L.bot) ->
-  L.ge res!!n (transf s res!!s).
+  code ? n = Some instr -> In s (successors instr) ->
+  (forall n a, code ? n = None -> L.eq (transf n a) L.bot) ->
+  L.ge res ?? n (transf s res ?? s).
 Proof.
   intros.
   exploit (make_predecessors_correct_2 code); eauto. intros [l [P Q]].
-  destruct code!s as [instr'|] eqn:CS.
+  destruct code ? s as [instr'|] eqn:CS.
 - exploit reachable_exit_points_predecessor. eexact CS. intros (ep & U & V).
   unfold fixpoint in H. eapply DS.fixpoint_nodeset_solution; eauto.
 - apply L.ge_trans with L.bot. apply L.ge_bot.
@@ -1062,8 +1062,8 @@ Definition fixpoint_allnodes :=
 Theorem fixpoint_allnodes_solution:
   forall res n instr s,
   fixpoint_allnodes = Some res ->
-  code!n = Some instr -> In s (successors instr) ->
-  L.ge res!!n (transf s res!!s).
+  code ? n = Some instr -> In s (successors instr) ->
+  L.ge res ?? n (transf s res ?? s).
 Proof.
   intros.
   exploit (make_predecessors_correct_2 code); eauto. intros [l [P Q]].
@@ -1114,22 +1114,22 @@ Module Type BBLOCK_SOLVER.
   Hypothesis fixpoint_solution:
     forall A (code: PTree.t A) successors transf entrypoint res n instr s,
     fixpoint code successors transf entrypoint = Some res ->
-    code!n = Some instr -> In s (successors instr) ->
-    L.ge res!!s (transf n res!!n).
+    code ? n = Some instr -> In s (successors instr) ->
+    L.ge res ?? s (transf n res ?? n).
 
   Hypothesis fixpoint_entry:
     forall A (code: PTree.t A) successors transf entrypoint res,
     fixpoint code successors transf entrypoint = Some res ->
-    res!!entrypoint = L.top.
+    res ?? entrypoint = L.top.
 
   Hypothesis fixpoint_invariant:
     forall A (code: PTree.t A) successors transf entrypoint
            (P: L.t -> Prop),
     P L.top ->
-    (forall pc instr x, code!pc = Some instr -> P x -> P (transf pc x)) ->
+    (forall pc instr x, code ? pc = Some instr -> P x -> P (transf pc x)) ->
     forall res pc,
     fixpoint code successors transf entrypoint = Some res ->
-    P res!!pc.
+    P res ?? pc.
 
 End BBLOCK_SOLVER.
 
@@ -1150,7 +1150,7 @@ Variable transf: positive -> L.t -> L.t.
 Variable entrypoint: positive.
 Variable P: L.t -> Prop.
 Hypothesis Ptop: P L.top.
-Hypothesis Ptransf: forall pc instr x, code!pc = Some instr -> P x -> P (transf pc x).
+Hypothesis Ptransf: forall pc instr x, code ? pc = Some instr -> P x -> P (transf pc x).
 
 Definition bbmap := positive -> bool.
 Definition result := PMap.t L.t.
@@ -1201,13 +1201,13 @@ Definition step (bb: bbmap) (st: state) : result + state :=
   match st.(worklist) with
   | nil => inl _ st.(aval)
   | pc :: rem =>
-      match code!pc with
+      match code ? pc with
       | None =>
           inr _ (mkstate st.(aval) rem)
       | Some instr =>
           inr _ (propagate_successors 
                    bb (successors instr)
-                   (transf pc st.(aval)!!pc)
+                   (transf pc st.(aval) ?? pc)
                    (mkstate st.(aval) rem))
       end
   end.
@@ -1242,15 +1242,15 @@ Definition predecessors := make_predecessors code successors.
 
 Lemma predecessors_correct:
   forall n instr s,
-  code!n = Some instr -> In s (successors instr) -> In n predecessors!!!s.
+  code ? n = Some instr -> In s (successors instr) -> In n predecessors!!!s.
 Proof.
   intros. unfold predecessors. eapply make_predecessors_correct_1; eauto.
 Qed.
 
 Lemma multiple_predecessors:
   forall s n1 instr1 n2 instr2,
-  code!n1 = Some instr1 -> In s (successors instr1) ->
-  code!n2 = Some instr2 -> In s (successors instr2) ->
+  code ? n1 = Some instr1 -> In s (successors instr1) ->
+  code ? n2 = Some instr2 -> In s (successors instr2) ->
   n1 <> n2 ->
   basic_block_map s = true.
 Proof.
@@ -1269,7 +1269,7 @@ Qed.
 
 Lemma no_self_loop:
   forall n instr,
-  code!n = Some instr -> In n (successors instr) -> basic_block_map n = true.
+  code ? n = Some instr -> In n (successors instr) -> basic_block_map n = true.
 Proof.
   intros. unfold basic_block_map, is_basic_block_head.
   destruct (peq n entrypoint). auto. 
@@ -1290,12 +1290,12 @@ Qed.
 *)
 
 Definition state_invariant (st: state) : Prop :=
-  (forall n, basic_block_map n = true -> st.(aval)!!n = L.top)
+  (forall n, basic_block_map n = true -> st.(aval) ?? n = L.top)
 /\
   (forall n,
    In n st.(worklist) \/
-   (forall instr s, code!n = Some instr -> In s (successors instr) -> 
-               L.ge st.(aval)!!s (transf n st.(aval)!!n))).
+   (forall instr s, code ? n = Some instr -> In s (successors instr) -> 
+               L.ge st.(aval) ?? s (transf n st.(aval) ?? n))).
 
 Lemma propagate_successors_charact1:
   forall bb succs l st,
@@ -1316,8 +1316,8 @@ Qed.
 Lemma propagate_successors_charact2:
   forall bb succs l st n,
   let st' := propagate_successors bb succs l st in
-  (In n succs -> bb n = false -> In n st'.(worklist) /\ st'.(aval)!!n = l)
-/\ (~In n succs \/ bb n = true -> st'.(aval)!!n = st.(aval)!!n).
+  (In n succs -> bb n = false -> In n st'.(worklist) /\ st'.(aval) ?? n = l)
+/\ (~In n succs \/ bb n = true -> st'.(aval) ?? n = st.(aval) ?? n).
 Proof.
   induction succs; simpl; intros.
   (* Base case *)
@@ -1345,15 +1345,15 @@ Qed.
 
 Lemma propagate_successors_invariant:
   forall pc instr res rem,
-  code!pc = Some instr ->
+  code ? pc = Some instr ->
   state_invariant (mkstate res (pc :: rem)) ->
   state_invariant 
     (propagate_successors basic_block_map (successors instr)
-                          (transf pc res!!pc)
+                          (transf pc res ?? pc)
                           (mkstate res rem)).
 Proof.
   intros until rem. intros CODE [INV1 INV2]. simpl in INV1. simpl in INV2.
-  set (l := transf pc res!!pc).
+  set (l := transf pc res ?? pc).
   generalize (propagate_successors_charact1 basic_block_map
                 (successors instr) l (mkstate res rem)).
   generalize (propagate_successors_charact2 basic_block_map
@@ -1370,7 +1370,7 @@ Proof.
   right; intros.
   assert (instr0 = instr) by congruence. subst instr0.
   elim (U s); intros C D.
-  replace (st1.(aval)!!pc) with res!!pc. fold l.
+  replace (st1.(aval) ?? pc) with res ?? pc. fold l.
   destruct (basic_block_map s) eqn:BB.
   rewrite D. simpl. rewrite INV1. apply L.top_ge. auto. tauto. 
   elim (C H0 (refl_equal _)). intros X Y. rewrite Y. apply L.refl_ge. 
@@ -1383,7 +1383,7 @@ Proof.
   (* Case 2.1: n was already in worklist, still is *)
   left. apply V. simpl. tauto.
   (* Case 2.2: n was not in worklist *)
-  assert (INV3: forall s instr', code!n = Some instr' -> In s (successors instr') -> st1.(aval)!!s = res!!s).
+  assert (INV3: forall s instr', code ? n = Some instr' -> In s (successors instr') -> st1.(aval) ?? s = res ?? s).
     (* Amazingly, successors of n do not change.  The only way
        they could change is if they were successors of pc as well,
        but that gives them two different predecessors, so
@@ -1409,7 +1409,7 @@ Qed.
 
 Lemma propagate_successors_invariant_2:
   forall pc res rem,
-  code!pc = None ->
+  code ? pc = None ->
   state_invariant (mkstate res (pc :: rem)) ->
   state_invariant (mkstate res rem).
 Proof.
@@ -1442,7 +1442,7 @@ Proof.
   intros st INV. destruct st as [stin stwrk]. 
   unfold step. simpl. destruct stwrk as [ | pc rem ] eqn:WRK. 
   auto.
-  destruct (code!pc) as [instr|] eqn:CODE.
+  destruct (code ? pc) as [instr|] eqn:CODE.
   eapply propagate_successors_invariant; eauto. 
   eapply propagate_successors_invariant_2; eauto. 
 
@@ -1454,8 +1454,8 @@ Qed.
 Theorem fixpoint_solution:
   forall res n instr s,
   fixpoint = Some res ->
-  code!n = Some instr -> In s (successors instr) ->
-  L.ge res!!s (transf n res!!n).
+  code ? n = Some instr -> In s (successors instr) ->
+  L.ge res ?? s (transf n res ?? n).
 Proof.
   intros. 
   assert (state_invariant (mkstate res nil)).
@@ -1469,7 +1469,7 @@ Qed.
 Theorem fixpoint_entry:
   forall res,
   fixpoint = Some res ->
-  res!!entrypoint = L.top.
+  res ?? entrypoint = L.top.
 Proof.
   intros. 
   assert (state_invariant (mkstate res nil)).
@@ -1482,7 +1482,7 @@ Qed.
 (** ** Preservation of a property over solutions *)
 
 Definition Pstate (st: state) : Prop :=
-  forall pc, P st.(aval)!!pc.
+  forall pc, P st.(aval) ?? pc.
 
 Lemma propagate_successors_P:
   forall bb l,
@@ -1500,7 +1500,7 @@ Proof.
 Qed.
 
 Theorem fixpoint_invariant:
-  forall res pc, fixpoint = Some res -> P res!!pc.
+  forall res pc, fixpoint = Some res -> P res ?? pc.
 Proof.
   unfold fixpoint; intros. pattern res. 
   eapply (PrimIter.iterate_prop _ _ (step basic_block_map) Pstate).
@@ -1509,7 +1509,7 @@ Proof.
   apply PS.
   assert (PS2: Pstate (mkstate st.(aval) l)).
     red; intro; simpl. apply PS.
-  destruct (code!p) as [instr|] eqn:CODE.
+  destruct (code ? p) as [instr|] eqn:CODE.
   apply propagate_successors_P. eauto. auto. 
   auto.
 
@@ -1583,11 +1583,11 @@ Module NodeSetForward <: NODE_SET.
 
   Lemma all_nodes_spec:
     forall A (code: PTree.t A) n instr, 
-    code!n = Some instr -> In n (all_nodes code).
+    code ? n = Some instr -> In n (all_nodes code).
   Proof.
     intros A code n instr.
     apply PTree_Properties.fold_rec with
-      (P := fun m set => m!n = Some instr -> In n set).
+      (P := fun m set => m ? n = Some instr -> In n set).
     (* extensionality *)
     intros. apply H0. rewrite H. auto. 
     (* base case *)
@@ -1639,7 +1639,7 @@ Module NodeSetBackward <: NODE_SET.
 
   Lemma all_nodes_spec:
     forall A (code: PTree.t A) n instr, 
-    code!n = Some instr -> In n (all_nodes code).
+    code ? n = Some instr -> In n (all_nodes code).
   Proof NodeSetForward.all_nodes_spec.
 End NodeSetBackward.
 

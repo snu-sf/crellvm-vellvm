@@ -45,6 +45,33 @@ Local Unset Case Analysis Schemes.
 
 Local Notation "a # b" := (PMap.get b a) (at level 1).
 
+(* update: added for Vellvm - bounds *)
+Definition update (A: Type) (x: positive) (v: A) (f: positive -> A) : positive -> A :=
+  fun y => if peq y x then v else f y.
+
+Implicit Arguments update [A].
+
+Lemma update_s:
+  forall (A: Type) (x: positive) (v: A) (f: positive -> A),
+  update x v f x = v.
+Proof.
+  intros; unfold update. apply peq_true.
+Qed.
+
+Lemma update_o:
+  forall (A: Type) (x: positive) (v: A) (f: positive -> A) (y: positive),
+  x <> y -> update x v f y = f y.
+Proof.
+  intros; unfold update. apply peq_false; auto.
+Qed.
+
+Lemma update_stable:
+  forall (A: Type) (x: positive) (v: A) (f: positive -> A) (y: positive),
+  update x (f x) f y = f y.
+Proof.
+  intros; unfold update. destruct (peq y x); subst; auto.
+Qed.
+
 Module Mem <: MEM.
 
 Definition perm_order' (po: option permission) (p: permission) := 
@@ -64,21 +91,23 @@ Record mem' : Type := mkmem {
   mem_contents: PMap.t (ZMap.t memval);  (**r [block -> offset -> memval] *)
   mem_access: PMap.t (Z -> perm_kind -> option permission);
                                          (**r [block -> offset -> kind -> option permission] *)
+  bounds: block -> Z * Z; (* added for Vellvm *)
   nextblock: block;
   access_max: 
     forall b ofs, perm_order'' (mem_access#b ofs Max) (mem_access#b ofs Cur);
   nextblock_noaccess:
     forall b ofs k, ~(Plt b nextblock) -> mem_access#b ofs k = None;
   contents_default:
-    forall b, fst mem_contents#b = Undef
+    forall b, fst mem_contents#b = Undef;
+  bounds_noaccess: forall b ofs pk, ofs < fst(bounds b) \/ ofs >= snd(bounds b) -> mem_access # b ofs pk = None
 }.
 
 Definition mem := mem'.
 
 Lemma mkmem_ext:
- forall cont1 cont2 acc1 acc2 next1 next2 a1 a2 b1 b2 c1 c2,
-  cont1=cont2 -> acc1=acc2 -> next1=next2 ->
-  mkmem cont1 acc1 next1 a1 b1 c1 = mkmem cont2 acc2 next2 a2 b2 c2.
+ forall cont1 cont2 acc1 acc2 bounds1 bounds2 next1 next2 a1 a2 b1 b2 c1 c2 d1 d2,
+  cont1=cont2 -> acc1=acc2 -> bounds1=bounds2 -> next1=next2 ->
+  mkmem cont1 acc1 bounds1 next1 a1 b1 c1 d1 = mkmem cont2 acc2 bounds2 next2 a2 b2 c2 d2.
 Proof.
   intros. subst. f_equal; apply proof_irr.
 Qed.
@@ -339,6 +368,50 @@ Proof.
   intros. apply weak_valid_pointer_spec. auto.
 Qed.
 
+(** Bounds *)
+
+(** Each block has a low bound and a high bound, determined at allocation time
+    and invariant afterward.  The crucial properties of bounds is
+    that any offset below the low bound or above the high bound is
+    empty. *)
+
+Notation low_bound m b := (fst(bounds m b)).
+Notation high_bound m b := (snd(bounds m b)).
+
+Theorem perm_in_bounds:
+  forall m b ofs pk p, perm m b ofs pk p -> low_bound m b <= ofs < high_bound m b.
+Proof.
+  unfold perm. intros.
+  destruct (zlt ofs (fst (bounds m b))).
+  exploit bounds_noaccess. left; eauto.
+  intros.
+  rewrite H0 in H. contradiction.
+  destruct (zlt ofs (snd (bounds m b))).
+  omega. 
+  exploit bounds_noaccess. right; eauto.
+  intro; rewrite H0 in H. contradiction.
+Qed.
+
+Theorem range_perm_in_bounds:
+  forall m b lo hi pk p, 
+  range_perm m b lo hi pk p -> lo < hi -> low_bound m b <= lo /\ hi <= high_bound m b.
+Proof.
+  intros. split. 
+  exploit (perm_in_bounds m b lo pk p). apply H. omega. omega.
+  exploit (perm_in_bounds m b (hi-1) pk p). apply H. omega. omega.
+Qed.
+
+Theorem valid_access_in_bounds:
+  forall m chunk b ofs p,
+  valid_access m chunk b ofs p ->
+  low_bound m b <= ofs /\ ofs + size_chunk chunk <= high_bound m b.
+Proof.
+  intros. inv H. apply range_perm_in_bounds with (Cur) (p); auto.
+  generalize (size_chunk_pos chunk). omega.
+Qed.
+
+Hint Local Resolve perm_in_bounds range_perm_in_bounds valid_access_in_bounds.
+
 (** * Operations over memory stores *)
 
 (** The initial store *)
@@ -346,9 +419,13 @@ Qed.
 Program Definition empty: mem :=
   mkmem (PMap.init (ZMap.init Undef))
         (PMap.init (fun ofs k => None))
-        1%positive _ _ _.
+        (fun b => (0,0))
+        1%positive _ _ _ _.
 Next Obligation.
   repeat rewrite PMap.gi. red; auto.
+Qed.
+Next Obligation.
+  rewrite PMap.gi. auto.
 Qed.
 Next Obligation.
   rewrite PMap.gi. auto.
@@ -371,8 +448,9 @@ Program Definition alloc (m: mem) (lo hi: Z) :=
          (PMap.set m.(nextblock)
                    (fun ofs k => if zle lo ofs && zlt ofs hi then Some Freeable else None)
                    m.(mem_access))
+         (update m.(nextblock) (lo, hi) m.(bounds))
          (Psucc m.(nextblock))
-         _ _ _,
+         _ _ _ _,
    m.(nextblock)).
 Next Obligation.
   repeat rewrite PMap.gsspec. destruct (peq b (nextblock m)). 
@@ -388,6 +466,12 @@ Qed.
 Next Obligation.
   rewrite PMap.gsspec. destruct (peq b (nextblock m)). auto. apply contents_default. 
 Qed.
+Next Obligation.
+  rewrite PMap.gsspec. unfold update in *. destruct (peq b (nextblock m)); subst.
+  destruct (zle lo ofs); destruct (zlt ofs hi); simpl; auto.
+  simpl in H. omegaContradiction.
+  eapply bounds_noaccess; eauto.
+Qed.
 
 (** Freeing a block between the given bounds.
   Return the updated memory state where the given range of the given block
@@ -399,7 +483,8 @@ Program Definition unchecked_free (m: mem) (b: block) (lo hi: Z): mem :=
         (PMap.set b 
                 (fun ofs k => if zle lo ofs && zlt ofs hi then None else m.(mem_access)#b ofs k)
                 m.(mem_access))
-        m.(nextblock) _ _ _.
+        m.(bounds)
+        m.(nextblock) _ _ _ _.
 Next Obligation.
   repeat rewrite PMap.gsspec. destruct (peq b0 b).
   destruct (zle lo ofs && zlt ofs hi). red; auto. apply access_max. 
@@ -412,6 +497,12 @@ Next Obligation.
 Qed.
 Next Obligation.
   apply contents_default.
+Qed.
+Next Obligation.
+  repeat rewrite PMap.gsspec. destruct (peq b0 b); subst; auto.
+  destruct (zle lo ofs && zlt ofs hi); subst; auto.
+  apply bounds_noaccess; auto.
+  apply bounds_noaccess; auto.
 Qed.
 
 Definition free (m: mem) (b: block) (lo hi: Z): option mem :=
@@ -554,8 +645,9 @@ Program Definition store (chunk: memory_chunk) (m: mem) (b: block) (ofs: Z) (v: 
                           (setN (encode_val chunk v) ofs (m.(mem_contents)#b))
                           m.(mem_contents))
                 m.(mem_access)
+                m.(bounds)
                 m.(nextblock)
-                _ _ _)
+                _ _ _ _)
   else
     None.
 Next Obligation. apply access_max. Qed.
@@ -565,6 +657,7 @@ Next Obligation.
   rewrite setN_default. apply contents_default. 
   apply contents_default.
 Qed.
+Next Obligation. apply bounds_noaccess; auto. Qed.
 
 (** [storev chunk m addr v] is similar, but the address and offset are given
   as a single value [addr], which must be a pointer value. *)
@@ -584,8 +677,9 @@ Program Definition storebytes (m: mem) (b: block) (ofs: Z) (bytes: list memval) 
     Some (mkmem
              (PMap.set b (setN bytes ofs (m.(mem_contents)#b)) m.(mem_contents))
              m.(mem_access)
+             m.(bounds)
              m.(nextblock)
-             _ _ _)
+             _ _ _ _)
   else
     None.
 Next Obligation. apply access_max. Qed.
@@ -595,6 +689,7 @@ Next Obligation.
   rewrite setN_default. apply contents_default. 
   apply contents_default.
 Qed.
+Next Obligation. apply bounds_noaccess; auto. Qed. 
 
 (** [drop_perm m b lo hi p] sets the max permissions of the byte range
     [(b, lo) ... (b, hi - 1)] to [p].  These bytes must have current permissions
@@ -607,7 +702,8 @@ Program Definition drop_perm (m: mem) (b: block) (lo hi: Z) (p: permission): opt
                 (PMap.set b
                         (fun ofs k => if zle lo ofs && zlt ofs hi then Some p else m.(mem_access)#b ofs k)
                         m.(mem_access))
-                m.(nextblock) _ _ _)
+                m.(bounds)
+                m.(nextblock) _ _ _ _)
   else None.
 Next Obligation.
   repeat rewrite PMap.gsspec. destruct (peq b0 b). subst b0.
@@ -625,7 +721,15 @@ Qed.
 Next Obligation.
   apply contents_default.
 Qed.
-
+Next Obligation.
+  repeat rewrite PMap.gsspec. destruct (peq b0 b); subst; auto.
+  destruct (zle lo ofs). destruct (zlt ofs hi).
+  exploit range_perm_in_bounds; eauto. omega. intros. omegaContradiction. 
+  simpl. eapply bounds_noaccess; eauto. 
+  simpl. eapply bounds_noaccess; eauto.
+  eapply bounds_noaccess; eauto.
+Qed.
+ 
 (** * Properties of the memory operations *)
 
 (** Properties of the empty store. *)
@@ -1002,6 +1106,14 @@ Proof.
 Qed.
 
 Local Hint Resolve store_valid_access_1 store_valid_access_2 store_valid_access_3: mem.
+
+Theorem bounds_store:
+  forall b', bounds m2 b' = bounds m1 b'.
+Proof.
+  intros.
+  unfold store in STORE.
+  destruct ( valid_access_dec m1 chunk b ofs Writable); inv STORE. simpl. auto.
+Qed.
 
 (* NOTE: not used
 Theorem load_store_similar:
@@ -1742,6 +1854,25 @@ Proof.
   exploit perm_alloc_inv. apply H0. eauto. rewrite dec_eq_false; auto. 
 Qed.
 
+Theorem bounds_alloc:
+  forall b', bounds m2 b' = if eq_block b' b then (lo, hi) else bounds m1 b'.
+Proof.
+  injection ALLOC; intros. rewrite <- H; rewrite <- H0; simpl. 
+  unfold update. auto. 
+Qed.
+
+Theorem bounds_alloc_same:
+  bounds m2 b = (lo, hi).
+Proof.
+  rewrite bounds_alloc. apply dec_eq_true. 
+Qed. 
+
+Theorem bounds_alloc_other:
+  forall b', b' <> b -> bounds m2 b' = bounds m1 b'.
+Proof.
+  intros. rewrite bounds_alloc. apply dec_eq_false. auto.
+Qed.
+
 Theorem load_alloc_unchanged:
   forall chunk b' ofs,
   valid_block m1 b' ->
@@ -1971,6 +2102,12 @@ Proof.
   elim (valid_access_free_2 chunk ofs p); auto. omega.
 Qed.
 
+Theorem bounds_free:
+  forall b, bounds m2 b = bounds m1 b.
+Proof.
+  intros. rewrite free_result; simpl. auto.
+Qed.
+
 Theorem load_free:
   forall chunk b ofs,
   b <> bf \/ lo >= hi \/ ofs + size_chunk chunk <= lo \/ hi <= ofs ->
@@ -2110,6 +2247,14 @@ Proof.
   simpl. intros. apply perm_implies with p. apply perm_implies with Freeable. apply perm_cur.
   apply r. tauto. auto with mem. auto.
   auto. auto. auto.
+Qed.
+
+Theorem bounds_drop:
+  forall b', bounds m' b' = bounds m b'.
+Proof.
+  intros.
+  unfold drop_perm in DROP. destruct (range_perm_dec m b lo hi Cur Freeable); inv DROP.
+  unfold bounds; simpl. auto.
 Qed.
 
 Lemma valid_access_drop_1:

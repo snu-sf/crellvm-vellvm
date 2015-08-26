@@ -56,7 +56,7 @@ Definition initial : typenv := {| te_typ := PTree.empty _; te_equ := nil |}.
 (** Add the constraint [T(x) = ty]. *)
 
 Definition set (e: typenv) (x: positive) (ty: T.t) : res typenv :=
-  match e.(te_typ)!x with
+  match e.(te_typ) ? x with
   | None =>
       OK {| te_typ := PTree.set x ty e.(te_typ);
             te_equ := e.(te_equ) |}
@@ -80,7 +80,7 @@ Fixpoint set_list (e: typenv) (rl: list positive) (tyl: list T.t) {struct rl}: r
 
 Definition move (e: typenv) (r1 r2: positive) : res (bool * typenv) :=
   if peq r1 r2 then OK (false, e) else
-  match e.(te_typ)!r1, e.(te_typ)!r2 with
+  match e.(te_typ) ? r1, e.(te_typ) ? r2 with
   | None, None =>
       OK (false, {| te_typ := e.(te_typ); te_equ := (r1, r2) :: e.(te_equ) |})
   | Some ty1, None =>
@@ -113,7 +113,7 @@ Lemma move_shape:
 Proof.
   unfold move; intros.
   destruct (peq r1 r2). inv H. auto. 
-  destruct e.(te_typ)!r1 as [ty1|]; destruct e.(te_typ)!r2 as [ty2|]; inv H; simpl.
+  destruct e.(te_typ) ? r1 as [ty1|]; destruct e.(te_typ) ? r2 as [ty2|]; inv H; simpl.
   destruct (T.eq ty1 ty2); inv H1. auto.
   auto.
   auto.
@@ -127,7 +127,7 @@ Lemma length_move:
 Proof.
   unfold move; intros.
   destruct (peq r1 r2). inv H. omega.
-  destruct e.(te_typ)!r1 as [ty1|]; destruct e.(te_typ)!r2 as [ty2|]; inv H; simpl.
+  destruct e.(te_typ) ? r1 as [ty1|]; destruct e.(te_typ) ? r2 as [ty2|]; inv H; simpl.
   destruct (T.eq ty1 ty2); inv H1. omega.
   omega.
   omega.
@@ -170,7 +170,7 @@ Qed.
 Definition typassign := positive -> T.t.
 
 Definition makeassign (e: typenv) : typassign :=
-  fun x => match e.(te_typ)!x with Some ty => ty | None => T.default end.
+  fun x => match e.(te_typ) ? x with Some ty => ty | None => T.default end.
 
 Definition solve (e: typenv) : res typassign :=
   do e' <- solve_constraints e; OK(makeassign e').
@@ -178,7 +178,7 @@ Definition solve (e: typenv) : res typassign :=
 (** What it means to be a solution *)
 
 Definition satisf (te: typassign) (e: typenv) : Prop :=
-   (forall x ty, e.(te_typ)!x = Some ty -> te x = ty)
+   (forall x ty, e.(te_typ) ? x = Some ty -> te x = ty)
 /\ (forall x y, In (x, y) e.(te_equ) -> te x = te y).
 
 Lemma satisf_initial: forall te, satisf te initial.
@@ -193,7 +193,7 @@ Qed.
 Lemma set_incr:
   forall te x ty e e', set e x ty = OK e' -> satisf te e' -> satisf te e.
 Proof.
-  unfold set; intros. destruct (te_typ e)!x as [ty'|] eqn:E.
+  unfold set; intros. destruct (te_typ e) ? x as [ty'|] eqn:E.
 - destruct (T.eq ty ty'); inv H. auto.
 - inv H. destruct H0 as [A B]; simpl in *. red; split; intros; auto.
   apply A. rewrite PTree.gso by congruence. auto.
@@ -205,7 +205,7 @@ Lemma set_sound:
   forall te x ty e e', set e x ty = OK e' -> satisf te e' -> te x = ty.
 Proof.
   unfold set; intros. destruct H0 as [P Q].
-  destruct (te_typ e)!x as [ty'|] eqn:E.
+  destruct (te_typ e) ? x as [ty'|] eqn:E.
 - destruct (T.eq ty ty'); inv H. eauto.
 - inv H. simpl in P. apply P. apply PTree.gss.
 Qed.
@@ -232,8 +232,8 @@ Lemma move_incr:
 Proof.
   unfold move; intros. destruct H0 as [P Q].
   destruct (peq r1 r2). inv H; split; auto.
-  destruct (te_typ e)!r1 as [ty1|] eqn:E1;
-  destruct (te_typ e)!r2 as [ty2|] eqn:E2.
+  destruct (te_typ e) ? r1 as [ty1|] eqn:E1;
+  destruct (te_typ e) ? r2 as [ty2|] eqn:E2.
 - destruct (T.eq ty1 ty2); inv H. split; auto.
 - inv H; simpl in *; split; auto. intros. apply P. 
   rewrite PTree.gso by congruence. auto.
@@ -250,9 +250,9 @@ Lemma move_sound:
 Proof.
   unfold move; intros. destruct H0 as [P Q].
   destruct (peq r1 r2). congruence.
-  destruct (te_typ e)!r1 as [ty1|] eqn:E1;
-  destruct (te_typ e)!r2 as [ty2|] eqn:E2.
-- destruct (T.eq ty1 ty2); inv H. erewrite ! P by eauto. auto.
+  destruct (te_typ e) ? r1 as [ty1|] eqn:E1;
+  destruct (te_typ e) ? r2 as [ty2|] eqn:E2.
+- destruct (T.eq ty1 ty2); inv H. erewrite ? P by eauto. auto.
 - inv H; simpl in *. rewrite (P r1 ty1). rewrite (P r2 ty1). auto. 
   apply PTree.gss. rewrite PTree.gso by congruence. auto.
 - inv H; simpl in *. rewrite (P r1 ty2). rewrite (P r2 ty2). auto. 
@@ -289,8 +289,8 @@ Proof.
   unfold move; intros. 
   destruct (peq r1 r2). inv H. split; auto.
   unfold makeassign;
-  destruct (te_typ e)!r1 as [ty1|] eqn:E1;
-  destruct (te_typ e)!r2 as [ty2|] eqn:E2.
+  destruct (te_typ e) ? r1 as [ty1|] eqn:E1;
+  destruct (te_typ e) ? r2 as [ty2|] eqn:E2.
 - destruct (T.eq ty1 ty2); inv H. auto.
 - discriminate.
 - discriminate.
@@ -348,7 +348,7 @@ Lemma set_complete:
   satisf te e -> te x = ty -> exists e', set e x ty = OK e' /\ satisf te e'.
 Proof.
   unfold set; intros. generalize H; intros [P Q]. 
-  destruct (te_typ e)!x as [ty1|] eqn:E. 
+  destruct (te_typ e) ? x as [ty1|] eqn:E. 
 - replace ty1 with ty. rewrite dec_eq_true. exists e; auto. 
   exploit P; eauto. congruence. 
 - econstructor; split; eauto. split; simpl; intros; auto. 
@@ -376,8 +376,8 @@ Proof.
   assert (Q': forall x y, In (x, y) ((r1, r2) :: te_equ e) -> te x = te y).
   { intros. destruct H1; auto. congruence. }
   destruct (peq r1 r2). econstructor; econstructor; eauto.
-  destruct (te_typ e)!r1 as [ty1|] eqn:E1;
-  destruct (te_typ e)!r2 as [ty2|] eqn:E2.
+  destruct (te_typ e) ? r1 as [ty1|] eqn:E1;
+  destruct (te_typ e) ? r2 as [ty2|] eqn:E2.
 - replace ty2 with ty1. rewrite dec_eq_true. econstructor; econstructor; eauto.
   exploit (P r1); eauto. exploit (P r2); eauto. congruence. 
 - econstructor; econstructor; split; eauto. 

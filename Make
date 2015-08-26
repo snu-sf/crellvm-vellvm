@@ -58,9 +58,11 @@
 ./src/Vellvm/typings_props.v
 ./src/Vellvm/typings.v
 ./src/Vellvm/vellvm.v
+./src/Vellvm/vellvm_tactics.v
 ./src/Vellvm/memory_props.v
 ./src/Vellvm/program_sim.v
-./src/Vellvm/interpreter.v
+./src/Vellvm/util.v
+./src/Vellvm/maps_ext.v
 
 ./src/Vellvm/Dominators/dom_type.v
 ./src/Vellvm/Dominators/dom_libs.v

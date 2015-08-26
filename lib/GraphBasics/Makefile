@@ -48,7 +48,10 @@ COQSRC:=-I $(COQTOP)/kernel -I $(COQTOP)/lib \
   -I $(CAMLP4LIB)
 ZFLAGS:=$(OCAMLLIBS) $(COQSRC)
 OPT:=
-OTHERFLAGS=
+OTHERFLAGS=-I ../metalib-20090714 \
+	-I ../compcert-2.4/lib \
+	-I ../compcert-2.4/old \
+	-I ../../src/Vellvm
 COQFLAGS:=-q $(OPT) $(COQLIBS) $(OTHERFLAGS) $(COQ_XML)
 COQC:=$(COQBIN)coqc
 COQDEP:=$(COQBIN)coqdep -c

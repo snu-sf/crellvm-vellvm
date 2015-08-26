@@ -1685,7 +1685,7 @@ Proof.
 Qed.
 
 (* We assume alignment is correct. *)
-Axiom align_is_always_correct: forall m ofs, (align_chunk m | ofs).
+(*Axiom align_is_always_correct: forall m ofs, (align_chunk m | ofs).*)
 
 (* Lemma mstore_aux_ex: forall mb lo hi mc gv m ofs *)
 (*   (Hperm : Mem.range_perm m mb lo hi Freeable) *)

@@ -3,6 +3,7 @@ Require Import ListSet.
 Require Import Coqlib.
 Require Import Metatheory.
 Require Import Maps.
+Require Import maps_ext.
 Require Import Lattice.
 Require Import Kildall.
 Require Import Iteration.

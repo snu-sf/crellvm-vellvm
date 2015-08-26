@@ -306,7 +306,7 @@ Definition sign_ext' (nbits: nat) (v: val) : val :=
           (Int.repr nbits (Int.unsigned wz n)))
   | _ => Vundef
   end.
-
+(*
 Definition singleoffloat (v: val) : val :=
   match v with
   | Vfloat f => Vsingle (Float.to_single f)
@@ -318,7 +318,7 @@ Definition floatofsingle (v: val) : val :=
   | Vsingle f => Vfloat (Float.of_single f)
   | _ => Vundef
   end.
-
+*)
 Definition hcast {U : Type} (Sig : U -> Type) (u:U) {v : U} (pf : u = v) (a : Sig u) : Sig v := @eq_rect U u Sig a v pf. 
 
 Lemma hcast_eq: forall T S u pf x,
@@ -676,6 +676,12 @@ Definition mulfs (v1 v2: val): val :=
 Definition divfs (v1 v2: val): val :=
   match v1, v2 with
   | Vsingle f1, Vsingle f2 => Vsingle(Float32.div f1 f2)
+  | _, _ => Vundef
+  end.
+
+Definition modfs (v1 v2: val): val :=
+  match v1, v2 with
+  | Vsingle f1, Vsingle f2 => Vsingle(Float32.rem f1 f2)
   | _, _ => Vundef
   end.
 
@@ -1424,6 +1430,79 @@ Proof.
   intros. destruct ob; simpl; auto. destruct b; auto. 
 Qed.
 
+Definition is_bool (v: val) :=
+  v = Vundef \/ v = Vtrue \/ v = Vfalse.
+
+Definition cmp_mismatch (c: comparison): val :=
+  match c with
+  | Ceq => Vfalse
+  | Cne => Vtrue
+  | _   => Vundef
+  end.
+
+Lemma of_bool_is_bool:
+  forall b, is_bool (of_bool b).
+Proof.
+  destruct b; unfold is_bool; simpl; tauto.
+Qed.
+
+Lemma undef_is_bool: is_bool Vundef.
+Proof.
+  unfold is_bool; tauto.
+Qed.
+
+Lemma cmp_mismatch_is_bool:
+  forall c, is_bool (cmp_mismatch c).
+Proof.
+  destruct c; simpl; unfold is_bool; tauto.
+Qed.
+
+Lemma cmp_is_bool:
+  forall c v1 v2, is_bool (cmp c v1 v2).
+Proof.
+  destruct v1; destruct v2; simplify_op; try apply undef_is_bool;
+    try solve [apply of_bool_is_bool].
+  destruct c; unfold cmp; simpl; destruct (eq_nat_dec wz wz0); subst
+  ; try rewrite hcast_eq; simpl
+  ; try match goal with
+  | |- context [if ?c then _ else _] => destruct c
+  end; unfold is_bool; auto.
+Qed.
+
+Lemma cmpu_is_bool:
+  forall valid_ptr c v1 v2, is_bool (cmpu valid_ptr c v1 v2).
+Proof.
+  destruct v1; destruct v2; simplify_op; try apply undef_is_bool;
+    try solve [apply of_bool_is_bool]
+  ; try (destruct c; unfold cmpu; simpl
+  ; try destruct (eq_nat_dec _ _); subst
+  ; try rewrite hcast_eq; simpl
+  ; try match goal with
+  | |- context [if ?c then _ else _] => destruct c
+  end; unfold is_bool; auto; fail).
+
+  destruct c; unfold cmpu; simpl; try destruct (eq_block _ _); subst
+  ; repeat match goal with
+  | |- context [if ?c then _ else _] => destruct c; unfold is_bool; simpl
+  end; auto.
+Qed.
+
+Lemma cmpf_is_bool:
+  forall c v1 v2, is_bool (cmpf c v1 v2).
+Proof.
+  destruct v1; destruct v2; simplify_op;
+  apply undef_is_bool || apply of_bool_is_bool.
+Qed.
+
+Lemma notbool_is_bool:
+  forall v, is_bool (notbool v).
+Proof.
+  destruct v; simplify_op.
+  apply undef_is_bool. apply of_bool_is_bool. 
+  apply undef_is_bool. unfold is_bool; tauto.
+  unfold is_bool. auto. unfold is_bool; auto.
+Qed.
+
 Lemma zero_ext_and:
   forall n wz v
   (Hwz: get_wordsize v = Some wz),
@@ -1547,13 +1626,13 @@ Lemma sign_ext_lessdef:
 Proof.
   intros; inv H; simpl; auto.
 Qed.
-
+(*
 Lemma singleoffloat_lessdef:
   forall v1 v2, lessdef v1 v2 -> lessdef (singleoffloat v1) (singleoffloat v2).
 Proof.
   intros; inv H; simpl; auto.
 Qed.
-
+*)
 Lemma add_lessdef:
   forall v1 v1' v2 v2',
   lessdef v1 v1' -> lessdef v2 v2' -> lessdef (add v1 v2) (add v1' v2').
@@ -1640,6 +1719,310 @@ match v with
        | _ => false
        end
 end.
+
+Lemma has_chunkb__has_chunk: forall v chk,
+  has_chunkb v chk = true ->
+  has_chunk v chk.
+Proof.
+  destruct v, chk; simpl; intros; try solve [auto | congruence].
+    apply andb_true_iff in H. destruct H as [H1 H2].
+    apply andb_true_iff in H1. destruct H1 as [H1 H3].
+    destruct (eq_nat_dec wz n); try inv H1. subst.
+    destruct (zle 0 (Int.unsigned n i)); try inv H3.
+    destruct (zlt (Int.unsigned n i) (Int.modulus n)); try inv H2.
+    auto.
+    destruct (eq_nat_dec n 31); try inv H; auto.
+    destruct (eq_nat_dec n 31); try inv H; auto.
+Qed.
+
+Lemma cmp_has_Mint0: forall c0 v1 v2,
+  has_chunk (Val.cmp c0 v1 v2) (Mint 0).
+Proof.
+  intros.
+  match goal with
+  | |- context [cmp ?c ?v1 ?v2] => assert (J:=cmp_is_bool c v1 v2)
+  end. 
+    destruct J as [J | [ J | J ]]; rewrite J; constructor; try solve [
+      auto |
+      unfold Int.unsigned, one, zero, Int.one, Int.zero, Int.repr; simpl;
+      apply Z_mod_lt; apply Int.modulus_pos
+    ].
+  unfold Int.modulus, two_power_nat, Int.wordsize, shift_nat; simpl; omega.
+  unfold Int.modulus, two_power_nat, Int.wordsize, shift_nat; simpl; omega.
+Qed.
+
+Lemma cmpu_has_Mint0: forall valid_ptr c0 v1 v2,
+  has_chunk (cmpu valid_ptr c0 v1 v2) (Mint 0).
+Proof.
+  intros.
+  match goal with
+  | |- context [cmpu ?val ?c ?v1 ?v2] => assert (J:=cmpu_is_bool val c v1 v2)
+  end. 
+    destruct J as [J | [ J | J ]]; rewrite J; constructor; try solve [
+      auto |
+      unfold Int.unsigned, one, zero, Int.one, Int.zero, Int.repr; simpl;
+      apply Z_mod_lt; apply Int.modulus_pos
+    ].
+  unfold Int.modulus, two_power_nat, Int.wordsize, shift_nat; simpl; omega.
+  unfold Int.modulus, two_power_nat, Int.wordsize, shift_nat; simpl; omega.
+Qed.
+
+Lemma cmpf_has_Mint0: forall c0 v1 v2,
+  has_chunk (cmpf c0 v1 v2) (Mint 0).
+Proof.
+  intros.
+  match goal with
+  | |- context [cmpf ?c ?v1 ?v2] => assert (J:=cmpf_is_bool c v1 v2)
+  end. 
+    destruct J as [J | [ J | J ]]; rewrite J; constructor; try solve [
+      auto |
+      unfold Int.unsigned, one, zero, Int.one, Int.zero, Int.repr; simpl;
+      apply Z_mod_lt; apply Int.modulus_pos
+    ].
+  unfold Int.modulus, two_power_nat, Int.wordsize, shift_nat; simpl; omega.
+  unfold Int.modulus, two_power_nat, Int.wordsize, shift_nat; simpl; omega.
+Qed.
+
+Ltac bop_has_chunk :=
+  intros;
+  simplify_op; try solve [
+    auto |
+    match goal with
+    | |- context [if ?e then _ else _] =>
+      destruct e; simpl; eauto
+    | |- _ => idtac
+    end;
+    split; try solve [
+      auto |
+      apply Int.Z_mod_modulus_range
+    ]
+  ].
+
+Lemma add_has_chunk1 : forall wz i0 wz0 i1,
+  has_chunk (add (Vint wz i0) (Vint wz0 i1)) (Mint wz).
+Proof.
+  unfold add; bop_has_chunk.
+Qed.
+
+Lemma add_has_chunk2 : forall wz i0 wz0 i1,
+  has_chunk (add (Vint wz i0) (Vint wz0 i1)) (Mint wz0).
+Proof. unfold add; bop_has_chunk. Qed.
+
+Lemma sub_has_chunk1 : forall wz i0 wz0 i1,
+  has_chunk (sub (Vint wz i0) (Vint wz0 i1)) (Mint wz).
+Proof. unfold sub; bop_has_chunk. Qed.
+
+Lemma sub_has_chunk2 : forall wz i0 wz0 i1,
+  has_chunk (sub (Vint wz i0) (Vint wz0 i1)) (Mint wz0).
+Proof. unfold sub; bop_has_chunk. Qed.
+
+Lemma mul_has_chunk1 : forall wz i0 wz0 i1,
+  has_chunk (mul (Vint wz i0) (Vint wz0 i1)) (Mint wz).
+Proof. bop_has_chunk. Qed.
+
+Lemma mul_has_chunk2 : forall wz i0 wz0 i1,
+  has_chunk (mul (Vint wz i0) (Vint wz0 i1)) (Mint wz0).
+Proof. bop_has_chunk. Qed.
+
+Lemma divs_has_chunk1 : forall wz i0 wz0 i1 v
+  (DS: divs (Vint wz i0) (Vint wz0 i1) = Some v),
+  has_chunk v (Mint wz).
+Proof.
+  intros. inv DS.
+  destruct (eq_nat_dec _ _); subst; try rewrite hcast_eq in *; auto.
+  destruct (_ || _ && _); subst; auto; inv H0.
+  bop_has_chunk. inv H0.
+Qed.
+
+Lemma divs_has_chunk2 : forall wz i0 wz0 i1 v
+  (DS: divs (Vint wz i0) (Vint wz0 i1) = Some v),
+  has_chunk v (Mint wz0).
+Proof.
+  intros. inv DS.
+  destruct (eq_nat_dec _ _); subst; try rewrite hcast_eq in *; auto.
+  destruct (_ || _ && _); subst; auto; inv H0.
+  bop_has_chunk. inv H0.
+Qed.
+
+Lemma mods_has_chunk1 : forall wz i0 wz0 i1 v
+  (MS: mods (Vint wz i0) (Vint wz0 i1) = Some v),
+  has_chunk v (Mint wz).
+Proof.
+  intros. inv MS.
+  destruct (eq_nat_dec _ _); subst; try rewrite hcast_eq in *; auto.
+  destruct (_ || _ && _); subst; auto; inv H0.
+  bop_has_chunk. inv H0.
+Qed.
+
+Lemma mods_has_chunk2 : forall wz i0 wz0 i1 v
+  (MS: mods (Vint wz i0) (Vint wz0 i1) = Some v),
+  has_chunk v (Mint wz0).
+Proof.
+  intros. inv MS.
+  destruct (eq_nat_dec _ _); subst; try rewrite hcast_eq in *; auto.
+  destruct (_ || _ && _); subst; auto; inv H0.
+  bop_has_chunk. inv H0.
+Qed.
+
+Lemma divu_has_chunk1 : forall wz i0 wz0 i1 v
+  (DS: divu (Vint wz i0) (Vint wz0 i1) = Some v),
+  has_chunk v (Mint wz).
+Proof.
+  intros. inv DS.
+  destruct (eq_nat_dec _ _); subst; try rewrite hcast_eq in *; auto.
+  destruct (Int.eq _ _); subst; auto; inv H0.
+  bop_has_chunk. inv H0.
+Qed.
+
+Lemma divu_has_chunk2 : forall wz i0 wz0 i1 v
+  (DS: divu (Vint wz i0) (Vint wz0 i1) = Some v),
+  has_chunk v (Mint wz0).
+Proof.
+  intros. inv DS.
+  destruct (eq_nat_dec _ _); subst; try rewrite hcast_eq in *; auto.
+  destruct (Int.eq _ _); subst; auto; inv H0.
+  bop_has_chunk. inv H0.
+Qed.
+
+Lemma modu_has_chunk1 : forall wz i0 wz0 i1 v
+  (MS: modu (Vint wz i0) (Vint wz0 i1) = Some v),
+  has_chunk v (Mint wz).
+Proof.
+  intros. inv MS.
+  destruct (eq_nat_dec _ _); subst; try rewrite hcast_eq in *; auto.
+  destruct (Int.eq _ _); subst; auto; inv H0.
+  bop_has_chunk. inv H0.
+Qed.
+
+Lemma modu_has_chunk2 : forall wz i0 wz0 i1 v
+  (MS: modu (Vint wz i0) (Vint wz0 i1) = Some v),
+  has_chunk v (Mint wz0).
+Proof.
+  intros. inv MS.
+  destruct (eq_nat_dec _ _); subst; try rewrite hcast_eq in *; auto.
+  destruct (Int.eq _ _); subst; auto; inv H0.
+  bop_has_chunk. inv H0.
+Qed.
+
+Lemma and_has_chunk1 : forall wz i0 wz0 i1,
+  has_chunk (and (Vint wz i0) (Vint wz0 i1)) (Mint wz).
+Proof. bop_has_chunk. Qed.
+
+Lemma and_has_chunk2 : forall wz i0 wz0 i1,
+  has_chunk (and (Vint wz i0) (Vint wz0 i1)) (Mint wz0).
+Proof. bop_has_chunk. Qed.
+
+Lemma or_has_chunk1 : forall wz i0 wz0 i1,
+  has_chunk (or (Vint wz i0) (Vint wz0 i1)) (Mint wz).
+Proof. bop_has_chunk. Qed.
+
+Lemma or_has_chunk2 : forall wz i0 wz0 i1,
+  has_chunk (or (Vint wz i0) (Vint wz0 i1)) (Mint wz0).
+Proof. bop_has_chunk. Qed.
+
+Lemma xor_has_chunk1 : forall wz i0 wz0 i1,
+  has_chunk (xor (Vint wz i0) (Vint wz0 i1)) (Mint wz).
+Proof. bop_has_chunk. Qed.
+
+Lemma xor_has_chunk2 : forall wz i0 wz0 i1,
+  has_chunk (xor (Vint wz i0) (Vint wz0 i1)) (Mint wz0).
+Proof. bop_has_chunk. Qed.
+
+Lemma shl_has_chunk1 : forall wz i0 wz0 i1,
+  has_chunk (shl (Vint wz i0) (Vint wz0 i1)) (Mint wz).
+Proof. bop_has_chunk. Qed.
+
+Lemma shl_has_chunk2 : forall wz i0 wz0 i1,
+  has_chunk (shl (Vint wz i0) (Vint wz0 i1)) (Mint wz0).
+Proof. bop_has_chunk. Qed.
+
+Lemma shr_has_chunk1 : forall wz i0 wz0 i1,
+  has_chunk (shr (Vint wz i0) (Vint wz0 i1)) (Mint wz).
+Proof. bop_has_chunk. Qed.
+
+Lemma shr_has_chunk2 : forall wz i0 wz0 i1,
+  has_chunk (shr (Vint wz i0) (Vint wz0 i1)) (Mint wz0).
+Proof. bop_has_chunk. Qed.
+
+Lemma shr_carry_has_chunk1 : forall wz i0 wz0 i1,
+  has_chunk (shr_carry (Vint wz i0) (Vint wz0 i1)) (Mint wz).
+Proof.
+  unfold shr_carry; bop_has_chunk.
+  destruct (Int.ltu _ _ _); subst; auto.
+  bop_has_chunk.
+  split; auto.
+  SearchAbout Int.modulus.
+  apply Int.unsigned_range.
+  simpl; auto.
+Qed.
+
+Lemma shr_carry_has_chunk2 : forall wz i0 wz0 i1,
+  has_chunk (shr_carry (Vint wz i0) (Vint wz0 i1)) (Mint wz0).
+Proof. 
+  unfold shr_carry; bop_has_chunk.
+  destruct (Int.ltu _ _ _); subst; auto.
+  bop_has_chunk.
+  split; auto.
+  SearchAbout Int.modulus.
+  apply Int.unsigned_range.
+  simpl; auto.
+Qed.
+
+Lemma shrx_has_chunk1 : forall wz i0 wz0 i1 v
+  (S: shrx (Vint wz i0) (Vint wz0 i1) = Some v),
+  has_chunk v (Mint wz).
+Proof.
+  intros; inv S.
+  destruct (eq_nat_dec _ _); subst; try rewrite hcast_eq in *; auto.
+  destruct (Int.ltu _ _ _); subst; inv H0; simpl.
+  split; auto.
+  apply Int.Z_mod_modulus_range.
+  inv H0.
+Qed.
+
+Lemma shrx_has_chunk2 : forall wz i0 wz0 i1 v
+  (S: shrx (Vint wz i0) (Vint wz0 i1) = Some v),
+  has_chunk v (Mint wz0).
+Proof.
+  intros; inv S.
+  destruct (eq_nat_dec _ _); subst; try rewrite hcast_eq in *; auto.
+  destruct (Int.ltu _ _ _); subst; inv H0; simpl.
+  split; auto.
+  apply Int.Z_mod_modulus_range.
+  inv H0.
+Qed.
+
+Lemma shru_has_chunk1 : forall wz i0 wz0 i1,
+  has_chunk (shru (Vint wz i0) (Vint wz0 i1)) (Mint wz).
+Proof. bop_has_chunk. Qed.
+
+Lemma shru_has_chunk2 : forall wz i0 wz0 i1,
+  has_chunk (shru (Vint wz i0) (Vint wz0 i1)) (Mint wz0).
+Proof. bop_has_chunk. Qed.
+
+Lemma ror_has_chunk1 : forall wz i0 wz0 i1,
+  has_chunk (ror (Vint wz i0) (Vint wz0 i1)) (Mint wz).
+Proof. bop_has_chunk. Qed.
+
+Lemma ror_has_chunk2 : forall wz i0 wz0 i1,
+  has_chunk (ror (Vint wz i0) (Vint wz0 i1)) (Mint wz0).
+Proof. bop_has_chunk. Qed.
+
+Lemma zero_ext'_has_chunk : forall nbits v,
+  has_chunk (zero_ext' nbits v) (Mint nbits).
+Proof.
+  destruct v; simpl; auto.
+  split; auto.
+  apply Int.Z_mod_modulus_range.
+Qed.
+
+Lemma sign_ext'_has_chunk : forall nbits v,
+  has_chunk (sign_ext' nbits v) (Mint nbits).
+Proof.
+  destruct v; simpl; auto.
+  split; auto.
+    apply Int.Z_mod_modulus_range.
+Qed.
 
 End Val.
 

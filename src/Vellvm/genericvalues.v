@@ -26,7 +26,7 @@ Import LLVMtd.
 (******************************************************************************)
 (* We first define a generic value that is a list of memory values with memory 
    chunks. *)
-(* Definition moffset := Int.int 31. Not used anywhere *)
+Definition moffset := Int.int 31.
 Definition mem := Mem.mem.
 Definition GenericValue := list (val*memory_chunk).
 Definition GVMap := list (id*GenericValue).
@@ -34,7 +34,7 @@ Definition GVMap := list (id*GenericValue).
 Definition mblock := Values.block.
 Definition mptr := GenericValue.
 Definition null : GenericValue :=
-  (Vptr Mem.nullptr (Int.repr 0), Mint32)::nil. (* TODO: is Mint32 okay? *)
+  (Vptr Mem.nullptr (Int.repr 31 0), Mint 31)::nil.
 
 (******************************************************************************)
 (* Predicate of generic values. *)
@@ -66,15 +66,16 @@ end.
 Fixpoint eq_gv (gv1 gv2:GenericValue) : bool :=
 match gv1, gv2 with
 | nil, nil => true
-| (v1,c1)::gv1', (v2,c2)::gv2' => Val.eqb v1 v2 &&
-                                  memory_chunk_eq c1 c2 &&
-                                  eq_gv gv1' gv2'
+| (v1,c1)::gv1', (v2,c2)::gv2' => if Val.eq v1 v2
+                                  then memory_chunk_eq c1 c2 &&
+                                    eq_gv gv1' gv2'
+                                  else false
 | _, _ => false
 end.
 
 (* a list of undefined memory chunks with size n. *)
 Definition uninitMCs (n:nat) : list memory_chunk :=
-  Coqlib.list_repeat n Mint8unsigned.
+  Coqlib.list_repeat n (Mint 7).
 
 (* a list of repeated memory chunks. *)
 Fixpoint repeatMC (mcs:list memory_chunk) (n:nat) : list memory_chunk :=
@@ -110,21 +111,11 @@ match lt with
   end
 end.
 
-Print typ.
-
-(* FIXME: not sure about correctness. not proper size int -> None *)
 Fixpoint flatten_typ_aux (TD:TargetData)
   (acc:list (id*option (list memory_chunk))) (t:typ)
   : option (list memory_chunk) :=
 match t with
-| typ_int sz =>
-  match Size.to_nat sz with
-  | 8 => Some (Mint8unsigned::nil)
-  | 16 => Some (Mint16unsigned::nil)
-  | 32 => Some (Mint32::nil)
-  | 64 => Some (Mint64::nil)
-  | _ => None
-  end
+| typ_int sz => Some (Mint (Size.to_nat sz - 1) :: nil)
 | typ_floatpoint fp =>
   match fp with
   | fp_float => Some (Mfloat32 :: nil)
@@ -155,7 +146,7 @@ match t with
   | Some gv0 => Some gv0
   | None => None
   end
-| typ_pointer t' => Some (Mint32::nil)
+| typ_pointer t' => Some (Mint 31::nil)
 | typ_function _ _ _ => None
 | typ_namedt nid => 
   match lookupAL _ acc nid with
@@ -227,7 +218,7 @@ end.
 
 (* a list of undefined memory values with size n. *)
 Definition uninits (n:nat) : GenericValue :=
-   Coqlib.list_repeat n (Vundef, Mint8unsigned).
+   Coqlib.list_repeat n (Vundef, Mint 7).
 
 (* Generate an undefined generic values in terms of memory chunks. *)
 Definition mc2undefs (mc:list memory_chunk) : GenericValue :=
@@ -248,10 +239,12 @@ match gv with
 | _ => Some Vundef
 end.
 
-Definition GV2int (TD:TargetData) (gv:GenericValue) : option Z :=
+Definition GV2int (TD:TargetData) (bsz:sz) (gv:GenericValue) : option Z :=
 match gv with
-| (Vint i,c)::nil =>
-  Some (Int.signed i)
+| (Vint wz i,c)::nil =>
+  if eq_nat_dec (wz+1) (Size.to_nat bsz)
+  then Some (Int.signed wz i)
+  else None
 | _ => None
 end.
 
@@ -263,11 +256,11 @@ end.
 Definition val2GV (TD:TargetData) (v:val) (c:memory_chunk) : GenericValue :=
 (v,c)::nil.
 Definition ptr2GV (TD:TargetData) (ptr:val) : GenericValue :=
-val2GV TD ptr Mint32.
+val2GV TD ptr (Mint (Size.mul Size.Eight (getPointerSize TD)-1)).
 Definition blk2GV (TD:TargetData) (b:mblock) : GenericValue :=
-ptr2GV TD (Vptr b (Int.repr 0)).
+ptr2GV TD (Vptr b (Int.repr 31 0)).
 Definition isGVZero (TD:TargetData) (gv:GenericValue) : bool :=
-match (GV2int TD gv) with
+match (GV2int TD Size.One gv) with
 | Some z => if Coqlib.zeq z 0 then true else false
 | _ => false
 end.
@@ -280,7 +273,7 @@ match ma with
   | nil => None
   | _ =>
     match (mgetoffset TD (typ_array 0%nat t) idxs) with
-    | Some (offset, _) => Some (Vptr b (Int.add ofs (Int.repr offset)))
+    | Some (offset, _) => Some (Vptr b (Int.add 31 ofs (Int.repr 31 offset)))
     | _ => None
     end
   end
@@ -359,7 +352,7 @@ Fixpoint GVs2Nats (TD:TargetData) (lgv:list GenericValue) : option (list Z):=
 match lgv with
 | nil => Some nil
 | gv::lgv' =>
-    match (GV2int TD gv) with
+    match (GV2int TD Size.ThirtyTwo gv) with
     | Some z =>
         match (GVs2Nats TD lgv') with
         | Some ns => Some (z::ns)
@@ -414,10 +407,15 @@ match GV2val TD gv1 with
         then
           match fp1 with
           | fp_double => 
-               Some (val2GV TD (Val.singleoffloat (Vfloat f)) Mfloat32)
+               Some (val2GV TD (Vsingle (Float.to_single f)) Mfloat32)
           | _ => None (* FIXME: not supported 80 and 128 yet. *)
           end
         else None
+    | _ => gundef TD t2
+    end
+| Some (Vsingle f) =>
+    match (t1, t2) with
+    | (typ_floatpoint _, typ_floatpoint _) => None
     | _ => gundef TD t2
     end
 | _ => gundef TD t2
@@ -438,17 +436,32 @@ match (GV2val TD gv1, GV2val TD gv2) with
      | bop_mul =>
          Some (val2GV TD (Val.mul (Vint wz1 i1) (Vint wz2 i2)) (Mint (bsz'-1)))
      | bop_udiv =>
-         Some (val2GV TD (Val.divu (Vint wz1 i1) (Vint wz2 i2)) (Mint (bsz'-1)))
+         match Val.divu (Vint wz1 i1) (Vint wz2 i2) with
+         | Some vresult => Some (val2GV TD vresult (Mint (bsz'-1)))
+         | None => gundef TD (typ_int bsz')
+         end
      | bop_sdiv =>
-         Some (val2GV TD (Val.divs (Vint wz1 i1) (Vint wz2 i2)) (Mint (bsz'-1)))
+         match Val.divs (Vint wz1 i1) (Vint wz2 i2) with
+         | Some vresult => Some (val2GV TD vresult (Mint (bsz'-1)))
+         | None => gundef TD (typ_int bsz')
+         end
      | bop_urem =>
-         Some (val2GV TD (Val.modu (Vint wz1 i1) (Vint wz2 i2)) (Mint (bsz'-1)))
+         match Val.modu (Vint wz1 i1) (Vint wz2 i2) with
+         | Some vresult => Some (val2GV TD vresult (Mint (bsz'-1)))
+         | None => gundef TD (typ_int bsz')
+         end
      | bop_srem =>
-         Some (val2GV TD (Val.mods (Vint wz1 i1) (Vint wz2 i2)) (Mint (bsz'-1)))
+         match Val.mods (Vint wz1 i1) (Vint wz2 i2) with
+         | Some vresult => Some (val2GV TD vresult (Mint (bsz'-1)))
+         | None => gundef TD (typ_int bsz')
+         end
      | bop_shl =>
          Some (val2GV TD (Val.shl (Vint wz1 i1) (Vint wz2 i2)) (Mint (bsz'-1)))
      | bop_lshr =>
-         Some (val2GV TD (Val.shrx (Vint wz1 i1) (Vint wz2 i2)) (Mint (bsz'-1)))
+         match Val.shrx (Vint wz1 i1) (Vint wz2 i2) with
+         | Some vresult => Some (val2GV TD vresult (Mint (bsz'-1)))
+         | None => gundef TD (typ_int bsz')
+         end
      | bop_ashr =>
          Some (val2GV TD (Val.shr (Vint wz1 i1) (Vint wz2 i2)) (Mint (bsz'-1)))
      | bop_and =>
@@ -464,8 +477,8 @@ end.
 
 Definition mfbop (TD:TargetData) (op:fbop) (fp:floating_point)
   (gv1 gv2:GenericValue) : option GenericValue :=
-match (GV2val TD gv1, GV2val TD gv2) with
-| (Some (Vfloat f1), Some (Vfloat f2)) =>
+match (fp, GV2val TD gv1, GV2val TD gv2) with
+| (fp_double, Some (Vfloat f1), Some (Vfloat f2)) =>
   let v :=
      match op with
      | fbop_fadd => Val.addf (Vfloat f1) (Vfloat f2)
@@ -474,14 +487,21 @@ match (GV2val TD gv1, GV2val TD gv2) with
      | fbop_fdiv => Val.divf (Vfloat f1) (Vfloat f2)
      | fbop_frem => Val.modf (Vfloat f1) (Vfloat f2)
      end in
-  match fp with
-  | fp_float => Some (val2GV TD (Val.singleoffloat v) Mfloat32)
-  | fp_double => Some (val2GV TD v Mfloat64)
-  | _ => None (* FIXME: not supported 80 and 128 yet. *)
-  end
+  Some (val2GV TD v Mfloat64)
+| (fp_single, Some (Vsingle f1), Some (Vsingle f2)) =>
+  let v :=
+     match op with
+     | fbop_fadd => Val.addfs (Vsingle f1) (Vsingle f2)
+     | fbop_fsub => Val.subfs (Vsingle f1) (Vsingle f2)
+     | fbop_fmul => Val.mulfs (Vsingle f1) (Vsingle f2)
+     | fbop_fdiv => Val.divfs (Vsingle f1) (Vsingle f2)
+     | fbop_frem => Val.modfs (Vsingle f1) (Vsingle f2)
+     end in
+  Some (val2GV TD v Mfloat32)
 | _ => gundef TD (typ_floatpoint fp)
 end.
 
+(*
 Definition mptrtoint (TD:TargetData) (M:mem) (gv1:GenericValue) (sz2:nat)
  : option GenericValue :=
     match GV2val TD gv1 with
@@ -498,6 +518,7 @@ Definition mptrtoint (TD:TargetData) (M:mem) (gv1:GenericValue) (sz2:nat)
                (Mint (sz2-1)))
     | _ => gundef TD (typ_int sz2)
     end.
+*)
 
 Definition mbitcast (t1:typ) (gv1:GenericValue)(t2:typ) : option GenericValue :=
 match (t1, t2) with
@@ -506,6 +527,7 @@ match (t1, t2) with
 | _ => None
 end.
 
+(*
 Definition minttoptr (TD:TargetData) (M:mem) (gv1:GenericValue)
   : option GenericValue :=
   match GV2val TD gv1 with
@@ -517,6 +539,7 @@ Definition minttoptr (TD:TargetData) (M:mem) (gv1:GenericValue)
       end
   | _ => gundef TD (typ_pointer typ_void)
   end.
+*)
 
 (* Here is another idea to support inttoptr and ptrtoint. We should
    distinguish two kinds of ptr: at global spaces, and at heap or stack. The
@@ -593,7 +616,7 @@ match (t1, t2) with
 | (_, _) => None
 end.
 
-Definition micmp_int TD c gv1 gv2 : option GenericValue :=
+Definition micmp_int m TD c gv1 gv2 : option GenericValue :=
   match (GV2val TD gv1, GV2val TD gv2) with
   | (Some (Vint wz1 i1), Some (Vint wz2 i2)) =>
      match c with
@@ -602,13 +625,13 @@ Definition micmp_int TD c gv1 gv2 : option GenericValue :=
      | cond_ne =>
          Some (val2GV TD (Val.cmp Cne (Vint wz1 i1) (Vint wz2 i2)) (Mint 0))
      | cond_ugt =>
-         Some (val2GV TD (Val.cmpu Cgt (Vint wz1 i1) (Vint wz2 i2)) (Mint 0))
+         Some (val2GV TD (Val.cmpu (Mem.valid_pointer m) Cgt (Vint wz1 i1) (Vint wz2 i2)) (Mint 0))
      | cond_uge =>
-         Some (val2GV TD (Val.cmpu Cge (Vint wz1 i1) (Vint wz2 i2)) (Mint 0))
+         Some (val2GV TD (Val.cmpu (Mem.valid_pointer m) Cge (Vint wz1 i1) (Vint wz2 i2)) (Mint 0))
      | cond_ult =>
-         Some (val2GV TD (Val.cmpu Clt (Vint wz1 i1) (Vint wz2 i2)) (Mint 0))
+         Some (val2GV TD (Val.cmpu (Mem.valid_pointer m) Clt (Vint wz1 i1) (Vint wz2 i2)) (Mint 0))
      | cond_ule =>
-         Some (val2GV TD (Val.cmpu Cle (Vint wz1 i1) (Vint wz2 i2)) (Mint 0))
+         Some (val2GV TD (Val.cmpu (Mem.valid_pointer m) Cle (Vint wz1 i1) (Vint wz2 i2)) (Mint 0))
      | cond_sgt =>
          Some (val2GV TD (Val.cmp Cgt (Vint wz1 i1) (Vint wz2 i2)) (Mint 0))
      | cond_sge =>
@@ -621,22 +644,15 @@ Definition micmp_int TD c gv1 gv2 : option GenericValue :=
   | _ => gundef TD (typ_int 1%nat)
   end.
 
-Definition micmp_ptr (TD:TargetData) (M:mem) (c:cond) (gv1 gv2:GenericValue)
-  : option GenericValue :=
-  match (mptrtoint TD M gv1 Size.ThirtyTwo, mptrtoint TD M gv2 Size.ThirtyTwo)
-    with
-  | (Some gv1', Some gv2') => micmp_int TD c gv1' gv2'
-  | _ => None
-  end.
-
-Definition micmp (TD:TargetData) (c:cond) (t:typ) (gv1 gv2:GenericValue)
+Definition micmp m (TD:TargetData) (c:cond) (t:typ) (gv1 gv2:GenericValue)
   : option GenericValue :=
 match t with
-| typ_int sz => micmp_int TD c gv1 gv2
+| typ_int sz => micmp_int m TD c gv1 gv2
 | typ_pointer _ => gundef TD (typ_int 1%nat)
 | _ => None
 end.
 
+(* TODO: issue. Single vs Float. *)
 Definition mfcmp (TD:TargetData) (c:fcond) (fp:floating_point)
   (gv1 gv2:GenericValue) : option GenericValue :=
 match (GV2val TD gv1, GV2val TD gv2) with
@@ -713,7 +729,7 @@ match t with
   Some (val2GV TD (Vint wz (Int.repr wz 0)) (Mint wz))
 | typ_floatpoint fp =>
   match fp with
-  | fp_float => Some (val2GV TD (Vfloat Float.zero) Mfloat32)
+  | fp_float => Some (val2GV TD (Vsingle Float32.zero) Mfloat32)
   | fp_double => Some (val2GV TD (Vfloat Float.zero) Mfloat64)
   | _ => None (* FIXME: not supported 80 and 128 yet. *)
   end
@@ -812,7 +828,7 @@ match cs with
   end
 end.
 
-Fixpoint _const2GV (TD:TargetData) (gl:GVMap) (c:const)
+Fixpoint _const2GV m (TD:TargetData) (gl:GVMap) (c:const)
   : option (GenericValue*typ) :=
 match c with
 | const_zeroinitializer t =>
@@ -826,7 +842,7 @@ match c with
                typ_int sz)
 | const_floatpoint fp f =>
          match fp with
-         | fp_float => Some (val2GV TD (Val.singleoffloat (Vfloat f)) Mfloat32, 
+         | fp_float => Some (val2GV TD (Vsingle (Float.to_single f)) Mfloat32, 
                              typ_floatpoint fp)
          | fp_double => Some (val2GV TD (Vfloat f) Mfloat64, typ_floatpoint fp)
          | _ => None (* FIXME: not supported 80 and 128 yet. *)
@@ -840,7 +856,7 @@ match c with
          Some (val2GV TD (Vptr Mem.nullptr (Int.repr 31 0)) (Mint 31),
                typ_pointer t)
 | const_arr t lc =>
-         match _list_const_arr2GV_ _const2GV TD gl t lc with
+         match _list_const_arr2GV_ (_const2GV m) TD gl t lc with
          | Some gv =>
              match length lc with
              | O => Some (uninits 1,
@@ -851,7 +867,7 @@ match c with
          | _ => None
          end
 | const_struct t lc =>
-         match (_list_const_struct2GV_ _const2GV TD gl lc) with
+         match (_list_const_struct2GV_ (_const2GV m) TD gl lc) with
          | None => None
          | Some (gv0, ts) =>
              let '(_, nts) := TD in
@@ -868,7 +884,7 @@ match c with
          | None => None
          end
 | const_truncop op c1 t2 =>
-         match _const2GV TD gl c1 with
+         match _const2GV m TD gl c1 with
          | Some (gv1, t1) =>
            match mtrunc TD op t1 t2 gv1 with
            | Some gv2 => Some (gv2, t2)
@@ -877,7 +893,7 @@ match c with
          | _ => None
          end
 | const_extop op c1 t2 =>
-         match _const2GV TD gl c1 with
+         match _const2GV m TD gl c1 with
          | Some (gv1, t1) =>
            match mext TD op t1 t2 gv1 with
            | Some gv2 => Some (gv2, t2)
@@ -886,7 +902,7 @@ match c with
          | _ => None
          end
 | const_castop op c1 t2 =>
-         match _const2GV TD gl c1 with
+         match _const2GV m TD gl c1 with
          | Some (gv1, t1) =>
            match mcast TD op t1 t2 gv1 with
            | Some gv2 => Some (gv2, t2)
@@ -895,7 +911,7 @@ match c with
          | _ => None
          end
 | const_gep ib c1 cs2 =>
-       match _const2GV TD gl c1 with
+       match _const2GV m TD gl c1 with
        | Some (gv1, typ_pointer t1) =>
          match getConstGEPTyp cs2 (typ_pointer t1) with
          | Some t2 =>
@@ -925,23 +941,23 @@ match c with
        | _ => None
        end
 | const_select c0 c1 c2 =>
-  match _const2GV TD gl c0, _const2GV TD gl c1, _const2GV TD gl c2 with
+  match _const2GV m TD gl c0, _const2GV m TD gl c1, _const2GV m TD gl c2 with
   | Some (gv0, t0), Some gvt1, Some gvt2 => if isGVZero TD gv0
                                             then Some gvt2
                                             else Some gvt1
   | _, _, _ => None
   end
 | const_icmp cond c1 c2 =>
-         match _const2GV TD gl c1, _const2GV TD gl c2 with
+         match _const2GV m TD gl c1, _const2GV m TD gl c2 with
          | Some (gv1, t1), Some (gv2, _) =>
-             match micmp TD cond t1 gv1 gv2 with
+             match micmp m TD cond t1 gv1 gv2 with
              | Some gv2 => Some (gv2, typ_int Size.One)
              | _ => None
              end
          | _, _ => None
          end
 | const_fcmp cond c1 c2 =>
-         match _const2GV TD gl c1, _const2GV TD gl c2 with
+         match _const2GV m TD gl c1, _const2GV m TD gl c2 with
          | Some (gv1, typ_floatpoint fp1), Some (gv2, _) =>
            match mfcmp TD cond fp1 gv1 gv2 with
            | Some gv2 => Some (gv2, typ_int Size.One)
@@ -950,7 +966,7 @@ match c with
          | _, _ => None
          end
 | const_extractvalue c1 cs2 =>
-       match _const2GV TD gl c1 with
+       match _const2GV m TD gl c1 with
        | Some (gv1, t1) =>
          match getSubTypFromConstIdxs cs2 t1 with
          | Some t2 =>
@@ -963,7 +979,7 @@ match c with
        | _ => None
        end
 | const_insertvalue c1 c2 cs3 =>
-         match _const2GV TD gl c1, _const2GV TD gl c2 with
+         match _const2GV m TD gl c1, _const2GV m TD gl c2 with
          | Some (gv1, t1), Some (gv2, t2) =>
            match insertGenericValue TD t1 gv1 cs3 t2 gv2 with
            | Some gv3 => Some (gv3, t1)
@@ -972,7 +988,7 @@ match c with
          | _, _ => None
          end
 | const_bop op c1 c2 =>
-         match _const2GV TD gl c1, _const2GV TD gl c2 with
+         match _const2GV m TD gl c1, _const2GV m TD gl c2 with
          | Some (gv1, typ_int sz1), Some (gv2, _) =>
            match mbop TD op sz1 gv1 gv2 with
            | Some gv3 => Some (gv3, typ_int sz1)
@@ -981,7 +997,7 @@ match c with
          | _, _ => None
          end
 | const_fbop op c1 c2 =>
-         match _const2GV TD gl c1, _const2GV TD gl c2 with
+         match _const2GV m TD gl c1, _const2GV m TD gl c2 with
          | Some (gv1, typ_floatpoint fp1), Some (gv2, _) =>
            match mfbop TD op fp1 gv1 gv2 with
            | Some gv3 => Some (gv3, typ_floatpoint fp1)
@@ -991,16 +1007,16 @@ match c with
          end
 end.
 
-Definition _list_const_struct2GV :=
-  _list_const_struct2GV_ _const2GV.
+Definition _list_const_struct2GV m :=
+  _list_const_struct2GV_ (_const2GV m).
 
-Definition _list_const_arr2GV :=
-  _list_const_arr2GV_ _const2GV.
+Definition _list_const_arr2GV m :=
+  _list_const_arr2GV_ (_const2GV m).
 
 Definition cundef_gv gv t : GenericValue :=
 match t with
 | typ_int sz => (Vint (sz-1) (Int.zero (sz-1)), Mint (sz -1))::nil
-| typ_floatpoint fp_float => (Vfloat Float.zero, Mfloat32)::nil
+| typ_floatpoint fp_float => (Vsingle Float32.zero, Mfloat32)::nil
 | typ_floatpoint fp_double => (Vfloat Float.zero, Mfloat64)::nil
 | typ_pointer _ => null
 | _ => gv
@@ -1014,70 +1030,70 @@ end.
 
 Notation "? gv # t ?" := (cgv2gv gv t) (at level 41).
 
-Definition const2GV (TD:TargetData) (gl:GVMap) (c:const) : option GenericValue :=
-match (_const2GV TD gl c) with
+Definition const2GV m (TD:TargetData) (gl:GVMap) (c:const) : option GenericValue :=
+match (_const2GV m TD gl c) with
 | None => None
 | Some (gv, t) => Some (? gv # t ?)
 end.
 
 (* Compute the generic value of a program value. *)
-Definition getOperandValue (TD:TargetData) (v:value) (locals:GVMap)
+Definition getOperandValue m (TD:TargetData) (v:value) (locals:GVMap)
   (globals:GVMap) : option GenericValue :=
 match v with
 | value_id id => lookupAL _ locals id
-| value_const c => const2GV TD globals c
+| value_const c => const2GV m TD globals c
 end.
 
-Definition getOperandInt (TD:TargetData) (bsz:sz) (v:value) (locals:GVMap)
+Definition getOperandInt m (TD:TargetData) (bsz:sz) (v:value) (locals:GVMap)
   (globals:GVMap) : option Z :=
-match (getOperandValue TD v locals globals) with
+match (getOperandValue m TD v locals globals) with
 | Some gi => GV2int TD bsz gi
 | None => None
 end.
 
-Definition getOperandPtr (TD:TargetData) (v:value) (locals:GVMap)
+Definition getOperandPtr m (TD:TargetData) (v:value) (locals:GVMap)
   (globals:GVMap) : option val :=
-match (getOperandValue TD v locals globals) with
+match (getOperandValue m TD v locals globals) with
 | Some gi => GV2ptr TD (getPointerSize TD) gi
 | None => None
 end.
 
-Definition getOperandPtrInBits (TD:TargetData) (s:sz) (v:value) (locals:GVMap)
+Definition getOperandPtrInBits m (TD:TargetData) (s:sz) (v:value) (locals:GVMap)
   (globals:GVMap) : option val :=
-match (getOperandValue TD v locals globals) with
+match (getOperandValue m TD v locals globals) with
 | Some gi => GV2ptr TD s gi
 | None => None
 end.
 
 (* Check if the runtime of a program value is undefined. *)
-Definition isOperandUndef (TD:TargetData) (t:typ) (v:value) (locals:GVMap)
+Definition isOperandUndef m (TD:TargetData) (t:typ) (v:value) (locals:GVMap)
   (globals:GVMap) : Prop  :=
-match (getOperandValue TD v locals globals) with
+match (getOperandValue m TD v locals globals) with
 | Some gi => isGVUndef gi
 | None => False
 end.
 
 (* convert parameters and values to generic values *)
-Fixpoint params2GVs (TD:TargetData) (lp:params) (locals:GVMap)
+Fixpoint params2GVs m (TD:TargetData) (lp:params) (locals:GVMap)
   (globals:GVMap) : option (list GenericValue) :=
 match lp with
 | nil => Some nil
 | (_, v)::lp' =>
-    match (getOperandValue TD v locals globals,
-          params2GVs TD lp' locals globals) with
+    match (getOperandValue m TD v locals globals,
+          params2GVs m TD lp' locals globals) with
     | (Some gv, Some gvs) => Some (gv::gvs)
     | _ => None
     end
 end.
 
-Fixpoint values2GVs (TD:TargetData) (lv:list (sz * value)) (locals:GVMap)
+Fixpoint values2GVs m (TD:TargetData) (lv:list (sz * value)) (locals:GVMap)
   (globals:GVMap) : option (list GenericValue):=
 match lv with
 | nil => Some nil
 | (_, v) :: lv' =>
-  match (getOperandValue TD v locals globals) with
+  match (getOperandValue m TD v locals globals) with
   | Some GV =>
-    match (values2GVs TD lv' locals globals) with
+    match (values2GVs m TD lv' locals globals) with
     | Some GVs => Some (GV::GVs)
     | None => None
     end
@@ -1085,16 +1101,16 @@ match lv with
   end
 end.
 
-Fixpoint intValues2Nats (TD:TargetData) (lv:list (sz * value)) (locals:GVMap)
+Fixpoint intValues2Nats m (TD:TargetData) (lv:list (sz * value)) (locals:GVMap)
   (globals:GVMap) : option (list Z):=
 match lv with
 | nil => Some nil
 | (_, v) :: lv' =>
-  match (getOperandValue TD v locals globals) with
+  match (getOperandValue m TD v locals globals) with
   | Some GV =>
     match (GV2int TD Size.ThirtyTwo GV) with
     | Some z =>
-        match (intValues2Nats TD lv' locals globals) with
+        match (intValues2Nats m TD lv' locals globals) with
         | Some ns => Some (z::ns)
         | None => None
         end
@@ -1137,55 +1153,55 @@ Definition initLocals TD (la:args) (lg:list GenericValue): option GVMap :=
 _initializeFrameValues TD la lg nil.
 
 (* Operations of generic values used by Vellvm's operational semantics *)
-Definition BOP (TD:TargetData) (lc gl:GVMap) (op:bop) (bsz:sz)
+Definition BOP m (TD:TargetData) (lc gl:GVMap) (op:bop) (bsz:sz)
   (v1 v2:value) : option GenericValue :=
-match (getOperandValue TD v1 lc gl, getOperandValue TD v2 lc gl) with
+match (getOperandValue m TD v1 lc gl, getOperandValue m TD v2 lc gl) with
 | (Some gv1, Some gv2) => mbop TD op bsz gv1 gv2
 | _ => None
 end.
 
-Definition FBOP (TD:TargetData) (lc gl:GVMap) (op:fbop)
+Definition FBOP m (TD:TargetData) (lc gl:GVMap) (op:fbop)
   (fp:floating_point) (v1 v2:value) : option GenericValue :=
-match (getOperandValue TD v1 lc gl, getOperandValue TD v2 lc gl) with
+match (getOperandValue m TD v1 lc gl, getOperandValue m TD v2 lc gl) with
 | (Some gv1, Some gv2) => mfbop TD op fp gv1 gv2
 | _ => None
 end
 .
 
-Definition TRUNC (TD:TargetData) (lc gl:GVMap) (op:truncop) (t1:typ)
+Definition TRUNC m (TD:TargetData) (lc gl:GVMap) (op:truncop) (t1:typ)
   (v1:value) (t2:typ) : option GenericValue :=
-match (getOperandValue TD v1 lc gl) with
+match (getOperandValue m TD v1 lc gl) with
 | (Some gv1) => mtrunc TD op t1 t2 gv1
 | _ => None
 end
 .
 
-Definition CAST (TD:TargetData) (lc gl:GVMap) (op:castop) (t1:typ)
+Definition CAST m (TD:TargetData) (lc gl:GVMap) (op:castop) (t1:typ)
   (v1:value) (t2:typ) : option GenericValue:=
-match (getOperandValue TD v1 lc gl) with
+match (getOperandValue m TD v1 lc gl) with
 | (Some gv1) => mcast TD op t1 t2 gv1
 | _ => None
 end
 .
 
-Definition EXT (TD:TargetData) (lc gl:GVMap) (op:extop) (t1:typ)
+Definition EXT m (TD:TargetData) (lc gl:GVMap) (op:extop) (t1:typ)
   (v1:value) (t2:typ) : option GenericValue :=
-match (getOperandValue TD v1 lc gl) with
+match (getOperandValue m TD v1 lc gl) with
 | (Some gv1) => mext TD op t1 t2 gv1
 | _ => None
 end
 .
 
-Definition ICMP (TD:TargetData) (lc gl:GVMap) (c:cond) (t:typ)
+Definition ICMP m (TD:TargetData) (lc gl:GVMap) (c:cond) (t:typ)
   (v1 v2:value) : option GenericValue :=
-match (getOperandValue TD v1 lc gl, getOperandValue TD v2 lc gl) with
-| (Some gv1, Some gv2) => micmp TD c t gv1 gv2
+match (getOperandValue m TD v1 lc gl, getOperandValue m TD v2 lc gl) with
+| (Some gv1, Some gv2) => micmp m TD c t gv1 gv2
 | _ => None
 end.
 
-Definition FCMP (TD:TargetData) (lc gl:GVMap) (c:fcond)
+Definition FCMP m (TD:TargetData) (lc gl:GVMap) (c:fcond)
   (fp:floating_point) (v1 v2:value) : option GenericValue :=
-match (getOperandValue TD v1 lc gl, getOperandValue TD v2 lc gl) with
+match (getOperandValue m TD v1 lc gl, getOperandValue m TD v2 lc gl) with
 | (Some gv1, Some gv2) => mfcmp TD c fp gv1 gv2
 | _ => None
 end.
@@ -1267,8 +1283,10 @@ Definition has_chunk_eq (v : val) (chk : AST.memory_chunk) : bool :=
     | Vundef, _ => true
     | Vint wz i0, AST.Mint wz' =>
       beq_nat wz wz'
-    | Vfloat f, AST.Mfloat32 =>
-      if Floats.Float.eq_dec f (Floats.Float.singleoffloat f) then true else false
+    | Vsingle f, AST.Mfloat32 =>
+      true
+    | Vfloat f, AST.Mfloat64 =>
+      true
     | Vptr _ _, AST.Mint wz =>
       beq_nat wz 31%nat
     | Vinttoptr _, AST.Mint wz =>
@@ -1694,8 +1712,8 @@ Proof.
   simpl. constructor; simpl; auto.
 Qed.
 
-Lemma micmp_matches_chunks : forall TD cond5 t1 gv1 gv2 gv,
-  micmp TD cond5 t1 gv1 gv2 = Some gv ->
+Lemma micmp_matches_chunks : forall m TD cond5 t1 gv1 gv2 gv,
+  micmp m TD cond5 t1 gv1 gv2 = Some gv ->
   gv_chunks_match_typ TD gv (typ_int 1%nat).
 Proof.
   intros. unfold micmp in H.
@@ -1758,7 +1776,7 @@ Proof.
         simpl; split; try solve [auto | apply Val.cmpf_has_Mint0 |
                                  simpl; split; try solve [
                                    auto |
-                                   apply Z_mod_lt; apply Int.modulus_pos
+                                   unfold Int.modulus, two_power_nat, shift_nat; simpl; omega
                                 ]
                       ]
         ]
@@ -1793,164 +1811,164 @@ Proof.
 Qed.
 
 (* Inversion *)
-Lemma BOP_inversion : forall TD lc gl b s v1 v2 gv,
-  BOP TD lc gl b s v1 v2 = Some gv ->
+Lemma BOP_inversion : forall m TD lc gl b s v1 v2 gv,
+  BOP m TD lc gl b s v1 v2 = Some gv ->
   exists gv1, exists gv2,
-    getOperandValue TD v1 lc gl = Some gv1 /\
-    getOperandValue TD v2 lc gl = Some gv2 /\
+    getOperandValue m TD v1 lc gl = Some gv1 /\
+    getOperandValue m TD v2 lc gl = Some gv2 /\
     mbop TD b s gv1 gv2 = Some gv.
 Proof.
-  intros TD lc gl b s v1 v2 gv HBOP.
+  intros m TD lc gl b s v1 v2 gv HBOP.
   unfold BOP in HBOP.
-  remember (getOperandValue TD v1 lc gl) as ogv1.
+  remember (getOperandValue m TD v1 lc gl) as ogv1.
   destruct ogv1; try solve [inversion HBOP].
-    remember (getOperandValue TD v2 lc gl) as ogv2.
+    remember (getOperandValue m TD v2 lc gl) as ogv2.
     destruct ogv2; try solve [inversion HBOP].
       remember (mbop TD b s g g0) as R.
       destruct R; inversion HBOP; subst.
         exists g. exists g0. auto.
 Qed.
 
-Lemma FBOP_inversion : forall TD lc gl b fp v1 v2 gv,
-  FBOP TD lc gl b fp v1 v2 = Some gv ->
+Lemma FBOP_inversion : forall m TD lc gl b fp v1 v2 gv,
+  FBOP m TD lc gl b fp v1 v2 = Some gv ->
   exists gv1, exists gv2,
-    getOperandValue TD v1 lc gl = Some gv1 /\
-    getOperandValue TD v2 lc gl = Some gv2 /\
+    getOperandValue m TD v1 lc gl = Some gv1 /\
+    getOperandValue m TD v2 lc gl = Some gv2 /\
     mfbop TD b fp gv1 gv2 = Some gv.
 Proof.
-  intros TD lc gl b fp v1 v2 gv HFBOP.
+  intros m TD lc gl b fp v1 v2 gv HFBOP.
   unfold FBOP in HFBOP.
-  remember (getOperandValue TD v1 lc gl) as ogv1.
+  remember (getOperandValue m TD v1 lc gl) as ogv1.
   destruct ogv1; try solve [inversion HFBOP].
-    remember (getOperandValue TD v2 lc gl) as ogv2.
+    remember (getOperandValue m TD v2 lc gl) as ogv2.
     destruct ogv2; try solve [inversion HFBOP].
       remember (mfbop TD b fp g g0) as R.
       destruct R; inversion HFBOP; subst.
         exists g. exists g0. auto.
 Qed.
 
-Lemma getOperandPtr_inversion : forall TD lc gl v mptr,
-  getOperandPtr TD v lc gl = Some mptr ->
+Lemma getOperandPtr_inversion : forall m TD lc gl v mptr,
+  getOperandPtr m TD v lc gl = Some mptr ->
   exists gv,
-    getOperandValue TD v lc gl = Some gv /\
+    getOperandValue m TD v lc gl = Some gv /\
     GV2ptr TD (getPointerSize TD) gv = Some mptr.
 Proof.
-  intros TD lc gl v mptr HgetOperandPtr.
+  intros m TD lc gl v mptr HgetOperandPtr.
   unfold getOperandPtr in HgetOperandPtr.
-  remember (getOperandValue TD v lc gl) as ogv.
+  remember (getOperandValue m TD v lc gl) as ogv.
   destruct ogv; try solve [inversion HgetOperandPtr].
     exists g. auto.
 Qed.
 
-Lemma getOperandInt_inversion : forall TD sz lc gl v n,
-  getOperandInt TD sz v lc gl = Some n ->
+Lemma getOperandInt_inversion : forall m TD sz lc gl v n,
+  getOperandInt m TD sz v lc gl = Some n ->
   exists gv,
-    getOperandValue TD v lc gl = Some gv /\
+    getOperandValue m TD v lc gl = Some gv /\
     GV2int TD sz gv = Some n.
 Proof.
-  intros TD sz0 lc gl v mptr HgetOperandInt.
+  intros m TD sz0 lc gl v mptr HgetOperandInt.
   unfold getOperandInt in HgetOperandInt.
-  remember (getOperandValue TD v lc gl) as ogv.
+  remember (getOperandValue m TD v lc gl) as ogv.
   destruct ogv; try solve [inversion HgetOperandInt].
     exists g. auto.
 Qed.
 
-Lemma CAST_inversion : forall TD lc gl op t1 v1 t2 gv,
-  CAST TD lc gl op t1 v1 t2 = Some gv ->
+Lemma CAST_inversion : forall m TD lc gl op t1 v1 t2 gv,
+  CAST m TD lc gl op t1 v1 t2 = Some gv ->
   exists gv1,
-    getOperandValue TD v1 lc gl = Some gv1 /\
+    getOperandValue m TD v1 lc gl = Some gv1 /\
     mcast TD op t1 t2 gv1 = Some gv.
 Proof.
-  intros TD lc gl op t1 v1 t2 gv HCAST.
+  intros m TD lc gl op t1 v1 t2 gv HCAST.
   unfold CAST in HCAST.
-  remember (getOperandValue TD v1 lc gl) as ogv1.
+  remember (getOperandValue m TD v1 lc gl) as ogv1.
   destruct ogv1; try solve [inversion HCAST].
     remember (mcast TD op t1 t2 g) as R.
     destruct R; inversion HCAST; subst.
       exists g. auto.
 Qed.
 
-Lemma TRUNC_inversion : forall TD lc gl op t1 v1 t2 gv,
-  TRUNC TD lc gl op t1 v1 t2 = Some gv ->
+Lemma TRUNC_inversion : forall m TD lc gl op t1 v1 t2 gv,
+  TRUNC m TD lc gl op t1 v1 t2 = Some gv ->
   exists gv1,
-    getOperandValue TD v1 lc gl = Some gv1 /\
+    getOperandValue m TD v1 lc gl = Some gv1 /\
     mtrunc TD op t1 t2 gv1 = Some gv.
 Proof.
-  intros TD lc gl op t1 v1 t2 gv HTRUNC.
+  intros m TD lc gl op t1 v1 t2 gv HTRUNC.
   unfold TRUNC in HTRUNC.
-  remember (getOperandValue TD v1 lc gl) as ogv1.
+  remember (getOperandValue m TD v1 lc gl) as ogv1.
   destruct ogv1; try solve [inversion HTRUNC].
     remember (mtrunc TD op t1 t2 g) as R.
     destruct R; inversion HTRUNC; subst.
       exists g. auto.
 Qed.
 
-Lemma EXT_inversion : forall TD lc gl op t1 v1 t2 gv,
-  EXT TD lc gl op t1 v1 t2 = Some gv ->
+Lemma EXT_inversion : forall m TD lc gl op t1 v1 t2 gv,
+  EXT m TD lc gl op t1 v1 t2 = Some gv ->
   exists gv1,
-    getOperandValue TD v1 lc gl = Some gv1 /\
+    getOperandValue m TD v1 lc gl = Some gv1 /\
     mext TD op t1 t2 gv1 = Some gv.
 Proof.
-  intros TD lc gl op t1 v1 t2 gv HEXT.
+  intros m TD lc gl op t1 v1 t2 gv HEXT.
   unfold EXT in HEXT.
-  remember (getOperandValue TD v1 lc gl) as ogv1.
+  remember (getOperandValue m TD v1 lc gl) as ogv1.
   destruct ogv1; try solve [inversion HEXT].
     remember (mext TD op t1 t2 g) as R.
     destruct R; inversion HEXT; subst.
       exists g. auto.
 Qed.
 
-Lemma ICMP_inversion : forall TD lc gl cond t v1 v2 gv,
-  ICMP TD lc gl cond t v1 v2 = Some gv ->
+Lemma ICMP_inversion : forall m TD lc gl cond t v1 v2 gv,
+  ICMP m TD lc gl cond t v1 v2 = Some gv ->
   exists gv1, exists gv2,
-    getOperandValue TD v1 lc gl = Some gv1 /\
-    getOperandValue TD v2 lc gl = Some gv2 /\
-    micmp TD cond t gv1 gv2 = Some gv.
+    getOperandValue m TD v1 lc gl = Some gv1 /\
+    getOperandValue m TD v2 lc gl = Some gv2 /\
+    micmp m TD cond t gv1 gv2 = Some gv.
 Proof.
-  intros TD lc gl cond0 t v1 v2 gv HICMP.
+  intros m TD lc gl cond0 t v1 v2 gv HICMP.
   unfold ICMP in HICMP.
-  remember (getOperandValue TD v1 lc gl) as ogv1.
+  remember (getOperandValue m TD v1 lc gl) as ogv1.
   destruct ogv1; try solve [inversion HICMP].
-    remember (getOperandValue TD v2 lc gl) as ogv2.
+    remember (getOperandValue m TD v2 lc gl) as ogv2.
     destruct ogv2; try solve [inversion HICMP].
-      remember (micmp TD cond0 t g g0) as R.
+      remember (micmp m TD cond0 t g g0) as R.
       destruct R; inversion HICMP; subst.
         exists g. exists g0. auto.
 Qed.
 
-Lemma FCMP_inversion : forall TD lc gl cond fp v1 v2 gv,
-  FCMP TD lc gl cond fp v1 v2 = Some gv ->
+Lemma FCMP_inversion : forall m TD lc gl cond fp v1 v2 gv,
+  FCMP m TD lc gl cond fp v1 v2 = Some gv ->
   exists gv1, exists gv2,
-    getOperandValue TD v1 lc gl = Some gv1 /\
-    getOperandValue TD v2 lc gl = Some gv2 /\
+    getOperandValue m TD v1 lc gl = Some gv1 /\
+    getOperandValue m TD v2 lc gl = Some gv2 /\
     mfcmp TD cond fp gv1 gv2 = Some gv.
 Proof.
-  intros TD lc gl cond0 fp v1 v2 gv HFCMP.
+  intros m TD lc gl cond0 fp v1 v2 gv HFCMP.
   unfold FCMP in HFCMP.
-  remember (getOperandValue TD v1 lc gl) as ogv1.
+  remember (getOperandValue m TD v1 lc gl) as ogv1.
   destruct ogv1; try solve [inversion HFCMP].
-    remember (getOperandValue TD v2 lc gl) as ogv2.
+    remember (getOperandValue m TD v2 lc gl) as ogv2.
     destruct ogv2; try solve [inversion HFCMP].
       remember (mfcmp TD cond0 fp g g0) as R.
       destruct R; inversion HFCMP; subst.
         exists g. exists g0. auto.
 Qed.
 
-Lemma intValues2Nats_inversion : forall l0 lc gl TD ns0,
-  intValues2Nats TD l0 lc gl = Some ns0 ->
+Lemma intValues2Nats_inversion : forall l0 lc gl m TD ns0,
+  intValues2Nats m TD l0 lc gl = Some ns0 ->
   exists gvs0,
-    values2GVs TD l0 lc gl = Some gvs0 /\
+    values2GVs m TD l0 lc gl = Some gvs0 /\
     GVs2Nats TD gvs0 = Some ns0.
 Proof.
   induction l0; intros; simpl in *.
     inversion H. exists nil. auto.
 
     destruct a as [s v].
-    remember (getOperandValue TD v lc gl) as ogv.
+    remember (getOperandValue m TD v lc gl) as ogv.
     destruct ogv; try solve [inversion H].
     remember (GV2int TD Size.ThirtyTwo g) as on.
     destruct on; try solve [inversion H].
-    remember (intValues2Nats TD l0 lc gl) as ons.
+    remember (intValues2Nats m TD l0 lc gl) as ons.
     destruct ons; inversion H; subst.
     symmetry in Heqons.
     apply IHl0 in Heqons.
@@ -1961,231 +1979,223 @@ Proof.
       simpl. rewrite J2. rewrite <- Heqon. auto.
 Qed.
 
-Lemma values2GVs_GVs2Nats__intValues2Nats : forall l0 lc gl TD gvs0,
-  values2GVs TD l0 lc gl = Some gvs0 ->
-  GVs2Nats TD gvs0 = intValues2Nats TD l0 lc gl.
+Lemma values2GVs_GVs2Nats__intValues2Nats : forall l0 lc gl m TD gvs0,
+  values2GVs m TD l0 lc gl = Some gvs0 ->
+  GVs2Nats TD gvs0 = intValues2Nats m TD l0 lc gl.
 Proof.
-  induction l0; intros lc gl TD gvs0 H; simpl in *.
+  induction l0; intros lc gl m TD gvs0 H; simpl in *.
     inversion H. auto.
 
     destruct a as [s v].
-    destruct (getOperandValue TD v lc gl); try solve [inversion H].
-      remember (values2GVs TD l0 lc gl)as ogv.
+    destruct (getOperandValue m TD v lc gl); try solve [inversion H].
+      remember (values2GVs m TD l0 lc gl)as ogv.
       destruct ogv; inversion H; subst.
         rewrite <- IHl0 with (gvs0:=l1); auto.
 Qed.
 
 (* Properties of eqAL *)
 Lemma const2GV_eqAL_aux :
-  (forall c gl1 gl2 TD, eqAL _ gl1 gl2 ->
-     _const2GV TD gl1 c = _const2GV TD gl2 c) /\
-  (forall cs gl1 gl2 TD, eqAL _ gl1 gl2 ->
-    (forall t, _list_const_arr2GV TD gl1 t cs = _list_const_arr2GV TD gl2 t cs)
+  (forall c gl1 gl2 m TD, eqAL _ gl1 gl2 ->
+     _const2GV m TD gl1 c = _const2GV m TD gl2 c) /\
+  (forall cs gl1 gl2 m TD, eqAL _ gl1 gl2 ->
+    (forall t, _list_const_arr2GV m TD gl1 t cs = _list_const_arr2GV m TD gl2 t cs)
     /\
-    _list_const_struct2GV TD gl1 cs = _list_const_struct2GV TD gl2 cs).
+    _list_const_struct2GV m TD gl1 cs = _list_const_struct2GV m TD gl2 cs).
 Proof.
   apply const_mutind; intros; simpl;
   try solve [
     auto |
 
-    apply H with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in H0;
+    apply H with (m:=m)(TD:=TD)(gl1:=gl1)(gl2:=gl2) in H0;
       destruct H0; auto |
 
-    apply H with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in H0;
+    apply H with (m:=m)(TD:=TD)(gl1:=gl1)(gl2:=gl2) in H0;
     destruct H0;
-    rewrite H1; auto |
-
-    apply H with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in H0;
-    destruct H0;
-    rewrite H0; auto |
+    unfold _list_const_arr2GV in H0; rewrite H0; auto |
 
     rewrite H; auto |
 
     assert (J:=H1);
-    apply H0 with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in H1;
-    destruct H1;
-    rewrite H2; rewrite H1; erewrite H; eauto |
-
-    assert (J:=H1);
-    apply H with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in H1;
+    apply H with (m:=m)(TD:=TD)(gl1:=gl1)(gl2:=gl2) in H1;
     rewrite H1;
     assert (J':=J);
-    apply H0 with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in J;
+    apply H0 with (m:=m)(TD:=TD)(gl1:=gl1)(gl2:=gl2) in J;
     rewrite J; auto
-  ]; fold _list_const_struct2GV.
+  ];
+  fold _list_const_struct2GV.
 
-  apply H with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in H0.
-  rewrite (proj2 H0). auto.
+  apply H with (m:=m)(TD:=TD)(gl1:=gl1)(gl2:=gl2) in H0.
+  unfold _list_const_struct2GV in H0; rewrite (proj2 H0). auto.
 
   assert (J:=H1).
-  apply H with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in H1.
+  apply H with (m:=m)(TD:=TD)(gl1:=gl1)(gl2:=gl2) in H1.
   rewrite H1.
   assert (J':=J). trivial.
 
   assert (J:=H2).
-  apply H with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in H2.
+  apply H with (m:=m)(TD:=TD)(gl1:=gl1)(gl2:=gl2) in H2.
   rewrite H2.
   assert (J':=J).
-  apply H0 with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in J.
+  apply H0 with (m:=m)(TD:=TD)(gl1:=gl1)(gl2:=gl2) in J.
   rewrite J.
-  apply H1 with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in J'.
+  apply H1 with (m:=m)(TD:=TD)(gl1:=gl1)(gl2:=gl2) in J'.
   rewrite J'. auto.
 
   assert (J:=H1).
-  apply H with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in H1.
+  apply H with (m:=m)(TD:=TD)(gl1:=gl1)(gl2:=gl2) in H1.
   rewrite H1. auto.
 
   assert (J:=H2).
-  apply H with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in H2.
+  apply H with (m:=m)(TD:=TD)(gl1:=gl1)(gl2:=gl2) in H2.
   rewrite H2.
   assert (J':=J).
-  apply H0 with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in J.
+  apply H0 with (m:=m)(TD:=TD)(gl1:=gl1)(gl2:=gl2) in J.
   rewrite J. auto.
 
   split.
     intros.
     assert (J:=H1);
-    apply H with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in H1;
+    apply H with (m:=m)(TD:=TD)(gl1:=gl1)(gl2:=gl2) in H1;
     rewrite H1;
     assert (J':=J);
-    apply H0 with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in J.
+    apply H0 with (m:=m)(TD:=TD)(gl1:=gl1)(gl2:=gl2) in J.
     destruct J. rewrite H2; auto.
 
     assert (J:=H1);
-    apply H with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in H1;
+    apply H with (m:=m)(TD:=TD)(gl1:=gl1)(gl2:=gl2) in H1;
     rewrite H1;
     assert (J':=J);
-    apply H0 with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in J.
+    apply H0 with (m:=m)(TD:=TD)(gl1:=gl1)(gl2:=gl2) in J.
     destruct J. rewrite H3; auto.
 Qed.
 
-Lemma const2GV_eqAL : forall c gl1 gl2 TD,
+Lemma const2GV_eqAL : forall c gl1 gl2 m TD,
   eqAL _ gl1 gl2 ->
-  const2GV TD gl1 c = const2GV TD gl2 c.
+  const2GV m TD gl1 c = const2GV m TD gl2 c.
 Proof.
   intros. unfold const2GV.
   destruct const2GV_eqAL_aux.
   erewrite H0; eauto.
 Qed.
 
-Lemma getOperandValue_eqAL : forall lc1 gl lc2 v TD,
+Lemma getOperandValue_eqAL : forall lc1 gl lc2 v m TD,
   eqAL _ lc1 lc2 ->
-  getOperandValue TD v lc1 gl = getOperandValue TD v lc2 gl.
+  getOperandValue m TD v lc1 gl = getOperandValue m TD v lc2 gl.
 Proof.
   intros lc1 gl lc2 v TD HeqAL.
   unfold getOperandValue in *.
   destruct v; auto.
 Qed.
 
-Lemma BOP_eqAL : forall lc1 gl lc2 bop0 sz0 v1 v2 TD,
+Lemma BOP_eqAL : forall lc1 gl lc2 bop0 sz0 v1 v2 m TD,
   eqAL _ lc1 lc2 ->
-  BOP TD lc1 gl bop0 sz0 v1 v2 = BOP TD lc2 gl bop0 sz0 v1 v2.
+  BOP m TD lc1 gl bop0 sz0 v1 v2 = BOP m TD lc2 gl bop0 sz0 v1 v2.
 Proof.
-  intros lc1 gl lc2 bop0 sz0 v1 v2 TD HeqEnv.
+  intros lc1 gl lc2 bop0 sz0 v1 v2 m TD HeqEnv.
   unfold BOP in *.
   rewrite getOperandValue_eqAL with (lc2:=lc2)(v:=v1); auto.
   rewrite getOperandValue_eqAL with (lc2:=lc2)(v:=v2); auto.
 Qed.
 
-Lemma FBOP_eqAL : forall lc1 gl lc2 fbop0 fp0 v1 v2 TD,
+Lemma FBOP_eqAL : forall lc1 gl lc2 fbop0 fp0 v1 v2 m TD,
   eqAL _ lc1 lc2 ->
-  FBOP TD lc1 gl fbop0 fp0 v1 v2 = FBOP TD lc2 gl fbop0 fp0 v1 v2.
+  FBOP m TD lc1 gl fbop0 fp0 v1 v2 = FBOP m TD lc2 gl fbop0 fp0 v1 v2.
 Proof.
-  intros lc1 gl lc2 fbop0 fp0 v1 v2 TD HeqEnv.
+  intros lc1 gl lc2 fbop0 fp0 v1 v2 m TD HeqEnv.
   unfold FBOP in *.
   rewrite getOperandValue_eqAL with (lc2:=lc2)(v:=v1); auto.
   rewrite getOperandValue_eqAL with (lc2:=lc2)(v:=v2); auto.
 Qed.
 
-Lemma getOperandPtr_eqAL : forall lc1 gl lc2 v TD,
+Lemma getOperandPtr_eqAL : forall lc1 gl lc2 v m TD,
   eqAL _ lc1 lc2 ->
-  getOperandPtr TD v lc1 gl = getOperandPtr TD v lc2 gl.
+  getOperandPtr m TD v lc1 gl = getOperandPtr m TD v lc2 gl.
 Proof.
-  intros lc1 gl lc2 v TD HeqEnv.
+  intros lc1 gl lc2 v m TD HeqEnv.
   unfold getOperandPtr in *.
   erewrite getOperandValue_eqAL; eauto.
 Qed.
 
-Lemma getOperandInt_eqAL : forall lc1 gl lc2 sz v TD,
+Lemma getOperandInt_eqAL : forall lc1 gl lc2 sz v m TD,
   eqAL _ lc1 lc2 ->
-  getOperandInt TD sz v lc1 gl = getOperandInt TD sz v lc2 gl.
+  getOperandInt m TD sz v lc1 gl = getOperandInt m TD sz v lc2 gl.
 Proof.
-  intros lc1 gl lc2 sz0 v TD HeqAL.
+  intros lc1 gl lc2 sz0 v m TD HeqAL.
   unfold getOperandInt in *.
   erewrite getOperandValue_eqAL; eauto.
 Qed.
 
-Lemma getOperandPtrInBits_eqAL : forall lc1 gl lc2 sz v TD,
+Lemma getOperandPtrInBits_eqAL : forall lc1 gl lc2 sz v m TD,
   eqAL _ lc1 lc2 ->
-  getOperandPtrInBits TD sz v lc1 gl = getOperandPtrInBits TD sz v lc2 gl.
+  getOperandPtrInBits m TD sz v lc1 gl = getOperandPtrInBits m TD sz v lc2 gl.
 Proof.
-  intros lc1 gl lc2 sz0 v TD HeqAL.
+  intros lc1 gl lc2 sz0 v m TD HeqAL.
   unfold getOperandPtrInBits in *.
   erewrite getOperandValue_eqAL; eauto.
 Qed.
 
-Lemma CAST_eqAL : forall lc1 gl lc2 op t1 v1 t2 TD,
+Lemma CAST_eqAL : forall lc1 gl lc2 op t1 v1 t2 m TD,
   eqAL _ lc1 lc2 ->
-  CAST TD lc1 gl op t1 v1 t2 = CAST TD lc2 gl op t1 v1 t2.
+  CAST m TD lc1 gl op t1 v1 t2 = CAST m TD lc2 gl op t1 v1 t2.
 Proof.
-  intros lc1 gl lc2 op t1 v1 t2 TD HeqAL.
+  intros lc1 gl lc2 op t1 v1 t2 m TD HeqAL.
   unfold CAST in *.
   rewrite getOperandValue_eqAL with (lc2:=lc2)(v:=v1); auto.
 Qed.
 
-Lemma TRUNC_eqAL : forall lc1 gl lc2 op t1 v1 t2 TD,
+Lemma TRUNC_eqAL : forall lc1 gl lc2 op t1 v1 t2 m TD,
   eqAL _ lc1 lc2 ->
-  TRUNC TD lc1 gl op t1 v1 t2 = TRUNC TD lc2 gl op t1 v1 t2.
+  TRUNC m TD lc1 gl op t1 v1 t2 = TRUNC m TD lc2 gl op t1 v1 t2.
 Proof.
-  intros lc1 gl lc2 op t1 v1 t2 TD HeqAL.
+  intros lc1 gl lc2 op t1 v1 t2 m TD HeqAL.
   unfold TRUNC in *.
   rewrite getOperandValue_eqAL with (lc2:=lc2)(v:=v1); auto.
 Qed.
 
-Lemma EXT_eqAL : forall lc1 gl lc2 op t1 v1 t2 TD,
+Lemma EXT_eqAL : forall lc1 gl lc2 op t1 v1 t2 m TD,
   eqAL _ lc1 lc2 ->
-  EXT TD lc1 gl op t1 v1 t2 = EXT TD lc2 gl op t1 v1 t2.
+  EXT m TD lc1 gl op t1 v1 t2 = EXT m TD lc2 gl op t1 v1 t2.
 Proof.
-  intros lc1 gl lc2 op t1 v1 t2 TD HeqAL.
+  intros lc1 gl lc2 op t1 v1 t2 m TD HeqAL.
   unfold EXT in *.
   rewrite getOperandValue_eqAL with (lc2:=lc2)(v:=v1); auto.
 Qed.
 
-Lemma ICMP_eqAL : forall lc1 gl lc2 cond t v1 v2 TD,
+Lemma ICMP_eqAL : forall lc1 gl lc2 cond t v1 v2 m TD,
   eqAL _ lc1 lc2 ->
-  ICMP TD lc1 gl cond t v1 v2 = ICMP TD lc2 gl cond t v1 v2.
+  ICMP m TD lc1 gl cond t v1 v2 = ICMP m TD lc2 gl cond t v1 v2.
 Proof.
-  intros lc1 gl lc2 cond0 t v1 v2 TD HeqAL.
+  intros lc1 gl lc2 cond0 t v1 v2 m TD HeqAL.
   unfold ICMP in *.
   rewrite getOperandValue_eqAL with (lc2:=lc2)(v:=v1); auto.
   rewrite getOperandValue_eqAL with (lc2:=lc2)(v:=v2); auto.
 Qed.
 
-Lemma FCMP_eqAL : forall lc1 gl lc2 cond fp v1 v2 TD,
+Lemma FCMP_eqAL : forall lc1 gl lc2 cond fp v1 v2 m TD,
   eqAL _ lc1 lc2 ->
-  FCMP TD lc1 gl cond fp v1 v2 = FCMP TD lc2 gl cond fp v1 v2.
+  FCMP m TD lc1 gl cond fp v1 v2 = FCMP m TD lc2 gl cond fp v1 v2.
 Proof.
-  intros lc1 gl lc2 cond0 fp v1 v2 TD HeqAL.
+  intros lc1 gl lc2 cond0 fp v1 v2 m TD HeqAL.
   unfold FCMP in *.
   rewrite getOperandValue_eqAL with (lc2:=lc2)(v:=v1); auto.
   rewrite getOperandValue_eqAL with (lc2:=lc2)(v:=v2); auto.
 Qed.
 
-Lemma intValues2Nats_eqAL : forall l0 lc1 gl lc2 TD,
+Lemma intValues2Nats_eqAL : forall l0 lc1 gl lc2 m TD,
   eqAL _ lc1 lc2 ->
-  intValues2Nats TD  l0 lc1 gl = intValues2Nats TD l0 lc2 gl.
+  intValues2Nats m TD l0 lc1 gl = intValues2Nats m TD l0 lc2 gl.
 Proof.
-  induction l0; intros lc1 gl lc2 TD HeqAL; simpl; auto.
+  induction l0; intros lc1 gl lc2 m TD HeqAL; simpl; auto.
     destruct a.
     rewrite getOperandValue_eqAL with (lc2:=lc2)(v:=v); auto.
     erewrite IHl0; eauto.
 Qed.
 
-Lemma values2GVs_eqAL : forall l0 lc1 gl lc2 TD,
+Lemma values2GVs_eqAL : forall l0 lc1 gl lc2 m TD,
   eqAL _ lc1 lc2 ->
-  values2GVs TD l0 lc1 gl = values2GVs TD l0 lc2 gl.
+  values2GVs m TD l0 lc1 gl = values2GVs m TD l0 lc2 gl.
 Proof.
-  induction l0; intros lc1 gl lc2 TD HeqAL; simpl; auto.
+  induction l0; intros lc1 gl lc2 m TD HeqAL; simpl; auto.
     destruct a.
     rewrite getOperandValue_eqAL with (lc2:=lc2)(v:=v); auto.
     erewrite IHl0; eauto.
@@ -2479,8 +2489,8 @@ Proof.
   unfold gundef in H. simpl in H. inv H. simpl. auto.
 Qed.
 
-Lemma micmp_typsize : forall los nts cond5 t1 gv1 gv2 gv,
-  micmp (los,nts) cond5 t1 gv1 gv2 = Some gv ->
+Lemma micmp_typsize : forall m los nts cond5 t1 gv1 gv2 gv,
+  micmp m (los,nts) cond5 t1 gv1 gv2 = Some gv ->
   Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat Size.One) 8) = sizeGenericValue gv.
 Proof.
   intros. unfold micmp in H.
@@ -2545,4 +2555,3 @@ Proof.
 Qed.
 
 End LLVMgv.
-

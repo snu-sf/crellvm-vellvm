@@ -13,6 +13,7 @@ Require Import Integers.
 Require Import Coqlib.
 Require Import targetdata.
 Require Import Maps.
+Require Import maps_ext.
 Require Import Lattice.
 Require Import Iteration.
 Require Import Kildall.

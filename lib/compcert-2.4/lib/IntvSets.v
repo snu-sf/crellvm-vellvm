@@ -156,7 +156,7 @@ Proof.
   intuition omega. 
   destruct (zlt h0 h); simpl.
   intuition. exploit BELOW; eauto. omega.
-  rewrite IHok. intuition. omegaContradiction. 
+  rewrite IHok. intuition.
 Qed.
 
 Lemma remove_ok:
@@ -204,10 +204,10 @@ Proof.
   tauto.
   assert (ok (Cons l0 h0 s0)) by (constructor; auto).
   destruct (zle h l0).
-  rewrite IHok; auto. simpl. intuition. omegaContradiction. 
+  rewrite IHok; auto. simpl. intuition.
   exploit BELOW0; eauto. intros. omegaContradiction.
   destruct (zle h0 l).
-  simpl in IHok0; rewrite IHok0. intuition. omegaContradiction.
+  simpl in IHok0; rewrite IHok0. intuition.
   exploit BELOW; eauto. intros; omegaContradiction.
   destruct (zle l l0).
   destruct (zle h0 h).
@@ -340,7 +340,7 @@ Proof.
   unfold add, In; intros. 
   destruct (zlt l h).
   simpl. apply R.In_add. apply proj2_sig.
-  intuition. omegaContradiction. 
+  intuition.
 Qed.
 
 Program Definition remove (l h: Z) (s: t) : t :=
@@ -404,7 +404,3 @@ Proof.
 Qed.
 
 End ISet.
-
-
-
-

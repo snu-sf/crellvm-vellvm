@@ -75,7 +75,7 @@ Module LPMap1(L: SEMILATTICE) <: SEMILATTICE.
 Definition t := PTree.t L.t.
 
 Definition get (p: positive) (x: t) : L.t :=
-  match x!p with None => L.bot | Some x => x end.
+  match x ? p with None => L.bot | Some x => x end.
 
 Definition set (p: positive) (v: L.t) (x: t) : t :=
   if L.beq v L.bot
@@ -118,7 +118,7 @@ Lemma beq_correct: forall x y, beq x y = true -> eq x y.
 Proof.
   unfold beq; intros; red; intros. unfold get.
   rewrite PTree.beq_correct in H. specialize (H p). 
-  destruct (x!p); destruct (y!p); intuition.
+  destruct (x ? p); destruct (y ? p); intuition.
   apply L.beq_correct; auto.
   apply L.eq_refl.
 Qed.
@@ -388,10 +388,10 @@ Lemma gcombine_bot:
   forall f t1 t2 p,
   f None None = None ->
   L.eq (get p (combine f t1 t2))
-       (match f t1!p t2!p with Some x => x | None => L.bot end).
+       (match f t1 ? p t2 ? p with Some x => x | None => L.bot end).
 Proof.
   intros. unfold get. generalize (gcombine f H t1 t2 p). unfold opt_eq. 
-  destruct ((combine f t1 t2)!p); destruct (f t1!p t2!p).
+  destruct ((combine f t1 t2) ? p); destruct (f t1 ? p t2 ? p).
   auto. contradiction. contradiction. intros; apply L.eq_refl.
 Qed.
 
@@ -400,7 +400,7 @@ Lemma ge_lub_left:
 Proof.
   unfold ge, lub; intros. 
   eapply L.ge_trans. apply L.ge_refl. apply gcombine_bot; auto.
-  unfold get. destruct x!p. destruct y!p. 
+  unfold get. destruct x ? p. destruct y ? p. 
   apply L.ge_lub_left.
   apply L.ge_refl. apply L.eq_refl.
   apply L.ge_bot.
@@ -411,7 +411,7 @@ Lemma ge_lub_right:
 Proof.
   unfold ge, lub; intros. 
   eapply L.ge_trans. apply L.ge_refl. apply gcombine_bot; auto.
-  unfold get. destruct y!p. destruct x!p. 
+  unfold get. destruct y ? p. destruct x ? p. 
   apply L.ge_lub_right.
   apply L.ge_refl. apply L.eq_refl.
   apply L.ge_bot.
@@ -434,7 +434,7 @@ Definition t: Type := t'.
 Definition get (p: positive) (x: t) : L.t :=
   match x with
   | Bot => L.bot
-  | Top_except m => match m!p with None => L.top | Some x => x end
+  | Top_except m => match m ? p with None => L.top | Some x => x end
   end.
 
 Definition set (p: positive) (v: L.t) (x: t) : t :=
@@ -492,7 +492,7 @@ Proof.
   apply eq_refl.
   red; intro; simpl.
   rewrite PTree.beq_correct in H. generalize (H p).
-  destruct (t0!p); destruct (t1!p); intuition.
+  destruct (t0 ? p); destruct (t1 ? p); intuition.
   apply L.beq_correct; auto.
   apply L.eq_refl.
 Qed.
@@ -559,10 +559,10 @@ Lemma gcombine_top:
   forall f t1 t2 p,
   f None None = None ->
   L.eq (get p (Top_except (LM.combine f t1 t2)))
-       (match f t1!p t2!p with Some x => x | None => L.top end).
+       (match f t1 ? p t2 ? p with Some x => x | None => L.top end).
 Proof.
   intros. simpl. generalize (LM.gcombine f H t1 t2 p). unfold LM.opt_eq. 
-  destruct ((LM.combine f t1 t2)!p); destruct (f t1!p t2!p).
+  destruct ((LM.combine f t1 t2) ? p); destruct (f t1 ? p t2 ? p).
   auto. contradiction. contradiction. intros; apply L.eq_refl.
 Qed.
 
@@ -574,7 +574,7 @@ Proof.
   rewrite get_bot. apply L.ge_bot.
   apply L.ge_refl. apply L.eq_refl.
   eapply L.ge_trans. apply L.ge_refl. apply gcombine_top; auto.
-  unfold get. destruct t0!p. destruct t1!p. 
+  unfold get. destruct t0 ? p. destruct t1 ? p. 
   unfold opt_lub. destruct (L.beq (L.lub t2 t3) L.top) eqn:E.
   apply L.ge_top. apply L.ge_lub_left. 
   apply L.ge_top. 
@@ -589,7 +589,7 @@ Proof.
   apply L.ge_refl. apply L.eq_refl.
   rewrite get_bot. apply L.ge_bot.
   eapply L.ge_trans. apply L.ge_refl. apply gcombine_top; auto.
-  unfold get. destruct t0!p; destruct t1!p. 
+  unfold get. destruct t0 ? p; destruct t1 ? p. 
   unfold opt_lub. destruct (L.beq (L.lub t2 t3) L.top) eqn:E.
   apply L.ge_top. apply L.ge_lub_right. 
   apply L.ge_top. 

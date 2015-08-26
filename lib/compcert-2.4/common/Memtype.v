@@ -271,6 +271,30 @@ Axiom valid_pointer_implies:
   forall m b ofs,
   valid_pointer m b ofs = true -> weak_valid_pointer m b ofs = true.
 
+(** Each block has associated low and high bounds.  These are the bounds 
+    that were given when the block was allocated.  *)
+
+Parameter bounds: forall (m: mem) (b: block), Z*Z.
+
+Notation low_bound m b := (fst(bounds m b)).
+Notation high_bound m b := (snd(bounds m b)).
+
+(** The crucial properties of bounds is that any offset below the low
+    bound or above the high bound is empty. *)
+
+Axiom perm_in_bounds:
+  forall m b ofs pk p, perm m b ofs pk p -> low_bound m b <= ofs < high_bound m b.
+
+Axiom range_perm_in_bounds:
+  forall m b lo hi pk p, 
+  range_perm m b lo hi pk p -> lo < hi ->
+  low_bound m b <= lo /\ hi <= high_bound m b.
+
+Axiom valid_access_in_bounds:
+  forall m chunk b ofs p,
+  valid_access m chunk b ofs p ->
+  low_bound m b <= ofs /\ ofs + size_chunk chunk <= high_bound m b.
+
 (** * Properties of the memory operations *)
 
 (** ** Properties of the initial memory state. *)
@@ -408,6 +432,10 @@ Axiom store_valid_access_2:
 Axiom store_valid_access_3:
   forall chunk m1 b ofs v m2, store chunk m1 b ofs v = Some m2 ->
   valid_access m1 chunk b ofs Writable.
+
+Axiom bounds_store:
+  forall chunk m1 b ofs v m2, store chunk m1 b ofs v = Some m2 ->
+  forall b', bounds m2 b' = bounds m1 b'.
 
 (** Load-store properties. *)
 (* NOTE: not used
@@ -640,6 +668,20 @@ Axiom valid_access_alloc_inv:
   then lo <= ofs /\ ofs + size_chunk chunk <= hi /\ (align_chunk chunk | ofs)
   else valid_access m1 chunk b' ofs p.
 
+(** Effect of [alloc] on bounds. *)
+
+Axiom bounds_alloc:
+  forall m1 lo hi m2 b, alloc m1 lo hi = (m2, b) ->
+  forall b', bounds m2 b' = if eq_block b' b then (lo, hi) else bounds m1 b'.
+
+Axiom bounds_alloc_same:
+  forall m1 lo hi m2 b, alloc m1 lo hi = (m2, b) ->
+  bounds m2 b = (lo, hi).
+
+Axiom bounds_alloc_other:
+  forall m1 lo hi m2 b, alloc m1 lo hi = (m2, b) ->
+  forall b', b' <> b -> bounds m2 b' = bounds m1 b'.
+
 (** Load-alloc properties. *)
 
 Axiom load_alloc_unchanged:
@@ -728,6 +770,12 @@ Axiom valid_access_free_inv_2:
   valid_access m2 chunk bf ofs p ->
   lo >= hi \/ ofs + size_chunk chunk <= lo \/ hi <= ofs.
 
+(** [free] preserves bounds. *)
+
+Axiom bounds_free:
+  forall m1 bf lo hi m2, free m1 bf lo hi = Some m2 ->
+  forall b, bounds m2 b = bounds m1 b.
+
 (** Load-free properties *)
 
 Axiom load_free:
@@ -767,6 +815,10 @@ Axiom perm_drop_3:
 Axiom perm_drop_4:
   forall m b lo hi p m', drop_perm m b lo hi p = Some m' ->
   forall b' ofs k p', perm m' b' ofs k p' -> perm m b' ofs k p'.
+
+Axiom bounds_drop:
+  forall m b lo hi p m', drop_perm m b lo hi p = Some m' ->
+  forall b', bounds m' b' = bounds m b'.
 
 Axiom load_drop:
   forall m b lo hi p m', drop_perm m b lo hi p = Some m' ->

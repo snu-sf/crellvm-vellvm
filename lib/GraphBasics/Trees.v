@@ -56,9 +56,9 @@ Proof.
         red in |- *; intros He; elim n0.
         rewrite <- He; trivial.
 
-        red in |- *; intro; elim n0; apply (G_ina_inv2 v0 a0 H n f); trivial.
+        red in |- *; intro; elim n0; apply (G_ina_inv2 v0 a0 X n f); trivial.
 
-        red in |- *; intro; elim n0; apply (G_ina_inv1 v0 a0 H f n); trivial.
+        red in |- *; intro; elim n0; apply (G_ina_inv1 v0 a0 X f n); trivial.
 
         apply G_eq with (v := v0) (a := a0); trivial.
 Defined.
@@ -107,35 +107,35 @@ Lemma Acyclic_connected_isa_tree :
  forall (v : V_set) (a : @A_set A), Acyclic v a -> Connected v a -> Tree v a.
 Proof.
         intros v a ac; elim ac; intros.
-        elim (Connected_not_empty _ _ H); auto.
+        elim (Connected_not_empty _ _ X); auto.
 
         apply T_eq with (v := V_single x) (a := @A_empty A).
-        symmetry  in |- *; apply (C_minus_isolated_left eq_a_dec _ _ H0 x).
+        symmetry  in |- *; apply (C_minus_isolated_left eq_a_dec _ _ X0 x).
         apply V_in_left; apply V_in_single.
 
         intros; red in |- *; intros; elim n.
-        apply (AC_ina_inv1 _ _ _ _ ac0 H1).
+        apply (AC_ina_inv1 _ _ _ _ ac0 H).
 
-        symmetry  in |- *; apply (C_minus_isolated_right eq_a_dec _ _ H0 x).
+        symmetry  in |- *; apply (C_minus_isolated_right eq_a_dec _ _ X0 x).
         apply V_in_left; apply V_in_single.
 
         intros; red in |- *; intros; elim n.
-        apply (AC_ina_inv1 _ _ _ _ ac0 H1).
+        apply (AC_ina_inv1 _ _ _ _ ac0 H).
 
         apply T_root.
 
         apply T_leaf.
-        apply H.
-        apply (C_minus_pendant eq_a_dec _ _ H0 x y).
+        apply X.
+        apply (C_minus_pendant eq_a_dec _ _ X0 x y).
         apply V_in_right; trivial.
 
         apply V_in_left; apply V_in_single.
 
         intros.
-        inversion H1.
-        inversion H2; trivial.
+        inversion H.
+        inversion H0; trivial.
 
-        elim n; apply (AC_ina_inv1 _ _ y z ac0 H2).
+        elim n; apply (AC_ina_inv1 _ _ y z ac0 H0).
 
         trivial.
 
@@ -156,7 +156,7 @@ Proof.
 
         trivial.
 
-        apply H; apply C_eq with (v := v') (a := a'); auto.
+        apply X; apply C_eq with (v := v') (a := a'); auto.
 Qed.
 
 End CONNECTED_AND_ACYCLIC.

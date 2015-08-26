@@ -7,7 +7,7 @@ Require Import Coqlib.
 Require Import alist.
 Require Import vellvm_tactics.
 
-Require Import Coqlib_old.
+(*Require Import Coqlib_old.*)
 
 (* This file defines data layouts. *)
 
@@ -706,10 +706,10 @@ Proof.
   intros. unfold RoundUpAlignment.
   assert ((Z_of_nat a + Z_of_nat b) / Z_of_nat b * Z_of_nat b >= Z_of_nat a)%Z
     as J.
-    apply Coqlib_old.roundup_is_correct.
-      destruct b; try solve [contradict H; omega | apply Coqlib_old.Z_of_S_gt_O].
+    apply Coqlib.roundup_is_correct.
+      destruct b; try solve [contradict H; omega | apply Coqlib.Z_of_S_gt_O].
   apply nat_of_Z_inj_ge in J.
-  rewrite Coqlib_old.Z_of_nat_eq in J. auto.
+  rewrite Coqlib.Z_of_nat_eq in J. auto.
 Qed.
 
 Lemma feasible_array_typ_inv : forall TD s t,
@@ -939,20 +939,20 @@ Case "typ_array".
     exists 8%nat. exists 1%nat. split; auto. omega.
 
     exists (RoundUpAlignment
-               (Coqlib_old.nat_of_Z (Coqlib_old.ZRdiv (Z_of_nat sz) 8)) al * 8 *
+               (Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz) 8)) al * 8 *
              Size.to_nat (S s))%nat.
     exists al. split; auto. split; auto.
-    assert (RoundUpAlignment (Coqlib_old.nat_of_Z (Coqlib_old.ZRdiv (Z_of_nat sz) 8)) al
-      >= (Coqlib_old.nat_of_Z (Coqlib_old.ZRdiv (Z_of_nat sz) 8)))%nat as J4.
+    assert (RoundUpAlignment (Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz) 8)) al
+      >= (Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz) 8)))%nat as J4.
       apply RoundUpAlignment_spec; auto.
-    assert (Coqlib_old.ZRdiv (Z_of_nat sz) 8 > 0) as J5.
-      apply Coqlib_old.ZRdiv_prop3; try omega.
+    assert (Coqlib.ZRdiv (Z_of_nat sz) 8 > 0) as J5.
+      apply Coqlib.ZRdiv_prop3; try omega.
     apply nat_of_Z_inj_gt in J5; try omega.
     simpl in J5.
-    assert (RoundUpAlignment (Coqlib_old.nat_of_Z (Coqlib_old.ZRdiv (Z_of_nat sz) 8)) al
+    assert (RoundUpAlignment (Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz) 8)) al
       * 8 > 0)%nat as J6. omega. clear J4 J5.
     assert (Size.to_nat (S s) > 0)%nat as J7. unfold Size.to_nat. omega.
-    remember (RoundUpAlignment (Coqlib_old.nat_of_Z (Coqlib_old.ZRdiv (Z_of_nat sz) 8)) 
+    remember (RoundUpAlignment (Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz) 8)) 
       al * 8)%nat as R1. 
     remember (Size.to_nat (S s)) as R2. 
     clear - J6 J7.
@@ -1008,7 +1008,7 @@ Case "typ_cons".
     destruct (le_lt_dec al1 al2); eauto.
       exists (sz2 +
              RoundUpAlignment
-               (Coqlib_old.nat_of_Z (Coqlib_old.ZRdiv (Z_of_nat sz1) 8)) al1 * 8)%nat.
+               (Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz1) 8)) al1 * 8)%nat.
       exists al2.
       split; auto.
         intros. clear - J13 l1. omega.
@@ -1123,7 +1123,7 @@ Lemma getTypeAllocSize_inv : forall TD typ5 sz,
   getTypeAllocSize TD typ5 = Some sz ->
   exists sz0, exists al0, getABITypeAlignment TD typ5 = Some al0 /\
     getTypeSizeInBits_and_Alignment TD true typ5 = Some (sz0, al0) /\
-    sz = RoundUpAlignment (Coqlib_old.nat_of_Z (Coqlib_old.ZRdiv (Z_of_nat sz0) 8)) al0.
+    sz = RoundUpAlignment (Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz0) 8)) al0.
 Proof.
   intros.
   unfold getTypeAllocSize in H.
@@ -1141,7 +1141,7 @@ Lemma getTypeAllocSize_inv' : forall los nts typ5 sz sz2 al2,
   _getTypeSizeInBits_and_Alignment los
          (_getTypeSizeInBits_and_Alignment_for_namedts los nts true)
          true typ5 = Some (sz2, al2) ->
-  sz = RoundUpAlignment (Coqlib_old.nat_of_Z (Coqlib_old.ZRdiv (Z_of_nat sz2) 8)) al2.
+  sz = RoundUpAlignment (Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz2) 8)) al2.
 Proof.
   intros.
   apply getTypeAllocSize_inv in H.
@@ -1157,8 +1157,8 @@ Lemma getTypeAllocSize_roundup : forall los nts sz2 al2 t
          (_getTypeSizeInBits_and_Alignment_for_namedts los nts true)
          true t = Some (sz2, al2))
   (s0 : sz) (HeqR3 : Some s0 = getTypeAllocSize (los, nts) t),
-  ((Coqlib_old.nat_of_Z (Coqlib_old.ZRdiv (Z_of_nat sz2) 8)) +
-    (s0 - (Coqlib_old.nat_of_Z (Coqlib_old.ZRdiv (Z_of_nat sz2) 8))))%nat = s0.
+  ((Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz2) 8)) +
+    (s0 - (Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz2) 8))))%nat = s0.
 Proof.
   intros.
   unfold getTypeAllocSize, getABITypeAlignment, getAlignment, getTypeStoreSize,
@@ -1166,8 +1166,8 @@ Proof.
     getTypeSizeInBits_and_Alignment_for_namedts in HeqR3.
   rewrite J6 in HeqR3.
   inv HeqR3.
-  assert (RoundUpAlignment (Coqlib_old.nat_of_Z (Coqlib_old.ZRdiv (Z_of_nat sz2) 8))
-      al2 >= (Coqlib_old.nat_of_Z (Coqlib_old.ZRdiv (Z_of_nat sz2) 8)))%nat as J8.
+  assert (RoundUpAlignment (Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz2) 8))
+      al2 >= (Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz2) 8)))%nat as J8.
     apply RoundUpAlignment_spec.
       eapply feasible_typ_inv' in H31; eauto.
       destruct H31 as [sz0 [al0 [J13 J14]]].
