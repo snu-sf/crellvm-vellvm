@@ -12,10 +12,13 @@ all: theories
 libs: lib/metalib-20090714
 	make -C lib/metalib-20090714
 
+compcert: libs lib/compcert-2.4
+	make -C lib/compcert-2.4
+
 depend: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
 	+$(MAKECOQ) depend
 
-theories: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
+theories: libs compcert Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
 	+$(MAKECOQ)
 
 Makefile.coq: Make
