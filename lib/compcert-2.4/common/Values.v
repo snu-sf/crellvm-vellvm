@@ -2307,36 +2307,52 @@ Proof.
   Val.simplify_op; try congruence.
 Qed.
 
-Lemma divu_isnt_ptr : forall wz i0 wz0 i1 b ofs,
-  Val.divu (Vint wz i0) (Vint wz0 i1) <> Some (Vptr b ofs).
+Lemma divu_isnt_ptr : forall wz i0 wz0 i1 v b ofs,
+  Val.divu (Vint wz i0) (Vint wz0 i1) = Some v ->
+  v <> Vptr b ofs.
 Proof.
   intros.
-  Val.simplify_op; try congruence.
-  destruct (Int.eq wz0 i1 (Int.zero wz0)) eqn:Heqn; congruence.
+  inv H; destruct (eq_nat_dec _ _); subst
+  ; try match goal with
+    | _: context[if ?s then _ else _] |- _ => destruct s end
+  ; subst; inv H1.
+  congruence.
 Qed.
 
-Lemma divs_isnt_ptr : forall wz i0 wz0 i1 b ofs,
-  Val.divs (Vint wz i0) (Vint wz0 i1) <> Some (Vptr b ofs).
+Lemma divs_isnt_ptr : forall wz i0 wz0 i1 v b ofs,
+  Val.divs (Vint wz i0) (Vint wz0 i1) = Some v ->
+  v <> Vptr b ofs.
 Proof.
   intros.
-  Val.simplify_op; try congruence.
-  destruct (Int.eq wz0 _ _ || Int.eq _ _ _ && Int.eq _ _ _ ); congruence.
+  inv H; destruct (eq_nat_dec _ _); subst
+  ; try match goal with
+    | _: context[if ?s then _ else _] |- _ => destruct s end
+  ; subst; inv H1.
+  congruence.
 Qed.
 
-Lemma modu_isnt_ptr : forall wz i0 wz0 i1 b ofs,
-  Val.modu (Vint wz i0) (Vint wz0 i1) <> Some (Vptr b ofs).
+Lemma modu_isnt_ptr : forall wz i0 wz0 i1 v b ofs,
+  Val.modu (Vint wz i0) (Vint wz0 i1) = Some v ->
+  v <> Vptr b ofs.
 Proof.
   intros.
-  Val.simplify_op; try congruence.
-  destruct (Int.eq _ _ _); congruence.
+  inv H; destruct (eq_nat_dec _ _); subst
+  ; try match goal with
+    | _: context[if ?s then _ else _] |- _ => destruct s end
+  ; subst; inv H1.
+  congruence.
 Qed.
 
-Lemma mods_isnt_ptr : forall wz i0 wz0 i1 b ofs,
-  Val.mods (Vint wz i0) (Vint wz0 i1) <> Some (Vptr b ofs).
+Lemma mods_isnt_ptr : forall wz i0 wz0 i1 v b ofs,
+  Val.mods (Vint wz i0) (Vint wz0 i1) = Some v ->
+  v <> Vptr b ofs.
 Proof.
   intros.
-  Val.simplify_op; try congruence.
-  destruct (Int.eq wz0 i1 _ || Int.eq _ _ _ && _); congruence.
+  inv H; destruct (eq_nat_dec _ _); subst
+  ; try match goal with
+    | _: context[if ?s then _ else _] |- _ => destruct s end
+  ; subst; inv H1.
+  congruence.
 Qed.
 
 Lemma shl_isnt_ptr : forall wz i0 wz0 i1 b ofs,
@@ -2347,12 +2363,16 @@ Proof.
   destruct (Int.ltu _ _ _); congruence.
 Qed.
 
-Lemma shrx_isnt_ptr : forall wz i0 wz0 i1 b ofs,
-  Val.shrx (Vint wz i0) (Vint wz0 i1) <> Some (Vptr b ofs).
+Lemma shrx_isnt_ptr : forall wz i0 wz0 i1 v b ofs,
+  Val.shrx (Vint wz i0) (Vint wz0 i1) = Some v ->
+  v <> Vptr b ofs.
 Proof.
   intros.
-  Val.simplify_op; try congruence.
-  destruct (Int.ltu _ _ _); congruence.
+  inv H; destruct (eq_nat_dec _ _); subst
+  ; try match goal with
+    | _: context[if ?s then _ else _] |- _ => destruct s end
+  ; subst; inv H1.
+  congruence.
 Qed.
 
 Lemma shr_isnt_ptr : forall wz i0 wz0 i1 b ofs,

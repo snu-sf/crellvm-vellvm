@@ -822,6 +822,31 @@ Proof.
   apply Val.load_result_type.
 Qed.
 
+Lemma decode_val_chunk:
+  forall chunk cl,
+  Val.has_chunk (decode_val chunk cl) chunk.
+Proof.
+  intros. unfold decode_val.
+  destruct chunk; simpl; auto. 
+
+    unfold decode_int.
+    destruct (proj_bytes cl); simpl.
+      split; auto.
+      apply Int.Z_mod_modulus_range.
+
+      destruct (eq_nat_dec _ _); simpl; auto.
+        unfold proj_value.
+        destruct cl; try solve [simpl; auto].
+          destruct m; try solve [simpl; auto].
+            destruct (check_value (size_quantity_nat Q32) v Q32
+                       (Fragment v q n0::cl)); simpl; auto.
+            destruct v; unfold Val.has_chunk; auto.
+            split; auto; apply Int.Z_mod_modulus_range.
+
+    destruct (proj_bytes cl); simpl; auto.
+    destruct (proj_bytes cl); simpl; auto.
+Qed.
+
 (* need? *)
 (*
 Lemma encode_val_int8_zero_ext:

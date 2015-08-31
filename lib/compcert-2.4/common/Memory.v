@@ -791,6 +791,15 @@ Proof.
   apply decode_val_type. 
 Qed.
 
+Theorem load_chunk:
+  forall m chunk b ofs v,
+  Mem.load chunk m b ofs = Some v ->
+  Val.has_chunk v chunk.
+Proof.
+  intros. exploit load_result; eauto; intros. rewrite H0.
+  apply decode_val_chunk.
+Qed.
+
 (* NOTE: not used
 Theorem load_cast:
   forall m chunk b ofs v,
