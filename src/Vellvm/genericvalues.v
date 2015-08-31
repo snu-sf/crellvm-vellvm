@@ -477,8 +477,8 @@ end.
 
 Definition mfbop (TD:TargetData) (op:fbop) (fp:floating_point)
   (gv1 gv2:GenericValue) : option GenericValue :=
-match (fp, GV2val TD gv1, GV2val TD gv2) with
-| (fp_double, Some (Vfloat f1), Some (Vfloat f2)) =>
+match (GV2val TD gv1, GV2val TD gv2) with
+| (Some (Vfloat f1), Some (Vfloat f2)) =>
   let v :=
      match op with
      | fbop_fadd => Val.addf (Vfloat f1) (Vfloat f2)
@@ -487,8 +487,11 @@ match (fp, GV2val TD gv1, GV2val TD gv2) with
      | fbop_fdiv => Val.divf (Vfloat f1) (Vfloat f2)
      | fbop_frem => Val.modf (Vfloat f1) (Vfloat f2)
      end in
-  Some (val2GV TD v Mfloat64)
-| (fp_single, Some (Vsingle f1), Some (Vsingle f2)) =>
+  match fp with
+  | fp_double => Some (val2GV TD v Mfloat64)
+  | _ => None
+  end
+| (Some (Vsingle f1), Some (Vsingle f2)) =>
   let v :=
      match op with
      | fbop_fadd => Val.addfs (Vsingle f1) (Vsingle f2)
@@ -497,7 +500,10 @@ match (fp, GV2val TD gv1, GV2val TD gv2) with
      | fbop_fdiv => Val.divfs (Vsingle f1) (Vsingle f2)
      | fbop_frem => Val.modfs (Vsingle f1) (Vsingle f2)
      end in
-  Some (val2GV TD v Mfloat32)
+  match fp with
+  | fp_float => Some (val2GV TD v Mfloat32)
+  | _ => None
+  end
 | _ => gundef TD (typ_floatpoint fp)
 end.
 
