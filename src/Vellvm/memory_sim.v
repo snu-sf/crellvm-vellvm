@@ -34,7 +34,7 @@ Inductive val_inject (mi: meminj): val -> val -> Prop :=
       forall i, val_inject mi (Vinttoptr i) (Vinttoptr i)
   | val_inject_undef: val_inject mi Vundef Vundef.
 
-Hint Resolve val_inject_int val_inject_float val_inject_ptr val_inject_inttoptr 
+Hint Resolve val_inject_int val_inject_float val_inject_single val_inject_ptr val_inject_inttoptr 
              val_inject_undef.
 
 Inductive val_list_inject (mi: meminj): list val -> list val-> Prop:= 
@@ -93,7 +93,7 @@ Lemma val_inject_incr:
   val_inject f1 v v' ->
   val_inject f2 v v'.
 Proof.
-  intros. inv H0; eauto. constructor.
+  intros. inv H0; eauto.
 Qed.
 
 Lemma val_list_inject_incr:
