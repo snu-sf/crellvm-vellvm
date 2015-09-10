@@ -1,3 +1,4 @@
+Require Import Program.
 Require Import syntax.
 Require Import infrastructure.
 Require Import List.
@@ -300,9 +301,9 @@ Proof. intros. inv H; auto. Qed.
 
 Definition const2GV_isnt_stuck_Prop S TD c t :=
   wf_const S TD c t ->
-  forall m gl (Hty: uniq (snd TD)),
+  forall gl (Hty: uniq (snd TD)),
   wf_global TD S gl ->
-  exists gv, _const2GV m TD gl c = Some (gv, t).
+  exists gv, _const2GV TD gl c = Some (gv, t).
 
 Definition consts2GV_isnt_stuck_Prop sdct :=
   wf_const_list sdct ->
@@ -310,12 +311,73 @@ Definition consts2GV_isnt_stuck_Prop sdct :=
   let '(lsdc, lt) := split lsdct in
   let '(lsd, lc) := split lsdc in
   let '(ls, ld) := split lsd in
-  forall m S TD gl (Hty: uniq (snd TD)), 
+  forall S TD gl (Hty: uniq (snd TD)), 
   wf_list_targetdata_typ S TD gl lsd ->
   (forall t, (forall t0, In t0 lt -> t0 = t) ->
-    exists gv, _list_const_arr2GV m TD gl t lc = Some gv) /\
-  (exists gv, _list_const_struct2GV m TD gl lc = 
+    exists gv, _list_const_arr2GV TD gl t lc = Some gv) /\
+  (exists gv, _list_const_struct2GV TD gl lc = 
     Some (gv, lt)).
+
+Lemma gv2val_vfloat_float_false:
+  forall S TD gl c gv f
+    (WF: wf_const S TD c (typ_floatpoint fp_float))
+    (TY: _const2GV TD gl c = ret (gv, typ_floatpoint fp_float))
+    (VS: GV2val TD gv = ret Vfloat f),
+    False.
+Proof. admit. Qed.
+
+Lemma gv2val_vsingle_double_false:
+  forall S TD gl c gv f
+    (WF: wf_const S TD c (typ_floatpoint fp_double))
+    (TY: _const2GV TD gl c = ret (gv, typ_floatpoint fp_double))
+    (VS: GV2val TD gv = ret Vsingle f),
+    False.
+Proof.
+  intros.
+  destruct gv; inversion VS.
+  destruct p; destruct gv; inv VS. admit.
+  (*
+    induction c; dependent destruction TY; simpl in x.
+    - (* const_zeroinitializer *)
+      dependent destruction WF.
+      unfold zeroconst2GV, zeroconst2GV_aux in x.
+      destruct targetdata5; simpl in x.
+      dependent destruction x.
+    - (* const_floatpoint *)
+      destruct floating_point5; inv x.
+    - (* const_undef *)
+      unfold gundef in x;
+      destruct (flatten_typ _ _) in x; dependent destruction x;
+      destruct l0; inv x.
+    - (* const_arr *)
+      destruct (_list_const_arr2GV_ _ _ _ _ _) in x; dependent destruction x.
+      destruct (length _) in x; dependent destruction x.
+    - (* const_struct *)
+      dependent destruction WF.
+    - (* const_gid *)
+      destruct (lookupAL _ _ _) in x; dependent destruction x.
+    - (* const_truncop *)
+      dependent destruction WF.
+      destruct (_const2GV _ _ _) in x; dependent destruction x.
+      destruct p; subst.
+      unfold mtrunc in x.
+      destruct (GV2val _ _) in x.
+        Focus 2.
+          unfold gundef, mc2undefs, flatten_typ, flatten_typ_aux in x;
+          destruct targetdata5; simpl in x;
+          dependent destruction x.
+
+        destruct v; simpl in x.
+          unfold gundef, mc2undefs, flatten_typ, flatten_typ_aux in x;
+          destruct targetdata5; simpl in x;
+          dependent destruction x.
+
+          destruct t; unfold gundef, mc2undefs, flatten_typ, flatten_typ_aux in x;
+          destruct targetdata5; simpl in x;
+          dependent destruction x.
+
+*)
+  Qed.
 
 Lemma const2GV_isnt_stuck_mutind : 
   (forall S td c t, @const2GV_isnt_stuck_Prop S td c t) /\
@@ -342,13 +404,13 @@ Case "wfconst_array".
   simpl_split lsdc lt.
   simpl_split lsd lc.
   simpl_split ls ld.
-  destruct (@H0 m system5 targetdata5 gl) as [J1 [gv2 J2]]; 
+  destruct (@H0 system5 targetdata5 gl) as [J1 [gv2 J2]]; 
     try solve [destruct targetdata5; eauto using const2GV_typsize_mutind_array].
     assert (lc = const_list) as EQ.
       eapply make_list_const_spec2; eauto.
     rewrite H1. rewrite <- EQ. unfold Size.to_nat in *. 
     destruct (@J1 typ5) as [gv1 J3]; eauto using make_list_const_spec4.
-    fold (_list_const_arr2GV m). rewrite J3.
+    fold _list_const_arr2GV. rewrite J3.
     destruct sz5; eauto.
 
 Case "wfconst_struct".
@@ -356,12 +418,12 @@ Case "wfconst_struct".
   simpl_split lsd lc.
   simpl_split ls ld.
   erewrite <- map_list_const_typ_spec1 in H2; eauto.
-  destruct (@H0 m system5 (layouts5, namedts5) gl) as [_ [gv2 J2]]; 
+  destruct (@H0 system5 (layouts5, namedts5) gl) as [_ [gv2 J2]]; 
     try solve [eauto using const2GV_typsize_mutind_struct |
                eapply typ_eq_list_typ_spec1; eauto |
                eapply typ_eq_list_typ_spec1'; eauto].
     erewrite <- map_list_const_typ_spec2; eauto.
-    fold (_list_const_struct2GV m). repeat fill_ctxhole.
+    fold _list_const_struct2GV. repeat fill_ctxhole.
     destruct gv2; eauto.
 
 Case "wfconst_gid".
@@ -374,7 +436,7 @@ Case "wfconst_gid".
 Case "wfconst_trunc_int".
   match goal with
   | H4: wf_global _ _ _ |- _ => 
-    eapply (H0 m) in H4; eauto; destruct H4 as [gv H4]; fill_ctxhole
+    eapply H0 in H4; eauto; destruct H4 as [gv H4]; fill_ctxhole
   end.
   unfold mtrunc.
   assert (exists gv, gundef targetdata5 (typ_int sz2) = Some gv) as J.
@@ -384,21 +446,22 @@ Case "wfconst_trunc_int".
 Case "wfconst_trunc_fp".
   match goal with
   | H4: wf_global _ _ _ |- _ =>
-    eapply (H0 m) in H4; eauto; destruct H4 as [gv H4]; fill_ctxhole
+    eapply H0 in H4; eauto; destruct H4 as [gv H4]; fill_ctxhole
   end.
   unfold mtrunc. rewrite H1.
   assert (exists gv, gundef targetdata5 (typ_floatpoint floating_point2) = 
            Some gv) as J.
     eapply gundef__total; eauto.
   fill_ctxhole.
-  destruct (GV2val targetdata5 gv) as [[]|]; eauto.
+  destruct (GV2val targetdata5 gv) as [[]|] eqn:GVeqn; eauto.
   destruct floating_point1; try solve [eauto | elim_wrong_wf_typ].
-  admit. (* TODO: not true *)
-
+  destruct floating_point1; elim_wrong_wf_typ.
+  exfalso;
+  eapply gv2val_vsingle_double_false; eauto.
 Case "wfconst_zext".
   match goal with
   | H4: wf_global _ _ _ |- _ => 
-    eapply (H0 m) in H4; eauto; destruct H4 as [gv H4]; fill_ctxhole
+    eapply H0 in H4; eauto; destruct H4 as [gv H4]; fill_ctxhole
   end.
   unfold mext.
   assert (exists gv, gundef targetdata5 (typ_int sz2) = Some gv) as J.
@@ -408,7 +471,7 @@ Case "wfconst_zext".
 Case "wfconst_sext".
   match goal with
   | H4: wf_global _ _ _ |- _ => 
-    eapply (H0 m) in H4; eauto; destruct H4 as [gv H4]; fill_ctxhole
+    eapply H0 in H4; eauto; destruct H4 as [gv H4]; fill_ctxhole
   end.
   unfold mext.
   assert (exists gv, gundef targetdata5 (typ_int sz2) = Some gv) as J.
@@ -418,7 +481,7 @@ Case "wfconst_sext".
 Case "wfconst_fpext".
   match goal with
   | H4: wf_global _ _ _ |- _ => 
-    eapply (H0 m) in H4; eauto; destruct H4 as [gv H4]; fill_ctxhole
+    eapply H0 in H4; eauto; destruct H4 as [gv H4]; fill_ctxhole
   end.
   unfold mext.
   assert (exists gv, gundef targetdata5 (typ_floatpoint floating_point2) = 
@@ -430,7 +493,7 @@ Case "wfconst_fpext".
 Case "wfconst_ptrtoint".
   match goal with
   | H4: wf_global _ _ _ |- _ => 
-    eapply (H0 m) in H4; eauto; destruct H4 as [gv H4]; fill_ctxhole
+    eapply H0 in H4; eauto; destruct H4 as [gv H4]; fill_ctxhole
   end.
   assert (exists gv, gundef targetdata5 (typ_int sz5) = Some gv) as J.
     eapply gundef__total; eauto.
@@ -438,7 +501,7 @@ Case "wfconst_ptrtoint".
 Case "wfconst_inttoptr".
   match goal with
   | H4: wf_global _ _ _ |- _ => 
-    eapply (H0 m) in H4; eauto; destruct H4 as [gv H4]; fill_ctxhole
+    eapply H0 in H4; eauto; destruct H4 as [gv H4]; fill_ctxhole
   end.
   assert (exists gv, gundef targetdata5 (typ_pointer typ5) = Some gv) as J.
     eapply gundef__total; eauto.
@@ -447,11 +510,11 @@ Case "wfconst_bitcast".
   unfold mbitcast.
   match goal with
   | H4: wf_global _ _ _ |- _ => 
-    eapply (H0 m) in H4; eauto; destruct H4 as [gv H4]; fill_ctxhole
+    eapply H0 in H4; eauto; destruct H4 as [gv H4]; fill_ctxhole
   end. eauto.
 Case "wfconst_gep".
   (*clear H0.*)
-  eapply (H0 m) in H7; eauto; simpl; auto.
+  eapply H0 in H7; eauto; simpl; auto.
   destruct H7 as [gv H7]. repeat fill_ctxhole.
   assert (exists gv, gundef targetdata5 typ' = Some gv) as J.
     eapply gundef__total; eauto.
@@ -575,21 +638,21 @@ Case "wfconst_fbop".
   destruct J as [gv' J].
   rewrite J.
   unfold mfbop. rewrite JJ.
-  destruct (GV2val targetdata5 gv); eauto.
-  destruct (GV2val targetdata5 gv'); eauto.
+  destruct (GV2val targetdata5 gv) eqn:GV1; eauto.
+  destruct (GV2val targetdata5 gv') eqn:GV2; eauto.
   destruct v; eauto.
   destruct v0; eauto.
   destruct floating_point5; try solve [eauto | elim_wrong_wf_typ].
-  admit. (* TODO: not true *)
+  exfalso; eapply gv2val_vfloat_float_false; eauto.
   destruct v0; eauto.
   destruct floating_point5; try solve [eauto | elim_wrong_wf_typ].
-  admit. (* TODO: not true *)
+  exfalso; eapply gv2val_vsingle_double_false; eauto.
   destruct v; eauto.
 Case "wfconst_cons".
   simpl_split lsdc lt. simpl.
   simpl_split lsd lc. simpl.
   simpl_split ls ld. simpl.
-  intros m S TD gl Huniq Hwfl.
+  intros S TD gl Huniq Hwfl.
   assert (wf_list_targetdata_typ S TD gl lsd /\ system5 = S /\ targetdata5 = TD
             /\ wf_global TD S gl) 
     as Hwfl'.
@@ -660,12 +723,12 @@ Proof.
   admit. (* TODO: not true *)  
 Qed.
 
-Lemma micmp_is_total : forall S m TD c t
+Lemma micmp_is_total : forall S TD c t
   (Hztyp: wf_typ S TD t), 
   Typ.isIntOrIntVector t \/ isPointerTyp t ->
-  forall x y, exists z, micmp m TD c t x y = Some z.
+  forall x y, exists z, micmp TD c t x y = Some z.
 Proof.
-  intros S m TD c t Hty Hwft x y.
+  intros S TD c t Hty Hwft x y.
   unfold micmp, micmp_int.
   unfold isPointerTyp in Hwft. unfold is_true in Hwft.
   unfold micmp_int.
@@ -990,7 +1053,7 @@ Lemma zeroconst2GV_for_namedts_cons : forall TD los nm1 nm2,
       re ++ zeroconst2GV_for_namedts TD los nm1.
 Proof.
   induction nm2 as [|[]]; simpl.
-    exists nil. auto.
+  eexists nil; auto.
 
     destruct IHnm2 as [re IHnm2].
     rewrite IHnm2.
@@ -1174,7 +1237,7 @@ Proof.
   unfold zeroconst2GV in *. inv Ht.
   destruct zeroconst2GV_aux_typsize_mutrec as [J' _].
   assert (exists nts0 : list namedt, nts = nts0 ++ nts) as G'.
-    exists nil. auto.
+    eexists nil; auto.
   eapply J'; eauto.
   intros id5 gv5 lt5 sz0 al0 J4 J5 J6.
   apply lookupAL_middle_inv in J5.
@@ -1370,7 +1433,7 @@ Lemma flatten_typ_for_namedts_cons : forall TD los nm1 nm2,
       re ++ flatten_typ_for_namedts TD los nm1.
 Proof.
   induction nm2 as [|[]]; simpl.
-    exists nil. auto.
+    eexists nil; auto.
 
     destruct IHnm2 as [re IHnm2].
     rewrite IHnm2.
@@ -1554,7 +1617,7 @@ Proof.
   unfold flatten_typ in *. inv Ht.
   destruct flatten_typ_aux_typsize_mutrec as [J' _].
   assert (exists nts0 : list namedt, nts = nts0 ++ nts) as G'.
-    exists nil. auto.
+    eexists nil; auto.
   eapply J'; eauto.
   intros id5 gv5 lt5 sz0 al0 J4 J5 J6.
   apply lookupAL_middle_inv in J5.
@@ -1847,8 +1910,8 @@ Qed.
 
 Definition const2GV__getTypeSizeInBits_Prop S TD c t :=
   wf_const S TD c t ->
-  forall m los nts gl gv t'
-  (Heq: TD = (los, nts)) (Hc2g: _const2GV m (los,nts) gl c = Some (gv, t'))
+  forall los nts gl gv t'
+  (Heq: TD = (los, nts)) (Hc2g: _const2GV (los,nts) gl c = Some (gv, t'))
   (Hwfg: wf_global TD S gl),
   t = t' /\
   exists sz, exists al,
@@ -1863,16 +1926,16 @@ Definition consts2GV__getTypeSizeInBits_Prop sdct :=
   let '(lsdc, lt) := split lsdct in
   let '(lsd, lc) := split lsdc in
   let '(ls, ld) := split lsd in
-  forall m S TD los nts gl (Heq: TD = (los, nts))
+  forall S TD los nts gl (Heq: TD = (los, nts))
   (Hwf: wf_list_targetdata_typ S TD gl lsd),
   (forall gv t (Hft: feasible_typ TD t)
     (Heq: forall t0, In t0 lt -> t0 = t)
-    (Hc2g: _list_const_arr2GV m TD gl t lc = Some gv),
+    (Hc2g: _list_const_arr2GV TD gl t lc = Some gv),
    exists sz, 
     getTypeAllocSize TD t = Some sz /\
     (sz * length lc)%nat = sizeGenericValue gv) /\
   (forall gv lt'
-   (Hc2g: _list_const_struct2GV m TD gl lc = Some (gv, lt')),
+   (Hc2g: _list_const_struct2GV TD gl lc = Some (gv, lt')),
    lt' = lt /\
    exists sz, exists al,
     _getListTypeSizeInBits_and_Alignment los 
@@ -1925,7 +1988,7 @@ Case "wfconst_null".
 
 Case "wfconst_array". Focus.
   fold _list_const_arr2GV in *.
-  remember (_list_const_arr2GV_ (_const2GV m) (los, nts) gl typ5 const_list) as R.
+  remember (_list_const_arr2GV (los, nts) gl typ5 const_list) as R.
   destruct R; inv Hc2g.
   simpl_split lsdc lt.
   simpl_split lsd lc.
@@ -1937,7 +2000,7 @@ Case "wfconst_array". Focus.
     split; auto.
 
     split; auto.
-    destruct (@H0 m system5 (los,nts) los nts gl) as [J1 J2]; 
+    destruct (@H0 system5 (los,nts) los nts gl) as [J1 J2]; 
       eauto using const2GV_typsize_mutind_array.
     symmetry in HeqR.
     assert (lc = const_list) as EQ.
@@ -1975,7 +2038,7 @@ Case "wfconst_struct". Focus.
     inv Hc2g
   end.
   uniq_result.
-  destruct (@H0 m system5 (los,nts) los nts gl) as [J1 J2]; 
+  destruct (@H0 system5 (los,nts) los nts gl) as [J1 J2]; 
     eauto using const2GV_typsize_mutind_struct.
 
   symmetry in HeqR2.
@@ -2069,7 +2132,7 @@ Case "wfconst_bitcast". Focus.
   destruct Hwfg; eauto.
 
 Case "wfconst_gep". Focus.
-  remember (_const2GV m (los, nts) gl const_5) as R1.
+  remember (_const2GV (los, nts) gl const_5) as R1.
   destruct R1 as [[]|]; tinv Hc2g.
   destruct t; tinv Hc2g.
   symmetry in HeqR1.
@@ -2113,28 +2176,28 @@ Case "wfconst_gep". Focus.
         auto.
 
 Case "wfconst_select". Focus.
-  remember (_const2GV m (los, nts) gl const0) as R0.
-  remember (_const2GV m (los, nts) gl const1) as R1.
-  remember (_const2GV m (los, nts) gl const2) as R2.
+  remember (_const2GV (los, nts) gl const0) as R0.
+  remember (_const2GV (los, nts) gl const1) as R1.
+  remember (_const2GV (los, nts) gl const2) as R2.
   destruct R0 as [[gv0 t0]|]; tinv Hc2g.
   destruct R1 as [[gv1 t1]|]; tinv Hc2g.
   destruct R2 as [[gv2 t2]|]; tinv Hc2g.
   destruct (isGVZero (los, nts) gv0); inv Hc2g; eauto.
 
 Case "wfconst_icmp". Focus.
-  remember (_const2GV m (los, nts) gl const1) as R1.
-  remember (_const2GV m (los, nts) gl const2) as R2.
+  remember (_const2GV (los, nts) gl const1) as R1.
+  remember (_const2GV (los, nts) gl const2) as R2.
   destruct R1 as [[gv1 t1]|]; tinv Hc2g.
   destruct R2 as [[gv2 t2]|]; tinv Hc2g.
-  remember (micmp m (los, nts) cond5 t1 gv1 gv2) as R3.
+  remember (micmp (los, nts) cond5 t1 gv1 gv2) as R3.
   destruct R3; inv Hc2g; eauto.
   split; auto.
     symmetry in HeqR3.
     eapply micmp_typsize in HeqR3; try solve [eauto | constructor; auto].
 
 Case "wfconst_fcmp". Focus.
-  remember (_const2GV m (los, nts) gl const1) as R1.
-  remember (_const2GV m (los, nts) gl const2) as R2.
+  remember (_const2GV (los, nts) gl const1) as R1.
+  remember (_const2GV (los, nts) gl const2) as R2.
   destruct R1 as [[gv1 t1]|]; tinv Hc2g.
   destruct_typ t1; tinv Hc2g.
   destruct R2 as [[gv2 t2]|]; tinv Hc2g.
@@ -2145,7 +2208,7 @@ Case "wfconst_fcmp". Focus.
     eapply mfcmp_typsize in HeqR3; try solve [eauto | constructor; auto]. 
 
 Case "wfconst_extractvalue". Focus.
-  remember (_const2GV m (los, nts) gl const_5) as R1.
+  remember (_const2GV (los, nts) gl const_5) as R1.
   destruct R1 as [[gv1 t1]|]; tinv Hc2g.
   remember (getSubTypFromConstIdxs const_list t1) as R2.
   destruct R2 as [t2|]; tinv Hc2g.
@@ -2163,9 +2226,9 @@ Case "wfconst_extractvalue". Focus.
 
 Case "wfconst_insertvalue". Focus.
   clear H1.
-  remember (_const2GV m (los, nts) gl const_5) as R1.
+  remember (_const2GV (los, nts) gl const_5) as R1.
   destruct R1 as [[gv1 t1]|]; tinv Hc2g.
-  remember (_const2GV m (los, nts) gl const') as R2.
+  remember (_const2GV (los, nts) gl const') as R2.
   destruct R2 as [[gv2 t2]|]; tinv Hc2g.
   remember (insertGenericValue (los, nts) t1 gv1 const_list t2 gv2) as R3.
   destruct R3 as [gv3|]; inv Hc2g.
@@ -2184,8 +2247,8 @@ Case "wfconst_insertvalue". Focus.
       rewrite <- HeqR3. auto.
 
 Case "wfconst_bop". Focus.
-  remember (_const2GV m (los, nts) gl const1) as R1.
-  remember (_const2GV m (los, nts) gl const2) as R2.
+  remember (_const2GV (los, nts) gl const1) as R1.
+  remember (_const2GV (los, nts) gl const2) as R2.
   destruct R1 as [[gv1 t1]|]; tinv Hc2g.
   destruct_typ t1; tinv Hc2g.
   destruct R2 as [[gv2 t2]|]; tinv Hc2g.
@@ -2200,8 +2263,8 @@ Case "wfconst_bop". Focus.
 
 
 Case "wfconst_fbop". Focus.
-  remember (_const2GV m (los, nts) gl const1) as R1.
-  remember (_const2GV m (los, nts) gl const2) as R2.
+  remember (_const2GV (los, nts) gl const1) as R1.
+  remember (_const2GV (los, nts) gl const2) as R2.
   destruct R1 as [[gv1 t1]|]; tinv Hc2g.
   destruct_typ t1; tinv Hc2g.
   destruct R2 as [[gv2 t2]|]; tinv Hc2g.
@@ -2229,12 +2292,12 @@ Case "wfconst_cons".
   simpl_split lsdc lt. simpl.
   simpl_split lsd lc. simpl.
   simpl_split ls ld. simpl.
-  intros m S TD los nts gl EQ Hwfl; subst.
+  intros S TD los nts gl EQ Hwfl; subst.
   split.
     intros gv t Hft Hin Hc2g.
-    remember (_list_const_arr2GV m (los, nts) gl t lc) as R.
+    remember (_list_const_arr2GV (los, nts) gl t lc) as R.
     destruct R; try solve [inv Hc2g].
-    remember (_const2GV m (los, nts) gl const_) as R'.
+    remember (_const2GV (los, nts) gl const_) as R'.
     destruct R' as [[gv0 t0]|]; try solve [inv Hc2g].
     destruct (typ_dec t t0); subst; try solve [inv Hc2g].
     remember (getTypeAllocSize (los, nts) t0) as R1.
@@ -2262,9 +2325,9 @@ Case "wfconst_cons".
     ring.
 
     intros gv lt' Hc2g.
-    remember (_list_const_struct2GV m (los, nts) gl lc) as R.
+    remember (_list_const_struct2GV (los, nts) gl lc) as R.
     destruct R as [[gv1 ts1]|]; try solve [inv Hc2g].
-    remember (_const2GV m (los, nts) gl const_) as R'.
+    remember (_const2GV (los, nts) gl const_) as R'.
     destruct R' as [[gv0 t0]|]; try solve [inv Hc2g].
     remember (getTypeAllocSize (los, nts) t0) as R1.
     destruct R1; inv Hc2g.
@@ -2298,9 +2361,9 @@ Case "wfconst_cons".
 Transparent zeroconst2GV.
 Qed.
 
-Lemma const2GV__getTypeSizeInBits_aux : forall m S los nts c t gl gv t',
+Lemma const2GV__getTypeSizeInBits_aux : forall S los nts c t gl gv t',
   wf_const S (los, nts) c t ->
-  _const2GV m (los, nts) gl c = Some (gv, t') ->
+  _const2GV (los, nts) gl c = Some (gv, t') ->
   wf_global (los, nts) S gl ->
   t = t' /\
   exists sz, exists al,
@@ -2350,9 +2413,9 @@ Proof.
   simpl. eapply cundef_gv__getTypeSizeInBits; eauto.
 Qed.
 
-Lemma const2GV__getTypeSizeInBits : forall m S los nts c t gl gv
+Lemma const2GV__getTypeSizeInBits : forall S los nts c t gl gv
   (H1: wf_const S (los, nts) c t)
-  (H2: const2GV m (los, nts) gl c = Some gv),
+  (H2: const2GV (los, nts) gl c = Some gv),
   wf_global (los, nts) S gl ->
   exists sz, 
     getTypeSizeInBits (los, nts) t = Some sz /\
@@ -2360,7 +2423,7 @@ Lemma const2GV__getTypeSizeInBits : forall m S los nts c t gl gv
 Proof.
   intros.
   unfold const2GV in H2.
-  remember (_const2GV m (los, nts) gl c) as R.
+  remember (_const2GV (los, nts) gl c) as R.
   destruct R as [[]|]; inv H2.
   symmetry in HeqR.
   unfold getTypeSizeInBits, getTypeSizeInBits_and_Alignment.
@@ -2730,7 +2793,7 @@ Proof.
   unfold zeroconst2GV in *. inv Ht.
   destruct zeroconst2GV_aux_matches_chunks_mutrec as [J' _].
   assert (exists nts0 : list namedt, nts = nts0 ++ nts) as G'.
-    exists nil. auto.
+    eexists nil; auto.
   eapply J'; eauto.
   intros id5 gv5 lt5 J5 J6.
   apply lookupAL_middle_inv in J5.
@@ -2991,8 +3054,8 @@ Qed.
 
 Definition const2GV__matches_chunks_Prop S TD c t :=
   wf_const S TD c t ->
-  forall m gl gv t',
-  _const2GV m TD gl c = Some (gv, t') ->
+  forall gl gv t',
+  _const2GV TD gl c = Some (gv, t') ->
   wf_global TD S gl ->
   t = t' /\ gv_chunks_match_typ TD gv t.
 
@@ -3002,17 +3065,17 @@ Definition consts2GV__matches_chunks_Prop sdct :=
   let '(lsdc, lt) := split lsdct in
   let '(lsd, lc) := split lsdc in
   let '(ls, ld) := split lsd in
-  forall m S TD gl, 
+  forall S TD gl, 
   wf_list_targetdata_typ S TD gl lsd ->
   (forall gv t, 
     (forall t0, In t0 lt -> t0 = t) ->
-   _list_const_arr2GV m TD gl t lc = Some gv ->
+   _list_const_arr2GV TD gl t lc = Some gv ->
    match (length lc) with
    | S _ => gv_chunks_match_typ TD gv (typ_array (length lc) t)
    | _ => Forall2 vm_matches_typ gv nil
    end) /\
   (forall gv lt', 
-   _list_const_struct2GV m TD gl lc = Some (gv, lt') ->
+   _list_const_struct2GV TD gl lc = Some (gv, lt') ->
    lt' = lt /\
    gv_chunks_match_list_typ TD gv lt').
 
@@ -3084,7 +3147,7 @@ Case "wfconst_array". Focus.
       constructor; auto. split; auto. split; auto.
 
     split; auto.
-    destruct (@H0 m system5 targetdata5 gl) as [J1 J2]; try solve 
+    destruct (@H0 system5 targetdata5 gl) as [J1 J2]; try solve 
       [destruct targetdata5; eauto using const2GV_typsize_mutind_array].
     symmetry in HeqR.
     assert (lc = const_list) as EQ.
@@ -3108,7 +3171,7 @@ Case "wfconst_struct". Focus.
     destruct R1 as [[gv0 ts]|];
     inv H5
   end.
-  destruct (@H0 m system5 (layouts5, namedts5) gl) as [J1 J2];
+  destruct (@H0 system5 (layouts5, namedts5) gl) as [J1 J2];
     eauto using const2GV_typsize_mutind_struct.
 
   symmetry in HeqR2.
@@ -3180,7 +3243,7 @@ Case "wfconst_gid".
     uniq_result. auto.
 
 Case "wfconst_trunc_int". Focus.
-  destruct (_const2GV m targetdata5 gl const5) as [[]|]; inv H4.
+  destruct (_const2GV targetdata5 gl const5) as [[]|]; inv H4.
   remember (mtrunc targetdata5 truncop_int t (typ_int sz2) g) as R.
   destruct R; inv H7.
   split; auto.
@@ -3188,7 +3251,7 @@ Case "wfconst_trunc_int". Focus.
    eapply mtrunc_matches_chunks in HeqR; try solve [eauto | constructor; auto].
 
 Case "wfconst_trunc_fp". Focus.
-  destruct (_const2GV m targetdata5 gl const5) as [[]|]; inv H4.
+  destruct (_const2GV targetdata5 gl const5) as [[]|]; inv H4.
   remember (mtrunc targetdata5 truncop_int t (typ_floatpoint floating_point2) g) 
     as R.
   destruct R; inv H7.
@@ -3197,7 +3260,7 @@ Case "wfconst_trunc_fp". Focus.
    eapply mtrunc_matches_chunks in HeqR; try solve [eauto | constructor; auto].
 
 Case "wfconst_zext". Focus.
-  destruct (_const2GV m targetdata5 gl const5) as [[]|]; inv H4.
+  destruct (_const2GV targetdata5 gl const5) as [[]|]; inv H4.
   remember (mext targetdata5 extop_z t (typ_int sz2) g) as R.
   destruct R; inv H7.
   split; auto.
@@ -3205,7 +3268,7 @@ Case "wfconst_zext". Focus.
     eapply mext_matches_chunks in HeqR; try solve [eauto | constructor; auto].
 
 Case "wfconst_sext".  Focus.
-  destruct (_const2GV m targetdata5 gl const5) as [[]|]; inv H4.
+  destruct (_const2GV targetdata5 gl const5) as [[]|]; inv H4.
   remember (mext targetdata5 extop_s t (typ_int sz2) g) as R.
   destruct R; inv H7.
   split; auto.
@@ -3213,7 +3276,7 @@ Case "wfconst_sext".  Focus.
     eapply mext_matches_chunks in HeqR; try solve [eauto | constructor; auto].
 
 Case "wfconst_fpext".  Focus.
-  destruct (_const2GV m targetdata5 gl const5) as [[]|]; inv H4.
+  destruct (_const2GV targetdata5 gl const5) as [[]|]; inv H4.
   remember (mext targetdata5 extop_fp t (typ_floatpoint floating_point2) g) as R.
   destruct R; inv H7.
   split; auto.
@@ -3222,20 +3285,20 @@ Case "wfconst_fpext".  Focus.
 
 Case "wfconst_ptrtoint". Focus.
   destruct targetdata5. 
-  destruct (_const2GV m (l0, l1) gl const5) as [[]|]; inv H3.
+  destruct (_const2GV (l0, l1) gl const5) as [[]|]; inv H3.
   split; auto.
     unfold gv_chunks_match_typ, vm_matches_typ. simpl. 
     constructor; auto. split; auto.  split; auto.
 
 Case "wfconst_inttoptr". Focus.
   destruct targetdata5. 
-  destruct (_const2GV m (l0, l1) gl const5) as [[]|]; inv H3.
+  destruct (_const2GV (l0, l1) gl const5) as [[]|]; inv H3.
   split; auto.
     unfold gv_chunks_match_typ, vm_matches_typ. simpl. 
     constructor; auto. split; auto.  split; auto.
 
 Case "wfconst_bitcast". Focus.
-  remember (_const2GV m targetdata5 gl const5) as R1.
+  remember (_const2GV targetdata5 gl const5) as R1.
   destruct R1 as [[]|]; inv H3.
   remember (mbitcast t g (typ_pointer typ2)) as R.
   destruct R; inv H6.
@@ -3245,7 +3308,7 @@ Case "wfconst_bitcast". Focus.
   destruct H4; eauto.
 
 Case "wfconst_gep". Focus.
-  remember (_const2GV m targetdata5 gl const_5) as R1.
+  remember (_const2GV targetdata5 gl const_5) as R1.
   destruct R1 as [[]|]; tinv H7.
   destruct t; tinv H7.
   symmetry in HeqR1.
@@ -3285,28 +3348,28 @@ Case "wfconst_gep". Focus.
           simpl. eapply mgep_has_chunk; eauto.
 
 Case "wfconst_select". Focus.
-  remember (_const2GV m targetdata5 gl const0) as R0.
-  remember (_const2GV m targetdata5 gl const1) as R1.
-  remember (_const2GV m targetdata5 gl const2) as R2.
+  remember (_const2GV targetdata5 gl const0) as R0.
+  remember (_const2GV targetdata5 gl const1) as R1.
+  remember (_const2GV targetdata5 gl const2) as R2.
   destruct R0 as [[gv0 t0]|]; tinv H8.
   destruct R1 as [[gv1 t1]|]; tinv H8.
   destruct R2 as [[gv2 t2]|]; tinv H8.
   destruct (isGVZero targetdata5 gv0); inv H8; eauto.
 
 Case "wfconst_icmp". Focus.
-  remember (_const2GV m targetdata5 gl const1) as R1.
-  remember (_const2GV m targetdata5 gl const2) as R2.
+  remember (_const2GV targetdata5 gl const1) as R1.
+  remember (_const2GV targetdata5 gl const2) as R2.
   destruct R1 as [[gv1 t1]|]; tinv H7.
   destruct R2 as [[gv2 t2]|]; tinv H7.
-  remember (micmp m targetdata5 cond5 t1 gv1 gv2) as R3.
+  remember (micmp targetdata5 cond5 t1 gv1 gv2) as R3.
   destruct R3; inv H7; eauto.
   split; auto.
     symmetry in HeqR3.
     eapply micmp_matches_chunks in HeqR3; try solve [eauto | constructor; auto].
 
 Case "wfconst_fcmp". Focus.
-  remember (_const2GV m targetdata5 gl const1) as R1.
-  remember (_const2GV m targetdata5 gl const2) as R2.
+  remember (_const2GV targetdata5 gl const1) as R1.
+  remember (_const2GV targetdata5 gl const2) as R2.
   destruct R1 as [[gv1 t1]|]; tinv H7.
   destruct_typ t1; tinv H7.
   destruct R2 as [[gv2 t2]|]; tinv H7.
@@ -3317,7 +3380,7 @@ Case "wfconst_fcmp". Focus.
     eapply mfcmp_matches_chunks in HeqR3; try solve [eauto | constructor; auto]. 
 
 Case "wfconst_extractvalue". Focus.
-  remember (_const2GV m targetdata5 gl const_5) as R1.
+  remember (_const2GV targetdata5 gl const_5) as R1.
   destruct R1 as [[gv1 t1]|]; tinv H8.
   remember (getSubTypFromConstIdxs const_list t1) as R2.
   destruct R2 as [t2|]; tinv H8.
@@ -3336,9 +3399,9 @@ Case "wfconst_extractvalue". Focus.
 
 
 Case "wfconst_insertvalue". Focus.
-  remember (_const2GV m targetdata5 gl const_5) as R1.
+  remember (_const2GV targetdata5 gl const_5) as R1.
   destruct R1 as [[gv1 t1]|]; tinv H10.
-  remember (_const2GV m targetdata5 gl const') as R2.
+  remember (_const2GV targetdata5 gl const') as R2.
   destruct R2 as [[gv2 t2]|]; tinv H10.
   remember (insertGenericValue targetdata5 t1 gv1 const_list t2 gv2) as R3.
   destruct R3 as [gv3|]; inv H10.
@@ -3354,8 +3417,8 @@ Case "wfconst_insertvalue". Focus.
 
 
 Case "wfconst_bop". Focus.
-  remember (_const2GV m targetdata5 gl const1) as R1.
-  remember (_const2GV m targetdata5 gl const2) as R2.
+  remember (_const2GV targetdata5 gl const1) as R1.
+  remember (_const2GV targetdata5 gl const2) as R2.
   destruct R1 as [[gv1 t1]|]; tinv H4.
   destruct_typ t1; tinv H4.
   destruct R2 as [[gv2 t2]|]; tinv H4.
@@ -3369,8 +3432,8 @@ Case "wfconst_bop". Focus.
     eapply mbop_matches_chunks in HeqR3; eauto.
 
 Case "wfconst_fbop". Focus.
-  remember (_const2GV m targetdata5 gl const1) as R1.
-  remember (_const2GV m targetdata5 gl const2) as R2.
+  remember (_const2GV targetdata5 gl const1) as R1.
+  remember (_const2GV targetdata5 gl const2) as R2.
   destruct R1 as [[gv1 t1]|]; tinv H4.
   destruct_typ t1; tinv H4.
   destruct R2 as [[gv2 t2]|]; tinv H4.
@@ -3396,12 +3459,12 @@ Case "wfconst_cons".
   simpl_split lsdc lt. simpl.
   simpl_split lsd lc. simpl.
   simpl_split ls ld. simpl.
-  intros m S TD gl HwfTD; subst.
+  intros S TD gl HwfTD; subst.
   split.
     intros gv t Hin Hc2g.
-    remember (_list_const_arr2GV m TD gl t lc) as R.
+    remember (_list_const_arr2GV TD gl t lc) as R.
     destruct R; try solve [inv Hc2g].
-    remember (_const2GV m TD gl const_) as R'.
+    remember (_const2GV TD gl const_) as R'.
     destruct R' as [[gv0 t0]|]; try solve [inv Hc2g].
     destruct (typ_dec t t0); subst; try solve [inv Hc2g].
     remember (getTypeAllocSize TD t0) as R1.
@@ -3429,9 +3492,9 @@ Case "wfconst_cons".
         apply uninits_match_uninitMCs.
 
     intros gv lt' Hc2g.
-    remember (_list_const_struct2GV m TD gl lc) as R.
+    remember (_list_const_struct2GV TD gl lc) as R.
     destruct R as [[gv1 ts1]|]; try solve [inv Hc2g].
-    remember (_const2GV m TD gl const_) as R'.
+    remember (_const2GV TD gl const_) as R'.
     destruct R' as [[gv0 t0]|]; try solve [inv Hc2g].
     remember (getTypeAllocSize TD t0) as R1.
     destruct R1; inv Hc2g.
@@ -3454,9 +3517,9 @@ Case "wfconst_cons".
         apply uninits_match_uninitMCs.
 Qed.
 
-Lemma const2GV__matches_chunks_aux : forall S m TD c t gl gv t' 
+Lemma const2GV__matches_chunks_aux : forall S TD c t gl gv t' 
   (Hwf: wf_const S TD c t),
-  _const2GV m TD gl c = Some (gv, t') ->
+  _const2GV TD gl c = Some (gv, t') ->
   wf_global TD S gl ->
   t = t' /\ gv_chunks_match_typ TD gv t.
 Proof.
@@ -3495,14 +3558,14 @@ Proof.
   simpl. eapply cundef_gv__matches_chunks; eauto.
 Qed.
 
-Lemma const2GV__matches_chunks : forall S m TD c t gl gv
-  (Hwf: wf_const S TD c t) (Hc2g: const2GV m TD gl c = Some gv), 
+Lemma const2GV__matches_chunks : forall S TD c t gl gv
+  (Hwf: wf_const S TD c t) (Hc2g: const2GV TD gl c = Some gv), 
   wf_global TD S gl ->
   gv_chunks_match_typ TD gv t.
 Proof.
   intros.
   unfold const2GV in Hc2g.
-  remember (_const2GV m TD gl c) as R.
+  remember (_const2GV TD gl c) as R.
   destruct R as [[]|]; inv Hc2g.
   symmetry in HeqR.
   unfold getTypeSizeInBits, getTypeSizeInBits_and_Alignment.

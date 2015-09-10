@@ -713,7 +713,7 @@ Definition cmp_different_blocks (c: comparison): option bool :=
   | _   => None
   end.
 
-Definition cmpu_bool (c: comparison) (v1 v2: val): option bool :=
+Definition cmpu_bool_int (c: comparison) (v1 v2: val): option bool :=
   match v1, v2 with
   | Vint wz1 n1, Vint wz2 n2 =>
     match eq_nat_dec wz1 wz2 with
@@ -721,6 +721,13 @@ Definition cmpu_bool (c: comparison) (v1 v2: val): option bool :=
       Some (Int.cmpu wz1 c n1 (hcast Int.int _ (eq_sym pfeq) n2))
     | right _ => None
     end
+  | _, _ => None
+  end.
+
+Definition cmpu_bool (c: comparison) (v1 v2: val): option bool :=
+  match v1, v2 with
+  | Vint wz1 n1, Vint wz2 n2 =>
+    cmpu_bool_int c v1 v2
   | Vint wz1 n1, Vptr b2 ofs2 =>
     match eq_nat_dec 31 wz1 with
     | left pfeq =>
@@ -770,6 +777,9 @@ Definition of_optbool (ob: option bool): val :=
 
 Definition cmp (c: comparison) (v1 v2: val): val :=
   of_optbool (cmp_bool c v1 v2).
+
+Definition cmpu_int (c: comparison) (v1 v2: val): val :=
+  of_optbool (cmpu_bool_int c v1 v2).
 
 Definition cmpu (c: comparison) (v1 v2: val): val :=
   of_optbool (cmpu_bool c v1 v2).
@@ -1277,6 +1287,17 @@ Proof.
   destruct x; destruct y; simplify_op. rewrite Int.negate_cmp. auto.
 Qed.
 
+Theorem negate_cmpu_bool_int:
+  forall c x y,
+  cmpu_bool_int (negate_comparison c) x y = option_map negb (cmpu_bool_int c x y).
+Proof.
+  assert (forall c,
+    cmp_different_blocks (negate_comparison c) = option_map negb (cmp_different_blocks c))
+    by (destruct c; auto). 
+  destruct x; destruct y; simplify_op.
+  rewrite Int.negate_cmpu; auto.
+Qed.
+
 Theorem negate_cmpu_bool:
   forall valid_ptr c x y,
   cmpu_bool valid_ptr (negate_comparison c) x y = option_map negb (cmpu_bool valid_ptr c x y).
@@ -1310,6 +1331,14 @@ Proof.
   intros. unfold cmp. rewrite negate_cmp_bool. apply not_of_optbool.
 Qed.
 
+Theorem negate_cmpu_int:
+  forall c x y,
+  cmpu_int (negate_comparison c) x y =
+    notbool (cmpu_int c x y).
+Proof.
+  intros. unfold cmpu_int. rewrite negate_cmpu_bool_int. apply not_of_optbool.
+Qed.
+
 Theorem negate_cmpu:
   forall valid_ptr c x y,
   cmpu valid_ptr (negate_comparison c) x y =
@@ -1323,6 +1352,17 @@ Theorem swap_cmp_bool:
   cmp_bool (swap_comparison c) x y = cmp_bool c y x.
 Proof.
   destruct x; destruct y; simplify_op; auto. rewrite Int.swap_cmp. auto.
+Qed.
+
+Theorem swap_cmpu_bool_int:
+  forall c x y,
+  cmpu_bool_int (swap_comparison c) x y =
+    cmpu_bool_int c y x.
+Proof.
+  assert (forall c, cmp_different_blocks (swap_comparison c) = cmp_different_blocks c)
+    by (destruct c; auto).
+  destruct x; destruct y; simplify_op.
+  rewrite Int.swap_cmpu; auto.
 Qed.
 
 Theorem swap_cmpu_bool:
@@ -1402,9 +1442,23 @@ Proof.
   intros. destruct ob; simpl; auto. destruct b; auto. 
 Qed.
 
+Theorem cmpu_int_ne_0_optbool:
+  forall ob,
+  cmpu_int Cne (of_optbool ob) (Vint 0 (Int.zero 0)) = of_optbool ob.
+Proof.
+  intros; destruct ob; simpl; auto. destruct b; auto.
+Qed.
+
 Theorem cmpu_ne_0_optbool:
   forall valid_ptr ob,
   cmpu valid_ptr Cne (of_optbool ob) (Vint 0 (Int.zero 0)) = of_optbool ob.
+Proof.
+  intros. destruct ob; simpl; auto. destruct b; auto. 
+Qed.
+
+Theorem cmpu_int_eq_1_optbool:
+  forall ob,
+  cmpu_int Ceq (of_optbool ob) (Vint 0 (Int.one 0)) = of_optbool ob.
 Proof.
   intros. destruct ob; simpl; auto. destruct b; auto. 
 Qed.
@@ -1416,9 +1470,23 @@ Proof.
   intros. destruct ob; simpl; auto. destruct b; auto. 
 Qed.
 
+Theorem cmpu_int_eq_0_optbool:
+  forall ob,
+  cmpu_int Ceq (of_optbool ob) (Vint 0 (Int.zero 0)) = of_optbool (option_map negb ob).
+Proof.
+  intros. destruct ob; simpl; auto. destruct b; auto. 
+Qed.
+
 Theorem cmpu_eq_0_optbool:
   forall valid_ptr ob,
   cmpu valid_ptr Ceq (of_optbool ob) (Vint 0 (Int.zero 0)) = of_optbool (option_map negb ob).
+Proof.
+  intros. destruct ob; simpl; auto. destruct b; auto. 
+Qed.
+
+Theorem cmpu_int_ne_1_optbool:
+  forall ob,
+  cmpu_int Cne (of_optbool ob) (Vint 0 (Int.one 0)) = of_optbool (option_map negb ob).
 Proof.
   intros. destruct ob; simpl; auto. destruct b; auto. 
 Qed.
@@ -1467,6 +1535,19 @@ Proof.
   ; try match goal with
   | |- context [if ?c then _ else _] => destruct c
   end; unfold is_bool; auto.
+Qed.
+
+Lemma cmpu_int_is_bool:
+  forall c v1 v2, is_bool (cmpu_int c v1 v2).
+Proof.
+  destruct v1; destruct v2; simplify_op; try apply undef_is_bool;
+    try solve [apply of_bool_is_bool]
+  ; try (destruct c; unfold cmpu_int; simpl
+  ; try destruct (eq_nat_dec _ _); subst
+  ; try rewrite hcast_eq; simpl
+  ; try match goal with
+  | |- context [if ?c then _ else _] => destruct c
+  end; unfold is_bool; auto; fail).
 Qed.
 
 Lemma cmpu_is_bool:
@@ -1640,6 +1721,18 @@ Proof.
   intros. inv H. inv H0. auto. destruct v1'; simpl; auto. simpl; auto.
 Qed.
 
+Lemma cmpu_bool_int_lessdef:
+  forall c v1 v1' v2 v2' b,
+  lessdef v1 v1' -> lessdef v2 v2' ->
+  cmpu_bool_int c v1 v2 = Some b ->
+  cmpu_bool_int c v1' v2' = Some b.
+Proof.
+  intros. 
+  destruct v1; simpl in H; try discriminate;
+  destruct v2; simpl in H; try discriminate;
+  inv H; inv H0; simpl; auto.
+Qed.
+
 Lemma cmpu_bool_lessdef:
   forall valid_ptr valid_ptr' c v1 v1' v2 v2' b,
   (forall b ofs, valid_ptr b ofs = true -> valid_ptr' b ofs = true) ->
@@ -1741,6 +1834,22 @@ Proof.
   intros.
   match goal with
   | |- context [cmp ?c ?v1 ?v2] => assert (J:=cmp_is_bool c v1 v2)
+  end. 
+    destruct J as [J | [ J | J ]]; rewrite J; constructor; try solve [
+      auto |
+      unfold Int.unsigned, one, zero, Int.one, Int.zero, Int.repr; simpl;
+      apply Z_mod_lt; apply Int.modulus_pos
+    ].
+  unfold Int.modulus, two_power_nat, Int.wordsize, shift_nat; simpl; omega.
+  unfold Int.modulus, two_power_nat, Int.wordsize, shift_nat; simpl; omega.
+Qed.
+
+Lemma cmpu_int_has_Mint0: forall c0 v1 v2,
+  has_chunk (cmpu_int c0 v1 v2) (Mint 0).
+Proof.
+  intros.
+  match goal with
+  | |- context [cmpu_int ?c ?v1 ?v2] => assert (J:=cmpu_int_is_bool c v1 v2)
   end. 
     destruct J as [J | [ J | J ]]; rewrite J; constructor; try solve [
       auto |
@@ -2159,6 +2268,17 @@ Hypothesis valid_different_ptrs_inj:
   b1' <> b2' \/
   Int.unsigned 31 (Int.add 31 ofs1 (Int.repr 31 delta1)) <> Int.unsigned 31 (Int.add 31 ofs2 (Int.repr 31 delta2)).
 
+Lemma val_cmpu_bool_int_inject:
+  forall c v1 v2 v1' v2' b,
+  val_inject f v1 v1' ->
+  val_inject f v2 v2' ->
+  Val.cmpu_bool_int c v1 v2 = Some b ->
+  Val.cmpu_bool_int c v1' v2' = Some b.
+Proof.
+  Local Opaque Int.add.
+  intros. inv H; simpl in H1; try discriminate; inv H0; simpl in H1; try discriminate; simpl; auto.
+Qed.
+
 Lemma val_cmpu_bool_inject:
   forall c v1 v2 v1' v2' b,
   val_inject f v1 v1' ->
@@ -2410,6 +2530,16 @@ Proof.
   intros.
   unfold Val.cmp; Val.simplify_op; try congruence.
   destruct (Int.cmp _ _ _); unfold Vtrue, Vfalse, Vone, Vzero; congruence.
+Qed.
+
+Lemma cmpu_int_isnt_ptr :
+  forall (c:comparison) (wz0:nat) (i0: Int.int wz0)
+         (wz1:nat) (i1: Int.int wz1) (b:block) (ofs:Int.int 31),
+  Val.cmpu_int c (Vint wz0 i0) (Vint wz1 i1) <> Vptr b ofs.
+Proof.
+  intros.
+  unfold Val.cmpu_int; Val.simplify_op; try congruence.
+  destruct (Int.cmpu _ _); unfold Vtrue, Vfalse, Vone, Vzero; congruence.
 Qed.
 
 Lemma cmpu_isnt_ptr :

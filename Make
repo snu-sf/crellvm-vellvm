@@ -37,6 +37,7 @@
 ./src/Vellvm/genericvalues.v
 ./src/Vellvm/infrastructure.v
 ./src/Vellvm/infrastructure_props.v
+./src/Vellvm/interpreter.v
 ./src/Vellvm/memory_sim.v
 ./src/Vellvm/ndopsem.v
 ./src/Vellvm/opsem_dom.v

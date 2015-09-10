@@ -46,7 +46,7 @@ List.fold_left
    | None =>
        match GV2ptr TD (getPointerSize TD) gv with
        | Some (Vptr b' _) =>
-           if zeq b b' then Some gv else None
+           if peq b b' then Some gv else None
        | _ => None
        end
    end
@@ -90,10 +90,10 @@ Definition extcall_sem : Type :=
 
 (** We now specify the expected properties of this predicate. *)
 
-Definition mem_unchanged_on 
+Definition mem_unchanged_on
   (P: Values.block -> Z -> Prop) (m_before m_after: mem): Prop :=
-  (forall b ofs p,
-   P b ofs -> Mem.perm m_before b ofs p -> Mem.perm m_after b ofs p)
+  (forall b ofs k p,
+   P b ofs -> Mem.perm m_before b ofs k p -> Mem.perm m_after b ofs k p)
 /\(forall chunk b ofs v,
    (forall i, ofs <= i < ofs + size_chunk chunk -> P b i) ->
    Mem.load chunk m_before b ofs = Some v ->
