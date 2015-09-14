@@ -19,9 +19,10 @@ Extract Inductive sumbool => "bool" [ "true" "false" ].
 Extract Inductive list => "list" [ "[]" "(::)" ].
 Extract Inductive prod => "(*)"  [ "(,)" ].
 Extract Inductive option => "option"  [ "Some" "None" ].
-
+(*
 Extract Constant Iteration.dependent_description' => "fun x -> assert false".
-
+TODO: check 
+*)
 Extract Constant AtomImpl.atom => "String.t".
 Extract Constant AtomImpl.eq_atom_dec => "fun a b -> a = b".
 Extract Constant AtomImpl.atom_fresh_for_list => "Camlcoq.atom_fresh_for_list".
@@ -139,12 +140,12 @@ Extract Constant LLVMgv.mbop => "Llvmcaml.GenericValue.mbop".
 Extract Constant LLVMgv.mfbop => "Llvmcaml.GenericValue.mfbop".
 Extract Constant LLVMgv.mtrunc => "Llvmcaml.GenericValue.mtrunc".
 Extract Constant LLVMgv.mcast => "Llvmcaml.GenericValue.mcast".
-Extract Constant LLVMgv.mptrtoint => "Llvmcaml.GenericValue.mptrtoint".
-Extract Constant LLVMgv.minttoptr => "Llvmcaml.GenericValue.minttoptr".
+(*Extract Constant LLVMgv.mptrtoint => "Llvmcaml.GenericValue.mptrtoint". TODO: check *)
+(*Extract Constant LLVMgv.minttoptr => "Llvmcaml.GenericValue.minttoptr". TODO: check *)
 Extract Constant LLVMgv.mext => "Llvmcaml.GenericValue.mext".
 Extract Constant LLVMgv.micmp => "Llvmcaml.GenericValue.micmp".
 Extract Constant LLVMgv.micmp_int => "Llvmcaml.GenericValue.micmp_int".
-Extract Constant LLVMgv.micmp_ptr => "Llvmcaml.GenericValue.micmp_ptr".
+(*Extract Constant LLVMgv.micmp_ptr => "Llvmcaml.GenericValue.micmp_ptr". TODO: check *)
 Extract Constant LLVMgv.mfcmp => "Llvmcaml.GenericValue.mfcmp".
 Extract Constant LLVMgv.eq_gv => "Llvmcaml.GenericValue.eq_gv".
 Extract Constant LLVMgv.cgv2gv => "Llvmcaml.GenericValue.cgv2gv".
@@ -267,11 +268,11 @@ Extract Constant Floats.Float.zero   => "0.".
 (* Extract Constant Floats.Float.one   => "1.". *)
 Extract Constant Floats.Float.neg => "( ~-. )".
 Extract Constant Floats.Float.abs => "abs_float".
-Extract Constant Floats.Float.singleoffloat => "Floataux.singleoffloat".
-Extract Constant Floats.Float.intoffloat => "Floataux.intoffloat".
-Extract Constant Floats.Float.intuoffloat => "Floataux.intuoffloat".
-Extract Constant Floats.Float.floatofint => "Floataux.floatofint".
-Extract Constant Floats.Float.floatofintu => "Floataux.floatofintu".
+(*Extract Constant Floats.Float.singleoffloat => "Floataux.singleoffloat". TODO: check *)
+(*Extract Constant Floats.Float.intoffloat => "Floataux.intoffloat". TODO: check *)
+(*Extract Constant Floats.Float.intuoffloat => "Floataux.intuoffloat". TODO: check *)
+(*Extract Constant Floats.Float.floatofint => "Floataux.floatofint". TODO: check *)
+(*Extract Constant Floats.Float.floatofintu => "Floataux.floatofintu". TODO: check *)
 Extract Constant Floats.Float.add => "( +. )".
 Extract Constant Floats.Float.sub => "( -. )".
 Extract Constant Floats.Float.mul => "( *. )".
@@ -281,13 +282,13 @@ Extract Constant Floats.Float.cmp => "Floataux.cmp".
 Extract Constant Floats.Float.eq_dec => "fun (x: float) (y: float) -> x = y".
 Extract Constant Floats.Float.bits_of_double => "Floataux.bits_of_double".
 Extract Constant Floats.Float.double_of_bits => "Floataux.double_of_bits".
-Extract Constant Floats.Float.bits_of_single => "Floataux.bits_of_single".
-Extract Constant Floats.Float.single_of_bits => "Floataux.single_of_bits".
+(*Extract Constant Floats.Float.bits_of_single => "Floataux.bits_of_single". TODO: check *)
+(*Extract Constant Floats.Float.single_of_bits => "Floataux.single_of_bits". TODO: check *)
 
 (* Memdata *)
-Extract Constant Memdata.big_endian => "Memdataaux.big_endian".
-Extract Constant Memdata.encode_float => "Memdataaux.encode_float".
-Extract Constant Memdata.decode_float => "Memdataaux.decode_float".
+Extract Constant Archi.big_endian => "Memdataaux.big_endian". (* TODO: check *)
+(*Extract Constant Memdata.encode_float => "Memdataaux.encode_float". TODO: check *)
+(*Extract Constant Memdata.decode_float => "Memdataaux.decode_float". TODO: check *)
 
 (* Dominators *)
 Extract Constant cfg.Pcubeplus => "Camlcoq.pcubeplus".
@@ -302,4 +303,4 @@ Extraction Blacklist List String Int.
 
 Recursive Extraction Library Metatheory.
 Recursive Extraction Library analysis.
-(* Recursive Extraction Library interpreter. *)
+Recursive Extraction Library interpreter.
