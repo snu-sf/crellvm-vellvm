@@ -40,8 +40,6 @@
 ./src/Vellvm/interpreter.v
 ./src/Vellvm/memory_sim.v
 ./src/Vellvm/ndopsem.v
-./src/Vellvm/opsem_dom.v
-./src/Vellvm/opsem_inst.v
 ./src/Vellvm/opsem_props.v
 ./src/Vellvm/opsem.v
 ./src/Vellvm/opsem_wf.v
