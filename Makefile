@@ -1,6 +1,7 @@
 OTT ?= ott
 
 COQLIBS=-I src/Vellvm -I src/Vellvm/ott -I src/Vellvm/Dominators \
+  -I src/Interpreter -I src/Parser \
 	-I lib/GraphBasics -I lib/cpdtlib -I lib/metalib-20090714 \
 	-I lib/compcert-2.4/backend -I lib/compcert-2.4/common -I lib/compcert-2.4/flocq/Appli/ \
 	-I lib/compcert-2.4/flocq/Calc -I lib/compcert-2.4/flocq/Core -I lib/compcert-2.4/flocq/Prop \

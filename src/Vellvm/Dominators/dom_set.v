@@ -12,6 +12,7 @@ Require Export reach.
 Require Export dom_decl.
 Require Import dom_type.
 Require Import Dipaths.
+Require Import util.
 
 Require Import syntax.
 Require Import infrastructure.

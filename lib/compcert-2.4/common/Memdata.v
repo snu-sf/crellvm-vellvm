@@ -574,12 +574,24 @@ Proof.
   inversion H as [n' Hex]. rewrite Hex. auto.
 Qed.
 
+Remark undef_projb_none':
+  forall n, (n > 0)%nat -> proj_bytes (list_repeat n Undef) = None.
+Proof.
+  intros; destruct n; auto. inv H.
+Qed.
+
 Remark undef_projv_undef:
   forall c q, proj_value q (list_repeat (size_chunk_nat c) Undef) = Vundef.
 Proof.
   intros; destruct c; auto.
   assert (exists n', size_chunk_nat (Mint n) = S n') by apply size_chunk_nat_pos.
   inversion H as [n' Hex]. rewrite Hex. auto.
+Qed.
+
+Remark undef_projv_undef':
+  forall n q, (n > 0)%nat -> proj_value q (list_repeat n Undef) = Vundef.
+Proof.
+  intros; destruct n; auto.
 Qed.
 
 Lemma Int_unsigned_inj: forall n (x y: Int.int n)
@@ -876,6 +888,108 @@ Proof.
   unfold Val.zero_ext. rewrite Int.zero_ext_idem; auto. omega.
 Qed.
 *)
+
+(* NOTE: not used
+Lemma encode_decode_encode_val__eq__encode_val: forall v c,
+  encode_val c (decode_val c (encode_val c v)) = encode_val c v.
+Proof.
+  destruct v; destruct c; simpl; auto; unfold decode_val;
+    try (rewrite proj_inj_bytes; simpl).
+
+    rewrite undef_projb_none; rewrite undef_projv_undef;
+    destruct (eq_nat_dec 31 n); subst; auto.
+
+Focus.
+    unfold encode_int.
+    rewrite rev_if_be_involutive.
+    f_equal. f_equal. 
+    rewrite int_of_bytes_of_int.    
+    rewrite nat_of_Z_max.
+    rewrite Zmax_spec.
+    assert (J:=@bytesize_chunk_pos n).
+    destruct (zlt 0 (bytesize_chunk n)); try solve [contradict g; omega].
+    rewrite bytes_of_int_mod' with (y:=Int.unsigned wz i mod Int.modulus n); 
+      try omega; auto.
+    rewrite Zmod_mod_le with (c:=two_p (bytesize_chunk n * 8)); 
+      auto using two_p_bytesize_chunk__ge__modulus.
+      repeat rewrite Zmod_mod.
+      apply Int.eqmod_refl.
+
+    unfold encode_float. unfold encode_int.
+    rewrite rev_if_be_involutive.
+    f_equal. f_equal. 
+    simpl.
+    repeat rewrite Floats.Float.bits_of_single_of_bits. simpl.
+    repeat rewrite Zmod_0_l. auto.
+
+    unfold encode_float. unfold encode_int.
+    rewrite rev_if_be_involutive.
+    f_equal. f_equal. 
+    simpl.
+    repeat rewrite Floats.Float.bits_of_double_of_bits. simpl.
+    repeat rewrite Zmod_0_l. auto.
+
+    unfold encode_float. unfold encode_int. unfold decode_int.
+    rewrite rev_if_be_involutive. simpl.
+    f_equal. f_equal. 
+    rewrite int_of_bytes_of_int.    
+    rewrite Zmod_0_l. auto.
+
+    unfold encode_float.
+    rewrite rev_if_be_involutive. 
+    f_equal. f_equal. 
+    rewrite int_of_bytes_of_int.   
+    rewrite Floats.Float.bits_of_single_of_bits. 
+    erewrite bytes_of_int_mod; eauto. 
+    apply Int.eqmod_trans with 
+      (y:=Int.unsigned 31 (Floats.Float.bits_of_single f) 
+            mod two_p (Z_of_nat 4 * 8)).
+      apply Int.eqm_unsigned_repr_l.
+      apply Int.eqmod_refl.
+
+      apply Int.eqmod_sym.
+      apply Int.eqmod_mod.
+        apply two_p_gt_ZERO; try omega.
+
+    unfold encode_float.
+    rewrite rev_if_be_involutive. 
+    f_equal. f_equal. 
+    rewrite Floats.Float.bits_of_double_of_bits. 
+    rewrite int_of_bytes_of_int.    
+    erewrite bytes_of_int_mod; eauto. 
+    apply Int.eqmod_trans with 
+      (y:=Int.unsigned 63 (Floats.Float.bits_of_double f) 
+            mod two_p (Z_of_nat 8 * 8)).
+      apply Int.eqm_unsigned_repr_l.
+      apply Int.eqmod_refl.
+
+      apply Int.eqmod_sym.
+      apply Int.eqmod_mod.
+        apply two_p_gt_ZERO; try omega.
+
+    destruct (eq_nat_dec n 31); subst.
+      simpl.
+      destruct (eq_block b b); simpl; try congruence.
+      destruct (Int.eq_dec 31 i i); simpl; try congruence.
+      rewrite proj_bytes_undef'; auto using size_chunk_nat_pos'.
+
+    destruct (eq_nat_dec n 31); subst.
+      simpl.
+      destruct (Int.eq_dec 31 i i); simpl; try congruence.
+      rewrite proj_bytes_undef'; auto using size_chunk_nat_pos'.
+Qed.
+*)
+
+Lemma encode_decode_undef: forall c n,
+  (n > 0)%nat ->
+  encode_val c (decode_val c (list_repeat n Undef)) = 
+    list_repeat (size_chunk_nat c) Undef.
+Proof.
+  intros.
+  destruct c; simpl; unfold decode_val; rewrite undef_projb_none'; auto.
+    destruct (eq_nat_dec 31 n0); subst; auto.
+      rewrite undef_projv_undef'; auto.
+Qed.
 
 (** Pointers cannot be forged. *)
 

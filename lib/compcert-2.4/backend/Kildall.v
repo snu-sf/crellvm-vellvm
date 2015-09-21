@@ -804,6 +804,7 @@ End Dataflow_Solver.
 
 (** ** Construction of the reversed flow graph (the predecessor relation) *)
 
+(*
 Definition successors_list (successors: PTree.t (list positive)) (pc: positive) : list positive :=
   match successors ? pc with None => nil | Some l => l end.
 
@@ -1643,3 +1644,4 @@ Module NodeSetBackward <: NODE_SET.
   Proof NodeSetForward.all_nodes_spec.
 End NodeSetBackward.
 
+*)

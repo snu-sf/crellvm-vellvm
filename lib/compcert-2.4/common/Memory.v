@@ -296,7 +296,7 @@ Proof.
   intros. destruct H. apply perm_cur. apply H. generalize (size_chunk_pos chunk). omega.
 Qed.
 
-(* NOTE: not used
+(*
 Lemma valid_access_compat:
   forall m chunk1 chunk2 b ofs p,
   size_chunk chunk1 = size_chunk chunk2 ->
@@ -626,6 +626,25 @@ Remark getN_setN_outside:
   getN n p (setN vl q c) = getN n p c.
 Proof.
   intros. apply getN_setN_disjoint. apply Intv.disjoint_range. auto. 
+Qed.
+
+Lemma getN_update_setN_s: forall M mb n ofs bs (Heq: n = length bs),
+  bs = getN n ofs
+         ((PMap.set mb (setN bs ofs ((mem_contents M) # mb))
+            (mem_contents M)) # mb).
+Proof.
+  intros. subst.
+  Print PMap.
+  erewrite PMap.gss; eauto.
+  rewrite getN_setN_same; auto.
+Qed.
+
+Lemma getN_Undef__list_repeat_Undef: forall sz0 z,
+  getN sz0 z (ZMap.init Undef) = list_repeat sz0 Undef.
+Proof.
+  induction sz0; simpl; auto.
+    intro; rewrite ZMap.gi.
+    congruence.
 Qed.
 
 Remark setN_default:
@@ -1123,12 +1142,10 @@ Proof.
   unfold store in STORE.
   destruct ( valid_access_dec m1 chunk b ofs Writable); inv STORE. simpl. auto.
 Qed.
-
-(* NOTE: not used
+(*
 Theorem load_store_similar:
   forall chunk',
   size_chunk chunk' = size_chunk chunk ->
-  align_chunk chunk' <= align_chunk chunk ->
   exists v', load chunk' m2 b ofs = Some v' /\ decode_encode_val v chunk chunk' v'.
 Proof.
   intros.
@@ -1161,8 +1178,25 @@ Theorem load_store_same:
 Proof.
   apply load_store_similar_2; auto. omega.
 Qed.
-*)
 
+Theorem load_store_exact_same:
+  Val.has_chunk v chunk ->
+  load chunk m2 b ofs = Some v.
+Proof.
+  intros.
+  destruct (load_store_similar chunk) as [v' [A B]]. auto.
+  rewrite A. decEq. clear A STORE.
+  destruct v, chunk, v'; simpl in *; try inv H; try inv B; try solve [
+    auto |
+    destruct (eq_nat_dec n n); congruence
+  ].
+
+    destruct (eq_nat_dec n n); try congruence.
+    rewrite Int.repr_unsigned in B. auto.
+
+    rewrite <- H in B. auto.
+Qed.
+*)
 Theorem load_store_other:
   forall chunk' b' ofs',
   b' <> b
@@ -1393,6 +1427,122 @@ Proof.
   inv ENC; inv DEC; auto.
 - elim H1. apply compat_pointer_chunks_true; auto.
 - contradiction.
+Qed.
+
+Definition ld_st_ld_rel v1 v1' v2 b1 b2 ofs1 ofs2 m1 m2 M :=
+  ((v1 = v1' /\ 
+   (b1 <> b2 \/ ofs1 + size_chunk m1 <= ofs2 \/ ofs2 + size_chunk m2 <= ofs1))
+  \/ 
+   (v1 = decode_val m1 (Mem.getN (size_chunk_nat m1) ofs1
+           (Mem.setN (encode_val m2 v2) ofs2 ((Mem.mem_contents M) # b2))) /\
+    v1' = decode_val m1 (Mem.getN (size_chunk_nat m1) ofs1 
+            ((Mem.mem_contents M) # b2)) /\
+    (b1 = b2 /\ ofs1 + size_chunk m1 > ofs2 /\ ofs2 + size_chunk m2 > ofs1))).
+
+Lemma store_preserves_load_inv_aux': forall chunk m1 b ofs v m2 (STORE: store chunk m1 b ofs v = Some m2)
+  b1 chunk1 ofs1 v1,
+  Mem.load chunk1 m2 b1 ofs1 = Some v1 ->
+  exists v1',
+    Mem.load chunk1 m1 b1 ofs1 = Some v1' /\
+    ld_st_ld_rel v1 v1' v b1 b ofs1 ofs chunk1 chunk m1.
+Proof.
+  intros. unfold ld_st_ld_rel.
+  destruct (peq b1 b); subst; 
+    try solve [erewrite <- load_store_other; eauto; exists v1; eauto].
+  destruct (zle (ofs1 + size_chunk chunk1) ofs);
+    try solve [erewrite <- load_store_other; eauto; exists v1; split; auto].
+  destruct (zle (ofs + size_chunk chunk) ofs1);
+    try solve [erewrite <- load_store_other; eauto; exists v1; split; auto].
+  assert (valid_access m1 chunk1 b ofs1 Readable) as J.
+    apply load_valid_access in H.
+    eapply store_valid_access_2; eauto.
+  unfold load in *.
+  destruct (valid_access_dec m1 chunk1 b ofs1 Readable); try congruence.
+  exists (decode_val chunk1
+           (getN (size_chunk_nat chunk1) ofs1 ((Mem.mem_contents m1) # b))).
+  split; auto.
+  right.
+  split; auto.
+  destruct (valid_access_dec m2 chunk1 b ofs1 Readable); inv H.
+  erewrite store_mem_contents; eauto.
+  rewrite PMap.gsspec.
+  destruct (peq b b); try congruence.
+Qed.
+
+Lemma store_preserves_load_inv_aux: forall chunk m1 b ofs v m2 (STORE: store chunk m1 b ofs v = Some m2) b1 chunk1 ofs1 v1,
+  Mem.load chunk1 m2 b1 ofs1 = Some v1 ->
+  exists v1',
+    Mem.load chunk1 m1 b1 ofs1 = Some v1' /\
+    ((v1 = v1' /\
+     (b1 <> b \/ ofs1 + size_chunk chunk1 <= ofs \/ 
+      ofs + size_chunk chunk <= ofs1))
+    \/
+     ((forall b0 ofs0, v1 = Vptr b0 ofs0 -> v1 = v /\ chunk1 = chunk) /\
+      (b1 = b /\ ofs1 + size_chunk chunk1 > ofs /\ 
+       ofs + size_chunk chunk > ofs1))).
+Proof.
+  intros.
+  destruct (peq b1 b); subst;
+    try solve [erewrite <- load_store_other; eauto; exists v1; eauto].
+  destruct (zle (ofs1 + size_chunk chunk1) ofs);
+    try solve [erewrite <- load_store_other; eauto; exists v1; split; auto].
+  destruct (zle (ofs + size_chunk chunk) ofs1);
+    try solve [erewrite <- load_store_other; eauto; exists v1; split; auto].
+  assert (exists v1', load chunk1 m1 b ofs1 = Some v1') as J.
+    apply load_valid_access in H.
+    apply valid_access_load.
+    eapply store_valid_access_2; eauto.
+  destruct J as [v1' J].
+  exists v1'.
+  split; auto.
+    right.
+    split; auto.
+      intros. subst.
+      eapply load_pointer_store in H; eauto.
+      destruct H as [H | H].
+        destruct H as [J1 [J2 [J3 J4]]]; subst; auto.
+        unfold compat_pointer_chunks in J2.
+        assert (chunk = Mint 31 /\ chunk1 = Mint 31) by
+          (destruct chunk; destruct chunk1;
+          try destruct (eq_nat_dec 31 n); try destruct (eq_nat_dec 31 _);
+          subst; tauto).
+        destruct H; subst; auto.
+        destruct H as [H | [H | H]]; try solve [congruence | omega].
+Qed.
+
+
+(*
+Variable chunk: memory_chunk.
+Variable m1: mem.
+Variable b: block.
+Variable ofs: Z.
+Variable v: val.
+Variable m2: mem.
+Hypothesis STORE: store chunk m1 b ofs v = Some m2.
+*)
+
+Lemma store_preserves_load_inv: forall chunk m1 b ofs v m2
+  (STORE: store chunk m1 b ofs v = Some m2)
+  b1 ofs1 v1 chunk1,
+  load chunk1 m2 b1 ofs1 = Some v1 ->
+  exists v1',
+    load chunk1 m1 b1 ofs1 = Some v1' /\
+    (v1 = v1' \/ 
+     (forall b0 ofs0, v1 = Vptr b0 ofs0 -> v1 = v /\ chunk1 = chunk)).
+Proof.
+  intros.
+  eapply store_preserves_load_inv_aux in H; eauto.
+  destruct H as [v1' [J1 [[J2 J3] | [J2 J3]]]]; subst; eauto.
+Qed.
+
+Lemma store_getN_out: forall chunk m1 b ofs v m2 (STORE: store chunk m1 b ofs v = Some m2)
+  blk ofs1 sz (Hneq: blk <> b),
+  getN sz ofs1 ((Mem.mem_contents m1) # blk) = 
+    getN sz ofs1 ((Mem.mem_contents m2) # blk).
+Proof.
+  intros.
+  erewrite store_mem_contents with (m2:=m2); eauto.
+  erewrite PMap.gso; eauto.
 Qed.
 
 (* NOTE: not used
@@ -1741,6 +1891,16 @@ Variable m2: mem.
 Variable b: block.
 Hypothesis ALLOC: alloc m1 lo hi = (m2, b).
 
+Lemma alloc_mem_contents:
+  PMap.set (Mem.nextblock m1) 
+                 (PMap.init Undef)
+                 (Mem.mem_contents m1) = (Mem.mem_contents m2).
+Proof.
+  intros.
+  unfold alloc in ALLOC.
+  inversion ALLOC. auto.
+Qed.
+
 Theorem nextblock_alloc:
   nextblock m2 = Psucc (nextblock m1).
 Proof.
@@ -1995,6 +2155,17 @@ Proof.
   congruence. congruence.
 Qed.
 
+Lemma free_getN_out: forall b ofs sz (Hneq: bf <> b),
+  Mem.getN sz ofs ((Mem.mem_contents m1) # b) = 
+    Mem.getN sz ofs ((Mem.mem_contents m2) # b).
+Proof.
+  intros.
+  rewrite free_result. 
+  unfold unchecked_free. simpl.
+  generalize ofs.
+  induction sz; simpl; intros; auto.
+Qed.
+
 Theorem nextblock_free:
   nextblock m2 = nextblock m1.
 Proof.
@@ -2138,6 +2309,23 @@ Proof.
   intros. unfold load. rewrite pred_dec_true. 
   rewrite (load_result _ _ _ _ _ H). rewrite free_result; auto. 
   apply valid_access_free_inv_1. eauto with mem.
+Qed.
+
+Theorem load_free': forall (b : block)
+  (a : memory_chunk) (ofs : Z) (v : val)
+  (HeqR : Some v = load a m2 b ofs),
+  b <> bf \/ lo >= hi \/ ofs + size_chunk a <= lo \/ hi <= ofs.
+Proof.
+  intros.
+  symmetry in HeqR.
+  apply load_valid_access in HeqR.
+  destruct (peq b bf); subst; auto.
+  right.
+  destruct (zlt lo hi); try omega.
+  destruct (zle (ofs + size_chunk a) lo); auto.
+  destruct (zle hi ofs); auto.
+  contradict HeqR.
+  eapply valid_access_free_2; eauto; try omega.
 Qed.
 
 Theorem loadbytes_free:
