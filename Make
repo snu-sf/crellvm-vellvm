@@ -79,7 +79,3 @@
 ./src/Vellvm/Dominators/dom_list_tree_wf.v
 ./src/Vellvm/Dominators/dom_list_df.v
 
-./src/Vellvm/extraction_core.v
-./src/Vellvm/extraction_dom.v
-
-

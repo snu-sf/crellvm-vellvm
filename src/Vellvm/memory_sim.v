@@ -354,7 +354,7 @@ Proof.
   exploit check_value_ptr_inject_true. eexact H. eauto. eauto. 
   intro. rewrite H4. econstructor; eauto.
 
-  exploit check_value_ptr_inject_false. eexact H. admit. admit. eauto. eauto. 
+  exploit check_value_ptr_inject_false. eexact H. eauto. eauto. eauto. eauto. 
   intro. rewrite H4. econstructor; eauto.
 
   inversion H; subst; auto. inversion H0; subst; auto.
