@@ -239,9 +239,6 @@ Parameter  rem: float -> float -> float.
 Definition cmp (c:comparison) (f1 f2: float) : bool := (**r comparison *)
   cmp_of_comparison c (b64_compare f1 f2).
 
-Parameter bits_of_double: float -> int64.
-Parameter double_of_bits: int64 -> float.
-
 (** Conversions *)
 
 Definition of_single: float32 -> float := b64_of_b32 of_single_pl mode_NE.
@@ -276,7 +273,7 @@ Definition to_bits (f: float): int64 := Int.repr 63 (bits_of_b64 f).
 Definition of_bits (b: int64): float := b64_of_bits (Int.unsigned 63 b).
 
 Definition from_words (hi lo: int32) : float :=
-  double_of_bits
+  of_bits
     (Int.or 63 (Int.shl 63 (Int.repr 63 (Int.unsigned 31 hi)) (Int.repr 63 32))
               (Int.repr 63 (Int.unsigned 31 lo))).
 
