@@ -206,7 +206,7 @@ Record program (F V: Type) : Type := mkprogram {
 }.
 
 Definition prog_defs_names (F V: Type) (p: program F V) : list ident :=
-  List.map fst p.(prog_defs).
+  List.map (@fst ident (globdef F V)) p.(prog_defs).
 
 (** * Generic transformations over programs *)
 
