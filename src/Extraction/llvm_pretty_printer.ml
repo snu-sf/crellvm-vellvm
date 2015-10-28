@@ -25,7 +25,7 @@ let llvm_label st b =
     string_of_int (SlotTracker.get_local_slot st v)
 
 (** [writeConstantInt] *)
-let rec string_of_constant m st c = 
+let rec string_of_constant m st c =
   match (classify_value c) with
   | ValueKind.UndefValue -> "undef"
   | ValueKind.ConstantExpr -> string_of_constant_expr m st c
@@ -49,7 +49,8 @@ let rec string_of_constant m st c =
   | ValueKind.ConstantPointerNull -> "null"
   | ValueKind.GlobalVariable ->  llvm_name st c
   | ValueKind.Function ->  llvm_name st c
-  | _ -> failwith (string_of_valuekd (classify_value c) ^ " isnt Constant")
+  | _ ->
+    failwith (string_of_valuekd (classify_value c) ^ " isnt Constant")
 and string_of_constant_expr m st c =
   match (constexpr_opcode c) with
   | Opcode.Ret ->

@@ -18,48 +18,31 @@
 open Datatypes
 open BinPos
 open BinInt
+open BinNums
 
 (* Integers *)
 
-(*
 let rec camlint_of_positive = function
   | Coq_xI p -> Int32.add (Int32.shift_left (camlint_of_positive p) 1) 1l
   | Coq_xO p -> Int32.shift_left (camlint_of_positive p) 1
   | Coq_xH -> 1l
-*)
-let camlint_of_positive p = Pos.iter p Int32.succ 0l
 
-(*
 let camlint_of_z = function
   | Z0 -> 0l
   | Zpos p -> camlint_of_positive p
   | Zneg p -> Int32.neg (camlint_of_positive p)
-*)
-let camlint_of_z z =
-  if Z.gtb Z.zero z then camlint_of_positive (Z.to_pos (Z.abs z))
-  else if Z.eqb Z.zero z then 0l
-  else camlint_of_positive (Z.to_pos z)
 
 let camlint_of_coqint : Integers.Int.int -> int32 = camlint_of_z
 
-(*
 let rec camlint64_of_positive = function
   | Coq_xI p -> Int64.add (Int64.shift_left (camlint64_of_positive p) 1) 1L
   | Coq_xO p -> Int64.shift_left (camlint64_of_positive p) 1
   | Coq_xH -> 1L
-*)
-let camlint64_of_positive p = Pos.iter p Int64.succ 0L
 
-(*
 let camlint64_of_z = function
   | Z0 -> 0L
   | Zpos p -> camlint64_of_positive p
   | Zneg p -> Int64.neg (camlint64_of_positive p)
-*)
-let camlint64_of_z z =
-  if Z.gtb Z.zero z then camlint64_of_positive (Z.to_pos (Z.abs z))
-  else if Z.eqb Z.zero z then 0L
-  else camlint64_of_positive (Z.to_pos z)
 
 let camlint64_of_coqint : Integers.Int.int -> int64 = camlint64_of_z
 
@@ -71,25 +54,17 @@ let rec nat_of_camlint n =
   assert (n >= 0l);
   if n = 0l then O else S (nat_of_camlint (Int32.sub n 1l))
 
-let pos_one = Pos.of_succ_nat O
-let pos_two = Pos.of_succ_nat (S O)
-
 let rec positive_of_camlint n =
   if n = 0l then assert false else
-  if n = 1l then Pos.of_succ_nat O else
+  if n = 1l then Coq_xH else
   if Int32.logand n 1l = 0l
-  then Pos.mul pos_two (positive_of_camlint (Int32.shift_right_logical n 1))
-  else Pos.succ (Pos.mul pos_two (positive_of_camlint (Int32.shift_right_logical n 1)))
+  then Coq_xO (positive_of_camlint (Int32.shift_right_logical n 1))
+  else Coq_xI (positive_of_camlint (Int32.shift_right_logical n 1))
 
 let z_of_camlint n =
-  let rec z_of_camlint_aux n =
-    if Int32.logand n 1l = 0l
-    then Z.double (z_of_camlint_aux (Int32.shift_right_logical n 1))
-    else Z.succ (Z.double (z_of_camlint_aux (Int32.shift_right_logical n 1)))
-  in
-  if n = 0l then Z.zero else
-  if n > 0l then z_of_camlint_aux n
-  else z_of_camlint_aux (Int32.neg n)
+  if n = 0l then Z0 else
+  if n > 0l then Zpos (positive_of_camlint n)
+  else Zneg (positive_of_camlint (Int32.neg n))
 
 let coqint_of_camlint (n: int32) : Integers.Int.int = 
   (* Interpret n as unsigned so that resulting Z is in range *)
@@ -97,20 +72,15 @@ let coqint_of_camlint (n: int32) : Integers.Int.int =
 
 let rec positive_of_camlint64 n =
   if n = 0L then assert false else
-  if n = 1L then pos_one else
+  if n = 1L then Coq_xH else
   if Int64.logand n 1L = 0L
-  then Pos.mul pos_two (positive_of_camlint64 (Int64.shift_right_logical n 1))
-  else Pos.succ (Pos.mul pos_two (positive_of_camlint64 (Int64.shift_right_logical n 1)))
+  then Coq_xO (positive_of_camlint64 (Int64.shift_right_logical n 1))
+  else Coq_xI (positive_of_camlint64 (Int64.shift_right_logical n 1))
 
 let z_of_camlint64 n =
-  let rec z_of_camlint64_aux n =
-    if Int64.logand n 1L = 0L
-    then Z.double (z_of_camlint64_aux (Int64.shift_right_logical n 1))
-    else Z.succ (Z.double (z_of_camlint64_aux (Int64.shift_right_logical n 1)))
-  in
-  if n = 0L then Z.zero else
-  if n > 0L then z_of_camlint64_aux n
-  else z_of_camlint64_aux (Int64.neg n)
+  if n = 0L then Z0 else
+  if n > 0L then Zpos (positive_of_camlint64 n)
+  else Zneg (positive_of_camlint64 (Int64.neg n))
 
 let coqint_of_camlint64 (n: int64) : Integers.Int.int = 
   (* Interpret n as unsigned so that resulting Z is in range *)
@@ -118,9 +88,9 @@ let coqint_of_camlint64 (n: int64) : Integers.Int.int =
 
 (* Atoms (positive integers representing strings) *)
 
-let atom_of_string = (Hashtbl.create 17 : (string, Pos.t) Hashtbl.t)
-let string_of_atom = (Hashtbl.create 17 : (Pos.t, string) Hashtbl.t)
-let next_atom = ref pos_one
+let atom_of_string = (Hashtbl.create 17 : (string, positive) Hashtbl.t)
+let string_of_atom = (Hashtbl.create 17 : (positive, string) Hashtbl.t)
+let next_atom = ref Coq_xH
 
 let intern_string s =
   try
@@ -232,7 +202,7 @@ let z2llapint bit_width v is_signed =
   let v64 = camlint64_of_z v in
   Llvm.APInt.of_int64 bit_widthi v64 is_signed
                                    
-let pcubeplus (p: Pos.t) : Pos.t =
+let pcubeplus (p: positive) : positive =
   let i = camlint_of_positive p in
   positive_of_camlint (Int32.add (Int32.mul i (Int32.mul i i)) i)
 
