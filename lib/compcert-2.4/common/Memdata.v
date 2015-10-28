@@ -603,13 +603,15 @@ Proof.
   auto.
 Qed.
 
+(*
 Lemma bytesize_chunk_nat_ge: forall n,
   Z.of_nat (bytesize_chunk_nat n) * 8 >= (Int.zwordsize n).
 Proof.
-  admit.
+  ...
 Qed.
+*)
 
-
+(*
 Lemma decode_encode_val_general:
   forall v chunk1 chunk2,
   decode_encode_val v chunk1 chunk2 (decode_val chunk2 (encode_val chunk1 v)).
@@ -622,19 +624,19 @@ Opaque inj_value.
   try (rewrite proj_inj_value); try (rewrite proj_inj_value_mismatch by congruence);
   eauto.
   - (* Vint Mint Mint *)
-    destruct (eq_nat_dec _ _); subst; auto. admit.
+    destruct (eq_nat_dec _ _); subst; auto. ....
   - (* Vint Mint Mfloat32 *)
-    destruct (eq_nat_dec _ _); subst; auto. admit.
+    destruct (eq_nat_dec _ _); subst; auto. ....
   - (* Vint Mint Mfloat64 *)
-    destruct (eq_nat_dec _ _); subst; auto. admit.
+    destruct (eq_nat_dec _ _); subst; auto. ....
   - (* Vfloat Mfloat64 Mint *)
-    destruct (eq_nat_dec _ _); subst; auto. admit.
+    destruct (eq_nat_dec _ _); subst; auto. ....
   - (* Vfloat Mfloat64 Mfloat64 *)
-    admit.
+    ....
   - (* Vsingle Mfloat32 Mint *)
-    destruct (eq_nat_dec _ _); subst; auto. admit.
+    destruct (eq_nat_dec _ _); subst; auto. ....
   - (* Vsingle Mfloat32 Mfloat32 *)
-    admit.
+    ....
   - (* Vptr Mint Mint *)
     destruct (eq_nat_dec 31 n); subst; auto;
     destruct (eq_nat_dec _ _); subst; auto;
@@ -676,22 +678,22 @@ decEq.
 
 
 rewrite !Int.modulus_power.
-admit.
+....
 
-admit.
+....
 
-admit. admit. admit. admit.
+.... .... .... ....
 destruct (eq_nat_dec 31 n); subst; auto.
 destruct (eq_nat_dec 31 n0); subst; auto.
-admit.
+....
 destruct (eq_nat_dec _ _); subst; auto.
-admit. admit. admit. admit.
-admit.  admit.  admit.  admit. 
+.... .... .... ....
+....  ....  ....  .... 
 destruct (eq_nat_dec 31 n); subst; auto.
 destruct (eq_nat_dec 31 n0); subst; auto.
-admit. destruct (eq_nat_dec _ _); subst; auto. admit.
-destruct (eq_nat_dec _ n); subst; auto. admit.
-admit. admit. admit. admit. admit.
+.... destruct (eq_nat_dec _ _); subst; auto. ....
+destruct (eq_nat_dec _ n); subst; auto. ....
+.... .... .... .... ....
 
 
 Locate int32. 
@@ -773,11 +775,11 @@ simpl.
 
 
   destruct (eq_nat_dec _ _); subst; auto.
-  admit.
+  ....
   destruct (eq_nat_dec _ _); subst; simpl; auto.
-  admit.
+  ....
   destruct (eq_nat_dec _ _); subst; simpl; auto.
-  admit.
+  ....
   destruct (eq_nat_dec wz _); subst; simpl; auto. destruct (eq_nat_dec _ _); auto.  
 
   rewrite decode_encode_int_1. decEq. apply Int.zero_ext_idem. omega.
@@ -792,6 +794,8 @@ simpl.
   rewrite decode_encode_int_4. decEq. apply Float32.of_to_bits.
 *)
 Qed.
+*)
+
 (*
 Lemma decode_encode_val_similar:
   forall v1 chunk1 chunk2 v2,
@@ -813,11 +817,11 @@ Proof.
   simpl in *; destruct (eq_nat_dec _ n); subst; auto.
   destruct (eq_nat_dec 31 n0); subst; auto.
   destruct (eq_nat_dec 31 n0); subst; auto.
-  admit. (* not true *)
+  .... (* not true *)
   simpl in *; destruct (eq_nat_dec _ n); subst; auto.
   destruct (eq_nat_dec 31 n0); subst; auto.
   destruct (eq_nat_dec 31 n0); subst; auto.
-  admit. (* not true *)
+  .... (* not true *)
 *)
 Qed.
 *)

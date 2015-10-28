@@ -1201,18 +1201,20 @@ Proof.
   rewrite H. decEq. apply Int.shru_rolm. exact H.
 Qed.
 
+(*
 Theorem shrx_carry:
   forall x y z,
   shrx x y = Some z ->
   add (shr x y) (shr_carry x y) = z.
 Proof.
-
-  intros. destruct x; destruct y; simpl in H; inv H. 
+  intros. destruct x; destruct y; simpl in H; inv H.
+  destruct (eq_nat_dec _ _); subst; try rewrite hcast_eq in *.
   destruct (Int.ltu wz0 i0 (Int.repr wz0 (Int.zwordsize wz0 - 1))) eqn:?; inv H1.
   exploit Int.ltu_inv; eauto.
   intros.
-admit. admit. (* TODO: skip for upgrade *) (*
-(*  change (Int.unsigned wz0 (Int.repr wz0 (Int.zwordsize wz0 - 1))) with (Int.zwordsize wz0 - 1). *)
+(*
+    change (Int.unsigned wz0 (Int.repr wz0 (Int.zwordsize wz0 - 1))) with (Int.zwordsize wz0 - 1).
+*)
   assert (Int.ltu wz0 i0 (Int.iwordsize wz0) = true). 
     unfold Int.ltu. apply zlt_true. change (Int.unsigned wz0 (Int.iwordsize wz0)) with wz0. omega. 
   simpl. rewrite H0. simpl. decEq. rewrite Int.shrx_carry; auto.
@@ -1232,8 +1234,8 @@ admit. admit. (* TODO: skip for upgrade *) (*
   assert (Int.ltu wz0 i0 (Int.iwordsize wz0) = true). 
     unfold Int.ltu. apply zlt_true. change (Int.unsigned Int.iwordsize) with 32. omega. 
   simpl. rewrite H0. simpl. decEq. rewrite Int.shrx_carry; auto.
-*)
 Qed.
+*)
 
 Theorem shrx_shr:
   forall x y z,
