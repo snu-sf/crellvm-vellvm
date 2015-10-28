@@ -420,7 +420,7 @@ Proof.
            simpl; eauto using gv_inject_gundef;
         destruct f0; inv H0; unfold val2GV; simpl; eauto using gv_inject_gundef
       end.
-    admit. (* TODO: not true *)
+    destruct_typ t1; destruct_typ t2; inv H0; eauto using gv_inject_gundef.
  
     inv H0. eauto using gv_inject_gundef.
     inv H0. eauto using gv_inject_gundef.

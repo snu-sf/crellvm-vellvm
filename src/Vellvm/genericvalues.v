@@ -415,7 +415,7 @@ match GV2val TD gv1 with
     end
 | Some (Vsingle f) =>
     match (t1, t2) with
-    | (typ_floatpoint _, typ_floatpoint _) => None
+    | (typ_floatpoint _, typ_floatpoint _) => gundef TD t2
     | _ => gundef TD t2
     end
 | _ => gundef TD t2
@@ -489,6 +489,7 @@ match (GV2val TD gv1, GV2val TD gv2) with
      end in
   match fp with
   | fp_double => Some (val2GV TD v Mfloat64)
+  | fp_float => gundef TD (typ_floatpoint fp)
   | _ => None
   end
 | (Some (Vsingle f1), Some (Vsingle f2)) =>
@@ -502,6 +503,7 @@ match (GV2val TD gv1, GV2val TD gv2) with
      end in
   match fp with
   | fp_float => Some (val2GV TD v Mfloat32)
+  | fp_double => gundef TD (typ_floatpoint fp)
   | _ => None
   end
 | _ => gundef TD (typ_floatpoint fp)

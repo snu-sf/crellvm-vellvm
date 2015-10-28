@@ -318,67 +318,6 @@ Definition consts2GV_isnt_stuck_Prop sdct :=
   (exists gv, _list_const_struct2GV TD gl lc = 
     Some (gv, lt)).
 
-Lemma gv2val_vfloat_float_false:
-  forall S TD gl c gv f
-    (WF: wf_const S TD c (typ_floatpoint fp_float))
-    (TY: _const2GV TD gl c = ret (gv, typ_floatpoint fp_float))
-    (VS: GV2val TD gv = ret Vfloat f),
-    False.
-Proof. admit. Qed.
-
-Lemma gv2val_vsingle_double_false:
-  forall S TD gl c gv f
-    (WF: wf_const S TD c (typ_floatpoint fp_double))
-    (TY: _const2GV TD gl c = ret (gv, typ_floatpoint fp_double))
-    (VS: GV2val TD gv = ret Vsingle f),
-    False.
-Proof.
-  intros.
-  destruct gv; inversion VS.
-  destruct p; destruct gv; inv VS. admit.
-  (*
-    induction c; dependent destruction TY; simpl in x.
-    - (* const_zeroinitializer *)
-      dependent destruction WF.
-      unfold zeroconst2GV, zeroconst2GV_aux in x.
-      destruct targetdata5; simpl in x.
-      dependent destruction x.
-    - (* const_floatpoint *)
-      destruct floating_point5; inv x.
-    - (* const_undef *)
-      unfold gundef in x;
-      destruct (flatten_typ _ _) in x; dependent destruction x;
-      destruct l0; inv x.
-    - (* const_arr *)
-      destruct (_list_const_arr2GV_ _ _ _ _ _) in x; dependent destruction x.
-      destruct (length _) in x; dependent destruction x.
-    - (* const_struct *)
-      dependent destruction WF.
-    - (* const_gid *)
-      destruct (lookupAL _ _ _) in x; dependent destruction x.
-    - (* const_truncop *)
-      dependent destruction WF.
-      destruct (_const2GV _ _ _) in x; dependent destruction x.
-      destruct p; subst.
-      unfold mtrunc in x.
-      destruct (GV2val _ _) in x.
-        Focus 2.
-          unfold gundef, mc2undefs, flatten_typ, flatten_typ_aux in x;
-          destruct targetdata5; simpl in x;
-          dependent destruction x.
-
-        destruct v; simpl in x.
-          unfold gundef, mc2undefs, flatten_typ, flatten_typ_aux in x;
-          destruct targetdata5; simpl in x;
-          dependent destruction x.
-
-          destruct t; unfold gundef, mc2undefs, flatten_typ, flatten_typ_aux in x;
-          destruct targetdata5; simpl in x;
-          dependent destruction x.
-
-*)
-  Qed.
-
 Lemma const2GV_isnt_stuck_mutind : 
   (forall S td c t, @const2GV_isnt_stuck_Prop S td c t) /\
   (forall sdct, @consts2GV_isnt_stuck_Prop sdct).
@@ -455,9 +394,6 @@ Case "wfconst_trunc_fp".
   fill_ctxhole.
   destruct (GV2val targetdata5 gv) as [[]|] eqn:GVeqn; eauto.
   destruct floating_point1; try solve [eauto | elim_wrong_wf_typ].
-  destruct floating_point1; elim_wrong_wf_typ.
-  exfalso;
-  eapply gv2val_vsingle_double_false; eauto.
 Case "wfconst_zext".
   match goal with
   | H4: wf_global _ _ _ |- _ => 
@@ -643,10 +579,8 @@ Case "wfconst_fbop".
   destruct v; eauto.
   destruct v0; eauto.
   destruct floating_point5; try solve [eauto | elim_wrong_wf_typ].
-  exfalso; eapply gv2val_vfloat_float_false; eauto.
   destruct v0; eauto.
   destruct floating_point5; try solve [eauto | elim_wrong_wf_typ].
-  exfalso; eapply gv2val_vsingle_double_false; eauto.
   destruct v; eauto.
 Case "wfconst_cons".
   simpl_split lsdc lt. simpl.
@@ -716,11 +650,11 @@ Proof.
   destruct (GV2val TD y); eauto using gundef__total.
   destruct v; eauto using gundef__total.
   destruct fp; try solve [eauto | elim_wrong_wf_typ].
-  admit. (* TODO: not true *)
+  destruct (GV2val TD y); eauto using gundef__total.
   destruct (GV2val TD y); eauto using gundef__total.
   destruct v; eauto using gundef__total.
   destruct fp; try solve [eauto | elim_wrong_wf_typ].
-  admit. (* TODO: not true *)  
+  eauto using gundef__total.
 Qed.
 
 Lemma micmp_is_total : forall S TD c t
@@ -816,7 +750,6 @@ Proof.
     end.
     destruct v0; eauto using gundef__total.
       destruct floating_point1; try solve [eauto | elim_wrong_wf_typ].
-  admit. (* TODO: not true *)
 Qed.
 
 Lemma mext_is_total : forall s f b los nts ps id5 eop0 t1 t2 v, 
@@ -1692,7 +1625,6 @@ Proof.
 
     destruct_typ t1; try solve [eapply gundef__getTypeSizeInBits; eauto].
     destruct_typ t2; try solve [eapply gundef__getTypeSizeInBits; eauto].
-    inv H1.
 Qed.
 
 Lemma mext_typsize : forall S los nts eop t1 t2 gv1 gv2
@@ -2866,7 +2798,7 @@ Proof.
       constructor; auto.
         split; auto.
         simpl; auto.
-    destruct t1; destruct t2; eapply gundef__matches_chunks; eauto. inv H1.
+    destruct t1; destruct t2; eapply gundef__matches_chunks; eauto.
 Qed.
 
 Lemma mext_matches_chunks : forall S td eop t1 t2 gv1 gv2

@@ -167,7 +167,6 @@ Proof.
 
     destruct_typ t1; eauto using undef__no_embedded_ptrs.
       destruct_typ t2; eauto using undef__no_embedded_ptrs.
-      destruct (floating_point_order f1 f0); tinv H.
 Qed.
 
 Lemma mext_preserves_no_embedded_ptrs: forall td eop t1 t2 gv gv',
@@ -249,9 +248,9 @@ Proof.
   destruct v; eauto using undef__no_embedded_ptrs.
   destruct (GV2val td gv2); eauto using undef__no_embedded_ptrs.
   destruct v; eauto using undef__no_embedded_ptrs.
-  destruct fp0; tinv H; destruct fbop0; inv H; simpl; auto.
+  destruct fp0; tinv H; destruct fbop0; inv H; simpl; eauto using undef__no_embedded_ptrs.
   destruct (GV2val td gv2); try destruct v; eauto using undef__no_embedded_ptrs.
-  destruct fp0; tinv H; destruct fbop0; inv H; simpl; auto.    
+  destruct fp0; tinv H; destruct fbop0; inv H; simpl; eauto using undef__no_embedded_ptrs.
 Qed.
 
 Lemma BOP_preserves_no_embedded_ptrs: forall TD lc gl bop0 sz0 v1 v2 gvs3,
