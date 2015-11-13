@@ -268,8 +268,8 @@ module GenericValue = struct
       failwith "Switch isnt a const expr"
     | Opcode.Invoke ->      
       failwith "Invoke isnt a const expr"
-    | Opcode.Unwind ->
-      failwith "Unwind isnt a const expr"
+(*    | Opcode.Unwind ->
+      failwith "Unwind isnt a const expr" *)
     | Opcode.Unreachable ->
       failwith "Unreachable isnt a const expr"
     | Opcode.Add ->

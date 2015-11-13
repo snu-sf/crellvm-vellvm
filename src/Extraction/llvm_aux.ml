@@ -1,5 +1,105 @@
 open Llvm
 
+(* newly added by yoonseung *)
+let rec string_of_opcode op =
+  match op with
+    Opcode.Invalid -> "invalid"
+  | Opcode.Ret -> "ret"
+  | Opcode.Br -> "br"
+  | Opcode.IndirectBr -> "indirectbr"
+  | Opcode.Switch -> "switch"
+  | Opcode.Invoke -> "invoke"
+  | Opcode.Invalid2 -> "invalid2"
+  | Opcode.Unreachable -> "unreachable"
+  (* Standard binary operators *)
+  | Opcode.Add -> "add"
+  | Opcode.FAdd -> "fadd"
+  | Opcode.Sub -> "sub"
+  | Opcode.FSub -> "fsub"
+  | Opcode.Mul -> "mul"
+  | Opcode.FMul -> "fmul"
+  | Opcode.UDiv -> "udiv"
+  | Opcode.SDiv -> "sdiv"
+  | Opcode.FDiv -> "fdiv"
+  | Opcode.URem -> "urem"
+  | Opcode.SRem -> "srem"
+  | Opcode.FRem -> "frem"
+  (* Logical operators *)
+  | Opcode.Shl -> "shl"
+  | Opcode.LShr -> "lshr"
+  | Opcode.AShr -> "ashr"
+  | Opcode.And -> "and"
+  | Opcode.Or -> "or"
+  | Opcode.Xor -> "xor"
+  (* Memory operators *)
+  | Opcode.Alloca -> "alloca"
+  | Opcode.Load -> "load"
+  | Opcode.Store -> "store"
+  | Opcode.GetElementPtr -> "getelementptr"
+  (* Cast operators *)
+  | Opcode.Trunc -> "trunc"
+  | Opcode.ZExt -> "zext"
+  | Opcode.SExt -> "sext"
+  | Opcode.FPToUI -> "fptoui"
+  | Opcode.FPToSI -> "fptost"
+  | Opcode.UIToFP -> "uitofp"
+  | Opcode.SIToFP -> "sitofp"
+  | Opcode.FPTrunc -> "fptrunc"
+  | Opcode.FPExt -> "fpext"
+  | Opcode.PtrToInt -> "ptrtoint"
+  | Opcode.IntToPtr -> "inttoptr"
+  | Opcode.BitCast -> "bitcast"
+  (* Other operators *)
+  | Opcode.ICmp -> "icmp"
+  | Opcode.FCmp -> "fcmp"
+  | Opcode.PHI -> "phi"
+  | Opcode.Call -> "call"
+  | Opcode.Select -> "select"
+  | Opcode.UserOp1 -> "userop1"
+  | Opcode.UserOp2 -> "userop2"
+  | Opcode.VAArg -> "vaarg"
+  | Opcode.ExtractElement -> "extractelement"
+  | Opcode.InsertElement -> "insertelement"
+  | Opcode.ShuffleVector -> "shuflevector"
+  | Opcode.ExtractValue -> "extractvalue"
+  | Opcode.InsertValue -> "insertvalue"
+  | Opcode.Fence -> "fence"
+  | Opcode.AtomicCmpXchg -> "atomiccmpxchg"
+  | Opcode.AtomicRMW -> "atomicrmw"
+  | Opcode.Resume -> "resume"
+  | Opcode.LandingPad -> "landingpad"
+(*** removed in 3.6.2
+  | Opcode.Unwind -> "unwind"
+ ***)
+
+let string_of_valuekd op =
+  match op with
+  | ValueKind.NullValue -> "NullValue"
+  | ValueKind.Argument -> "Argument"
+  | ValueKind.BasicBlock -> "BasicBlock"
+  | ValueKind.InlineAsm -> "InlineAsm"
+  | ValueKind.MDNode -> "MDNode"
+  | ValueKind.MDString -> "MDString"
+  | ValueKind.BlockAddress -> "BlockAddress"
+  | ValueKind.ConstantAggregateZero -> "ConstantAggregateZero"
+  | ValueKind.ConstantArray -> "ConstantArray"
+  | ValueKind.ConstantExpr -> "ConstantExpr"
+  | ValueKind.ConstantFP -> "ConstantFP"
+  | ValueKind.ConstantInt -> "ConstantInt"
+  | ValueKind.ConstantPointerNull -> "ConstantPointerNull"
+  | ValueKind.ConstantStruct -> "ConstantStruct"
+  | ValueKind.ConstantVector -> "ConstantVector"
+  | ValueKind.Function -> "Function"
+  | ValueKind.GlobalAlias -> "GlobalAlias"
+  | ValueKind.GlobalVariable -> "GlobalVariable"
+  | ValueKind.UndefValue -> "UndefValue"
+  | ValueKind.Instruction opcode -> string_of_opcode opcode
+(* in 3.6.2 *)
+  | ValueKind.ConstantDataArray -> "ConstantDataArray"
+  | ValueKind.ConstantDataVector -> "ConstantDataVector"
+
+(* end *)
+                           
 let string_of_icmp op =
   match op with
   | Icmp.Eq -> "eq"
@@ -65,7 +165,7 @@ let is_terminator_opcode opcode =
   | Opcode.Switch -> true 
   | Opcode.IndirectBr -> true 
   | Opcode.Invoke -> true
-  | Opcode.Unwind -> true
+(*  | Opcode.Unwind -> true *)
   | Opcode.Resume -> true
   | Opcode.Unreachable -> true
   | _ -> false
@@ -210,7 +310,7 @@ let string_of_aligntype at =
   | Llvm_target.AlignType.Vector_align -> "v"
   | Llvm_target.AlignType.Float_align -> "f"
   | Llvm_target.AlignType.Aggregate_align -> "a"
-  | Llvm_target.AlignType.Stack_align -> "s"
+  (* | Llvm_target.AlignType.Stack_align -> "s" *)
 
 let string_of_valuekd op =
   match op with
@@ -255,6 +355,5 @@ match lk with
 
 let escaped_value_name (v:llvalue) : string =
    Llvm.escaped_value_name v
-
 
 
