@@ -621,25 +621,24 @@ let travel_global m st g =
   | _ -> failwith "Not_Global"
 
 let travel_layout dlt =
-  let tg = Llvm_target.TargetData.create dlt in
-  let n = Llvm_target.get_num_alignment tg in
+  let tg = Llvm_target.DataLayout.of_string dlt in
+  let n = Llvm_target.DataLayout.get_num_alignment tg in
   prerr_string "layouts: ";
   prerr_endline dlt;
   eprintf "byteorde=%s\n"
-    (string_of_endian (Llvm_target.byte_order tg));
+    (string_of_endian (Llvm_target.DataLayout.byte_order tg));
   eprintf "p size=%s abi=%s pref=%s\n"
-    (string_of_int ((Llvm_target.pointer_size tg)*8))
-    (string_of_int ((Llvm_target.pointer_abi_alignment tg)*8))
-    (string_of_int ((Llvm_target.pointer_pref_alignment tg)*8));
+    (string_of_int ((Llvm_target.DataLayout.pointer_size tg)*8))
+    (string_of_int ((Llvm_target.DataLayout.pointer_abi_alignment tg)*8))
+    (string_of_int ((Llvm_target.DataLayout.pointer_pref_alignment tg)*8));
   for i = 0 to n-1 do
     eprintf "typ=%s bitwidth=%s abi=%s pref=%s\n"
-      (string_of_aligntype (Llvm_target.get_align_type_enum tg i))
-      (string_of_int (Llvm_target.get_type_bitwidth tg i))
-      (string_of_int ((Llvm_target.get_abi_align tg i)*8))
-      (string_of_int ((Llvm_target.get_pref_align tg i)*8));
+      (string_of_aligntype (Llvm_target.DataLayout.get_align_type_enum tg i))
+      (string_of_int (Llvm_target.DataLayout.get_type_bitwidth tg i))
+      (string_of_int ((Llvm_target.DataLayout.get_abi_align tg i)*8))
+      (string_of_int ((Llvm_target.DataLayout.get_pref_align tg i)*8));
     flush_all()
-  done;
-  Llvm_target.TargetData.dispose tg
+  done
   
 let string_of_namedt m ty =
   match classify_type ty with
