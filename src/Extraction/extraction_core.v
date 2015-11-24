@@ -8,7 +8,7 @@ Require Import Memory.
 Require Import Integers.
 Require Import Floats.
 Require Import opsem.
-Require Import interpreter.
+(* Require Import interpreter. *)
 Require Import Maps.
 Require Import maps_ext.
 Require Import Iteration.
@@ -105,6 +105,8 @@ Extract Constant LLVMinfra.mgetoffset_aux =>
   "Llvmcaml.TargetData.mgetoffset_aux".
 Extract Constant LLVMinfra.mgetoffset =>
   "Llvmcaml.TargetData.mgetoffset".
+Extract Constant LLVMinfra.intConsts2Nats =>
+  "Llvmcaml.TargetData.intConsts2Nats".
 
 Extract Constant LLVMgv.mblock => "Llvmcaml.GenericValue.t".
 Extract Constant LLVMgv.mptr => "Llvmcaml.GenericValue.t".
@@ -347,4 +349,4 @@ Extraction Blacklist List String Int.
 
 Recursive Extraction Library Metatheory.
 Recursive Extraction Library analysis.
-Recursive Extraction Library interpreter.
+(* Recursive Extraction Library interpreter. *)
