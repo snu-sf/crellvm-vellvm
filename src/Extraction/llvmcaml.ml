@@ -1,6 +1,8 @@
 module TargetData = struct
   type t = int
 
+  let getTypeAllocSize (td:t) typ = failwith "undef"
+
   let getTypeAllocSizeInBits x y = failwith "undef"
   let _getStructElementOffset x y z = failwith "undef"
   let getStructElementOffset x y z = failwith "undef"
@@ -35,4 +37,6 @@ module TargetData = struct
   let getFloatAlignmentInfo x = failwith "undef"          
   let mgetoffset_aux x y z w = failwith "mgetoffset_aux undef"
   let mgetoffset x y z = failwith "mgetoffset undef"
+
+  let intConsts2Nats x y = failwith "intConsts2Nats undef"
 end
