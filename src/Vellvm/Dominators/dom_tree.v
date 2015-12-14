@@ -7,12 +7,12 @@ Require Import Relations.Relation_Operators.
 (* This file defines dominator trees with properties. *)
 Section DTree.
 
-Variable A:Set.
+Variable A:Type.
 Hypothesis Hdec: forall x y:A, {x = y} + {x <> y}.
 (* A rose tree. *)
-Inductive DTree : Set :=
+Inductive DTree : Type :=
 | DT_node : A -> DTrees -> DTree
-with DTrees : Set :=
+with DTrees : Type :=
 | DT_nil : DTrees
 | DT_cons : DTree -> DTrees -> DTrees
 .
@@ -1175,9 +1175,10 @@ Implicit Arguments create_dtree_from_chains [A].
 Implicit Arguments create_dtree_from_chains__is_dtree_edge__is_chain_edge [A].
 
 Require Import Maps.
+Require Import maps_ext.
 
 (* create_dtree constructs a well-formed dom-tree. *)
-Module DTreeProps (T:TREE).
+Module DTreeProps (T:TREE0).
 
 Module TCfg := Cfg(T).
 

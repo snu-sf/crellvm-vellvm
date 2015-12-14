@@ -21,7 +21,7 @@ Module MemProps.
 Fixpoint wf_global (maxb:Values.block) (gv:GenericValue) : Prop :=
 match gv with
 | nil => True
-| (Vptr b _,_)::gv' => b <= maxb /\ wf_global maxb gv'
+| (Vptr b _,_)::gv' => (b <= maxb)%positive /\ wf_global maxb gv'
 | _::gv' => wf_global maxb gv'
 end.
 
@@ -33,7 +33,7 @@ end.
 
 (* maxb must be non-negative. *)
 Definition wf_globals maxb (gl:GVMap) : Prop :=
-0 <= maxb /\ wf_global_list maxb gl.
+(xH <= maxb)%positive /\ wf_global_list maxb gl.
 
 (*****************************************************************)
 (* Two values are not aliased if they do not have pointers in the same block. *)
@@ -57,7 +57,7 @@ end.
 Fixpoint valid_ptrs (bound:Values.block) (gvs:GenericValue): Prop :=
 match gvs with
 | nil => True
-| (Vptr blk _,_)::gvs' => blk < bound /\ valid_ptrs bound gvs'
+| (Vptr blk _,_)::gvs' => (blk < bound)%positive /\ valid_ptrs bound gvs'
 | _::gvs' => valid_ptrs bound gvs'
 end.
 
@@ -70,10 +70,10 @@ forall id0 gvs,
 Definition wf_Mem maxb (td:targetdata) (M:mem) : Prop :=
 (forall gptr ty al gvs,
   mload td M gptr ty al = Some gvs -> valid_ptrs (Mem.nextblock M) gvs) /\
-maxb < Mem.nextblock M.
+(maxb < Mem.nextblock M)%positive.
 
 Definition wf_als maxb M (als: list Values.block) : Prop :=
-NoDup als /\ (forall al, In al als -> maxb < al < Mem.nextblock M).
+NoDup als /\ (forall al, In al als -> (maxb < al < Mem.nextblock M)%positive).
 
 (*****************************************************************)
 (* Check if gv contains pointers *)
@@ -88,7 +88,7 @@ end.
 Definition encode_decode_ident_prop
   (M:mem) (b:Values.block) (ofs:Z) (chunk:AST.memory_chunk) : Prop :=
 forall bs, 
-  bs = Mem.getN (size_chunk_nat chunk) ofs (Mem.mem_contents M b) ->
+  bs = Mem.getN (size_chunk_nat chunk) ofs (Maps.PMap.get b (Mem.mem_contents M)) ->
   bs = encode_val chunk (decode_val chunk bs).
 
 Fixpoint encode_decode_ident_aux (M:mem) (mc:list AST.memory_chunk) b ofs 
@@ -164,6 +164,9 @@ Proof.
       destruct_typ t2; eauto using undef__no_embedded_ptrs.
       destruct (floating_point_order f1 f0); tinv H.
       destruct f0; inv H; unfold val2GV; simpl; auto.
+
+    destruct_typ t1; eauto using undef__no_embedded_ptrs.
+      destruct_typ t2; eauto using undef__no_embedded_ptrs.
 Qed.
 
 Lemma mext_preserves_no_embedded_ptrs: forall td eop t1 t2 gv gv',
@@ -208,8 +211,8 @@ Proof.
 Opaque Val.cmp Val.cmpu.
   destruct cop; inv H;
     apply nonptr_no_embedded_ptrs;
-      try solve [auto | apply cmp_isnt_ptr | apply cmpu_isnt_ptr].
-Transparent Val.cmp Val.cmpu.
+      try solve [auto | apply cmp_isnt_ptr | apply cmpu_int_isnt_ptr].
+Transparent Val.cmp Val.cmpu Val.cmpu_int.
 Qed.
 
 Lemma mbop_preserves_no_embedded_ptrs: forall td bop0 sz0 gv1 gv2 gv3,
@@ -224,12 +227,16 @@ Proof.
   destruct (eq_nat_dec (wz + 1) (Size.to_nat sz0));
     eauto using undef__no_embedded_ptrs.
   destruct bop0; inv H;
-    apply nonptr_no_embedded_ptrs;
-      try solve [apply add_isnt_ptr | apply sub_isnt_ptr | apply mul_isnt_ptr |
-                 apply divu_isnt_ptr | apply divs_isnt_ptr | apply modu_isnt_ptr |
-                 apply mods_isnt_ptr | apply shl_isnt_ptr | apply shrx_isnt_ptr |
-                 apply shr_isnt_ptr | apply and_isnt_ptr | apply or_isnt_ptr |
-                 apply xor_isnt_ptr].
+    try apply nonptr_no_embedded_ptrs;
+      try solve
+        [apply add_isnt_ptr | apply sub_isnt_ptr | apply mul_isnt_ptr |
+         apply shl_isnt_ptr | apply shr_isnt_ptr | apply and_isnt_ptr |
+         apply or_isnt_ptr | apply xor_isnt_ptr |
+         (destruct (eq_nat_dec _ _); subst; eauto using undef__no_embedded_ptrs;
+           try match goal with
+             | _: context[if ?s then _ else _] |- _ => destruct s end
+           ; subst; inv H1; eauto using undef__no_embedded_ptrs
+           ; apply nonptr_no_embedded_ptrs; congruence)].
 Qed.
 
 Lemma mfbop_preserves_no_embedded_ptrs: forall td fbop0 fp0 gv1 gv2 gv3,
@@ -241,7 +248,9 @@ Proof.
   destruct v; eauto using undef__no_embedded_ptrs.
   destruct (GV2val td gv2); eauto using undef__no_embedded_ptrs.
   destruct v; eauto using undef__no_embedded_ptrs.
-  destruct fp0; tinv H; destruct fbop0; inv H; simpl; auto.
+  destruct fp0; tinv H; destruct fbop0; inv H; simpl; eauto using undef__no_embedded_ptrs.
+  destruct (GV2val td gv2); try destruct v; eauto using undef__no_embedded_ptrs.
+  destruct fp0; tinv H; destruct fbop0; inv H; simpl; eauto using undef__no_embedded_ptrs.
 Qed.
 
 Lemma BOP_preserves_no_embedded_ptrs: forall TD lc gl bop0 sz0 v1 v2 gvs3,
@@ -314,7 +323,7 @@ Lemma no_alias_with_blk_dec: forall blk gvs,
   no_alias_with_blk gvs blk \/ ~ no_alias_with_blk gvs blk.
 Proof.
   induction gvs as [|[[]]]; simpl; auto.
-    destruct (Z_eq_dec b blk); subst.
+    destruct (peq b blk); subst.
       right. intros [J1 J2]. auto.
 
       destruct IHgvs; auto.
@@ -372,7 +381,7 @@ Proof.
         right; intros [J1 J2]; auto
       ].
 
-      destruct (Z_eq_dec b0 b); subst.
+      destruct (peq b0 b); subst.
         tauto.
         destruct IHgvs2; tauto.
       tauto.
@@ -689,10 +698,10 @@ Proof.
 Qed.
 
 Lemma null_disjoint_with_ptr: forall mb ofs m,
-  mb > 0 -> no_alias null [(Vptr mb ofs, m)].
+  (mb > xH)%positive -> no_alias null [(Vptr mb ofs, m)].
 Proof.
   intros. simpl. unfold Mem.nullptr.
-  repeat split; auto. intro. subst. omega.
+  repeat split; auto. intro. subst. inv H.
 Qed.
 
 Lemma uninits_disjoint_with_ptr: forall n mb ofs m,
@@ -713,7 +722,7 @@ Qed.
 
 Lemma cgv2gvs_preserves_no_alias: forall g0 mb ofs m t0 maxb,
   no_alias g0 [(Vptr mb ofs, m)] ->
-  0 <= maxb < mb ->
+  (xH <= maxb < mb)%positive ->
   no_alias (cgv2gvs DGVs g0 t0) [(Vptr mb ofs, m)].
 Proof.
   intros.
@@ -727,7 +736,8 @@ Local Transparent cgv2gvs.
   destruct_typ t0; auto.
     destruct f; auto.
 
-    simpl. split; auto. split; auto. unfold Mem.nullptr. intro J. subst. omega.
+    simpl. split; auto. split; auto. unfold Mem.nullptr. intro J. subst.
+    inv H0; destruct maxb; inv H2.
 Global Opaque cgv2gvs.
 Qed.
 
@@ -803,10 +813,10 @@ Qed.
 
 (*****************************************************************)
 (* Properties of valid_ptrs. *)
-Lemma null_valid_ptrs: forall mb, mb > 0 -> valid_ptrs mb null.
+Lemma null_valid_ptrs: forall mb, (mb > xH)%positive -> valid_ptrs mb null.
 Proof.
   intros. unfold null, Mem.nullptr. simpl.
-  split; auto. omega.
+  split; auto. apply Pos.gt_lt; auto.
 Qed.
 
 Lemma uninits_valid_ptrs: forall bd n, valid_ptrs bd (uninits n).
@@ -1025,11 +1035,11 @@ Proof.
 Qed.
 
 Lemma valid_ptrs__trans: forall bound1 bound2 gv,
-  valid_ptrs bound1 gv -> bound1 <= bound2 -> valid_ptrs bound2 gv.
+  valid_ptrs bound1 gv -> (bound1 <= bound2)%positive -> valid_ptrs bound2 gv.
 Proof.
   induction gv as [|[]]; simpl; intros; auto.
     destruct v; auto.
-      destruct H. split; auto. omega.
+      destruct H. split; auto. eapply Pos.lt_le_trans; eauto.
 Qed.
 
 Lemma undef__valid_lift_ptrs: forall g td t1 blk
@@ -1043,7 +1053,7 @@ Opaque gv2gvs.
 Qed.
 
 Lemma in_valid_ptrs: forall bd m b ofs gvs,
-  valid_ptrs bd gvs -> In (Vptr b ofs, m) gvs -> b < bd.
+  valid_ptrs bd gvs -> In (Vptr b ofs, m) gvs -> (b < bd)%positive.
 Proof.
   induction gvs as [|[]]; simpl; intros.
     inv H0.
@@ -1076,7 +1086,7 @@ Proof.
       eapply in_valid_ptrs in H; eauto.
 Qed.
 
-Lemma valid_ptrs__no_alias__fresh_ptr: forall bound TD mb t (Hbd: bound <= mb)
+Lemma valid_ptrs__no_alias__fresh_ptr: forall bound TD mb t (Hbd: (bound <= mb)%positive)
   gvs, valid_ptrs bound gvs ->
   no_alias gvs ($ blk2GV TD mb # typ_pointer t $).
 Proof.
@@ -1088,7 +1098,7 @@ Proof.
     apply IHgvs in H0. rewrite simpl_blk2GV in *. simpl in *.
     destruct H0.
     repeat split; auto.
-      intro J. subst. contradict H; omega.
+      intro J. subst. contradict H; apply Pos.le_nlt; auto.
 Qed.
 
 Lemma undefs_valid_ptrs: forall bd gvs1
@@ -1124,7 +1134,7 @@ Proof.
 Qed.
 
 Lemma cgv2gvs_preserves_valid_ptrs: forall g0 t0 bd,
-  bd > 0 -> valid_ptrs bd g0 -> valid_ptrs bd (cgv2gvs DGVs g0 t0).
+  (bd > xH)%positive -> valid_ptrs bd g0 -> valid_ptrs bd (cgv2gvs DGVs g0 t0).
 Proof.
   intros.
 Local Transparent cgv2gvs.
@@ -1324,10 +1334,10 @@ Proof.
     eapply free_preserves_wf_als in HeqR; eauto.
 Qed.
 
-Lemma perm_mfree_1: forall TD M1 M2 ptr b ofs p 
+Lemma perm_mfree_1: forall TD M1 M2 ptr b ofs k p 
   (Hfree : free TD M1 ptr = ret M2) (Hnoalias: MemProps.no_alias_with_blk ptr b)
-  (Hperm: Mem.perm M1 b ofs p),
-  Mem.perm M2 b ofs p.
+  (Hperm: Mem.perm M1 b ofs k p),
+  Mem.perm M2 b ofs k p.
 Proof.
   intros.
   apply free_inv in Hfree.
@@ -1340,10 +1350,10 @@ Proof.
   destruct Hnoalias as [Hoalias _]. congruence.  
 Qed.
 
-Lemma range_perm_mfree_1: forall TD M1 M2 ptr b lo hi p 
+Lemma range_perm_mfree_1: forall TD M1 M2 ptr b lo hi k p 
   (Hfree : free TD M1 ptr = ret M2) (Hnoalias: MemProps.no_alias_with_blk ptr b)
-  (Hperm: Mem.range_perm M1 b lo hi p),
-  Mem.range_perm M2 b lo hi p.
+  (Hperm: Mem.range_perm M1 b lo hi k p),
+  Mem.range_perm M2 b lo hi k p.
 Proof.
   unfold Mem.range_perm.
   intros.
@@ -1364,9 +1374,9 @@ Qed.
 Lemma perm_mfree_2: forall TD M1 M2 ptr (Hfree : free TD M1 ptr = ret M2),
   exists b, exists i, 
     GV2ptr TD (getPointerSize TD) ptr = Some (Vptr b i) /\
-    forall lo hi, 
+    forall lo hi k, 
       Mem.bounds M1 b = (lo, hi) ->
-      forall ofs p, lo <= ofs < hi -> ~Mem.perm M2 b ofs p.
+      forall ofs p, lo <= ofs < hi -> ~Mem.perm M2 b ofs k p.
 Proof.
   intros.
   apply free_inv in Hfree.
@@ -1378,8 +1388,8 @@ Proof.
     eapply Mem.perm_free_2; eauto.
 Qed.
 
-Lemma perm_mfree_3: forall TD M1 M2 ptr (Hfree : free TD M1 ptr = ret M2) b ofs p,
-  Mem.perm M2 b ofs p -> Mem.perm M1 b ofs p.
+Lemma perm_mfree_3: forall TD M1 M2 ptr (Hfree : free TD M1 ptr = ret M2) b ofs k p,
+  Mem.perm M2 b ofs k p -> Mem.perm M1 b ofs k p.
 Proof.
   intros.
   apply free_inv in Hfree.
@@ -1685,7 +1695,7 @@ Proof.
 Qed.
 
 (* We assume alignment is correct. *)
-Axiom align_is_always_correct: forall m ofs, (align_chunk m | ofs).
+(*Axiom align_is_always_correct: forall m ofs, (align_chunk m | ofs).*)
 
 (* Lemma mstore_aux_ex: forall mb lo hi mc gv m ofs *)
 (*   (Hperm : Mem.range_perm m mb lo hi Freeable) *)
@@ -1890,6 +1900,7 @@ Proof.
       assert (J:=size_chunk_pos m0). omega.
 Qed.
 
+(* NOTE: not used
 Lemma mstore_mload_same: forall td Mem mp2 typ1 gv1 align1 Mem'
   (Hmatch: gv_chunks_match_typ td gv1 typ1),
   mstore td Mem mp2 typ1 gv1 align1 = ret Mem' ->
@@ -1925,6 +1936,7 @@ Proof.
     apply IHHmatch in H1; auto.  
     repeat fill_ctxhole.  auto.
 Qed.
+*)
 
 Lemma bounds_mstore_aux: forall b mc gvs M ofs M',
   mstore_aux M mc gvs b ofs = ret M' ->
@@ -1952,10 +1964,10 @@ Proof.
   eapply bounds_mstore_aux in J3; eauto.
 Qed.
 
-Lemma mstore_aux_preserves_range_perm: forall b lo hi p mc gv blk M ofs M' 
-  (Hperm: Mem.range_perm M b lo hi p)
+Lemma mstore_aux_preserves_range_perm: forall b lo hi k p mc gv blk M ofs M' 
+  (Hperm: Mem.range_perm M b lo hi k p)
   (Hst: mstore_aux M mc gv blk ofs = Some M'),
-  Mem.range_perm M' b lo hi p.
+  Mem.range_perm M' b lo hi k p.
 Proof.
   induction mc; destruct gv; simpl; intros; inv Hst; auto.
 
@@ -1968,10 +1980,10 @@ Proof.
     eapply Mem.perm_store_1; eauto.
 Qed.
 
-Lemma mstore_preserves_range_perm: forall td b lo hi p gv t gv0 al M M' 
-  (Hperm: Mem.range_perm M b lo hi p)
+Lemma mstore_preserves_range_perm: forall td b lo hi k p gv t gv0 al M M' 
+  (Hperm: Mem.range_perm M b lo hi k p)
   (Hst: mstore td M gv t gv0 al = Some M'),
-  Mem.range_perm M' b lo hi p.
+  Mem.range_perm M' b lo hi k p.
 Proof.
   intros.
   apply mstore_inversion in Hst.
@@ -1991,6 +2003,7 @@ Qed.
 (*   eapply Mem.perm_alloc_1; eauto. *)
 (* Qed. *)
 
+(* NOTE: not used
 Lemma mload_aux_mstore_aux_same: forall b0 mc Mem gv1 ofs0 Mem'
   (Hid: encode_decode_ident_aux Mem mc b0 ofs0),
   mstore_aux Mem mc gv1 b0 ofs0 = ret Mem' ->
@@ -2008,12 +2021,13 @@ Proof.
     eapply Mem.load_store_same' with (m2:=m) in Hid1; eauto. subst.
     apply IHmc in H1; auto.
 Qed.
-
+*)
 Lemma mstore_aux_mem_contents_outside: 
   forall mb ofs2 mc1 gv1 ofs1 M M' (Hst: mstore_aux M mc1 gv1 mb ofs1 = ret M')
   (Hlt: ofs1 >= ofs2),
   forall i0 : Z, i0 < ofs2 ->
-    Mem.mem_contents M mb i0 = Mem.mem_contents M' mb i0.
+    Maps.ZMap.get i0 (Maps.PMap.get mb (Mem.mem_contents M)) =
+    Maps.ZMap.get i0 (Maps.PMap.get mb (Mem.mem_contents M')).
 Proof.
   induction mc1; destruct gv1; intros; inv Hst; auto.
 
@@ -2025,13 +2039,14 @@ Proof.
       symmetry in HeqR.
       apply Mem.store_mem_contents in HeqR.
       rewrite HeqR.
-      rewrite update_s.
+      rewrite Maps.PMap.gsspec; destruct (peq _ _); eauto.
       rewrite Mem.setN_outside; auto.
         omega.
 
         assert (J:=@size_chunk_pos m). omega.
 Qed.
 
+(* NOTE: not used
 Lemma promotable_mstore_aux_preserves_encode_decode_ident:
   forall mb mc1 gv1 ofs mc M M'
   (Hsplit: snd (split gv1) = mc) (Hst : mstore_aux M mc1 gv1 mb ofs = ret M'),
@@ -2053,8 +2068,8 @@ Proof.
       symmetry in HeqR.
       apply Mem.store_mem_contents in HeqR.
 
-      assert (Mem.getN (size_chunk_nat m) ofs (Mem.mem_contents m0 mb) =
-                Mem.getN (size_chunk_nat m) ofs (Mem.mem_contents M' mb)) as EQ.
+      assert (Mem.getN (size_chunk_nat m) ofs (Maps.PMap.get mb (Mem.mem_contents m0)) =
+                Mem.getN (size_chunk_nat m) ofs (Maps.PMap.get mb (Mem.mem_contents M'))) as EQ.
         apply Mem.getN_exten.
         intros.
         eapply MemProps.mstore_aux_mem_contents_outside with
@@ -2074,6 +2089,7 @@ Proof.
 
         rewrite encode_val_length; auto.
 Qed.
+*)
 
 (*****************************************************************)
 (* Properties of alloca. *)
@@ -2091,7 +2107,7 @@ Lemma alloc_preserves_mload_aux_inv': forall M M' mb lo hi b
 Proof.
   induction mc; simpl; intros.
     inv H.
-    destruct (zeq b mb); subst; auto.
+    destruct (peq b mb); subst; auto.
 
     inv_mbind'.
     symmetry in HeqR.
@@ -2193,12 +2209,12 @@ Qed.
 
 Lemma nextblock_malloc: forall TD M tsz gn M' align0 mb,
   malloc TD M tsz gn align0 = ret (M', mb) ->
-  Mem.nextblock M + 1 = Mem.nextblock M'.
+  (Mem.nextblock M + 1)%positive = Mem.nextblock M'.
 Proof.
   intros.
   apply malloc_inv in H.
   apply Mem.nextblock_alloc in H.
-  rewrite H. omega.
+  rewrite H. rewrite Pplus_one_succ_r; auto.
   (* destruct H as [n [J1 [J2 J3]]]. *)
   (* apply Mem.nextblock_alloc in J3. *)
   (* rewrite J3. omega. *)
@@ -2245,37 +2261,39 @@ Lemma malloc_preserves_wf_Mem : forall maxb TD M tsz gn align0 M' mb
   wf_Mem maxb TD M'.
 Proof.
   intros. destruct Hwf as [J1 J2].
-  assert (Mem.nextblock M + 1 = Mem.nextblock M') as EQ.
+  assert ((Mem.nextblock M + 1)%positive = Mem.nextblock M') as EQ.
     eapply nextblock_malloc; eauto.
   split.
     rewrite <- EQ.
     intros.
     eapply malloc_preserves_mload_inv in H; eauto.
     destruct H as [[G _]| [G _]]; subst; eauto.
-      apply J1 in G. eapply valid_ptrs__trans; eauto. omega.
+      apply J1 in G. eapply valid_ptrs__trans; eauto. rewrite <- Pplus_one_succ_r; apply Ple_succ.
       eapply undefs_valid_ptrs; eauto.
 
-    omega.
+    eapply Plt_trans; eauto. rewrite <- EQ. rewrite <- Pplus_one_succ_r; apply Plt_succ.
 Qed.
 
 Lemma malloc_preserves_wf_als : forall maxb TD M M' tsz gn align0 mb als
   (Hmalloc: malloc TD M tsz gn align0 = ret (M', mb))
-  (Hbd: maxb < Mem.nextblock M) (Hwf: wf_als maxb M als),
+  (Hbd: (maxb < Mem.nextblock M)%positive) (Hwf: wf_als maxb M als),
   wf_als maxb M' (mb::als).
 Proof.
   intros. destruct Hwf as [J1 J2].
   split.
     constructor; auto.
       intro J. apply J2 in J.
-      apply malloc_result in Hmalloc. subst. omega.
+      apply malloc_result in Hmalloc. subst.
+      destruct J as [_ J3]. eapply Plt_strict; eauto.
 
     intros.
     simpl in H.
     erewrite <- nextblock_malloc; eauto.
     apply malloc_result in Hmalloc. subst.
     destruct H as [H | H]; subst.
-      omega.
-      apply J2 in H. omega.
+      split; eauto. rewrite <- Pplus_one_succ_r; apply Plt_succ.
+      apply J2 in H. destruct H; split; eauto.
+      rewrite <- Pplus_one_succ_r; eapply Plt_trans; eauto; eapply Plt_succ.
 Qed.
 
 Lemma malloc_preserves_wf_lc_in_tail: forall TD M M' tsz gn align0 mb lc
@@ -2286,7 +2304,7 @@ Proof.
   intros. apply Hwf in H.
   eapply valid_ptrs__trans; eauto.
   erewrite <- nextblock_malloc with (M':=M'); eauto.
-  omega.
+  rewrite <- Pplus_one_succ_r; apply Ple_succ.
 Qed.
 
 (* Lemma bounds_malloc: forall TD M tsz gn M' align0 mb *)
@@ -2376,7 +2394,7 @@ Qed.
 
 Lemma promotable_alloc_encode_decode_ident_aux: forall (M : mem) (M' : mem)
   (mc : list AST.memory_chunk)
-  (Hup : update (Mem.nextblock M) (fun _ : Z => Undef) (Mem.mem_contents M) =
+  (Hup : Maps.PMap.set (Mem.nextblock M) (Maps.ZMap.init Undef) (Mem.mem_contents M) =
          Mem.mem_contents M'),
   forall z : Z, encode_decode_ident_aux M' mc (Mem.nextblock M) z.
 Proof.
@@ -2385,20 +2403,22 @@ Proof.
       unfold encode_decode_ident_prop.
       intros.
       rewrite <- Hup in H.
-      rewrite update_s in H.
+      rewrite Maps.PMap.gss in H.
       assert (bs = list_repeat (size_chunk_nat a) Undef) as EQ.
         erewrite <- Mem.getN_Undef__list_repeat_Undef; eauto.
       subst.
       repeat rewrite EQ.
+      SearchAbout (list_repeat _ Undef).
+      
       rewrite encode_decode_undef; auto.
         assert (J:=@size_chunk_nat_pos a).
         destruct J as [n J]. rewrite J. omega.
 Qed.
 
-Lemma alloc_preserves_encode_decode_ident: forall (M : mem) (mb' : Z)
-  (Hlt : mb' < Mem.nextblock M) (l0 : list AST.memory_chunk) (m : Mem.mem_)
+Lemma alloc_preserves_encode_decode_ident: forall (M : mem) (mb' : positive)
+  (Hlt : (mb' < Mem.nextblock M)%positive) (l0 : list AST.memory_chunk) (m : Mem.mem)
   (ofs : Z) (Hid : encode_decode_ident_aux M l0 mb' ofs)
-  (Hup : update (Mem.nextblock M) (fun _ : Z => Undef) (Mem.mem_contents M) =
+  (Hup : Maps.PMap.set (Mem.nextblock M) (Maps.ZMap.init Undef) (Mem.mem_contents M) =
          Mem.mem_contents m),
   encode_decode_ident_aux m l0 mb' ofs.
 Proof.
@@ -2416,12 +2436,12 @@ Proof.
       rewrite <- Hup.
       apply Mem.getN_exten.
       intros.
-      rewrite update_o; auto. omega.
+      rewrite Maps.PMap.gso; auto.
 Qed.
 
 Lemma malloc_preserves_encode_decode_ident: forall TD M tsz gn align0 M' mb
   ty al mb' (Hal: malloc TD M tsz gn align0 = ret (M', mb))
-  (Hlt: mb' < Mem.nextblock M)
+  (Hlt: (mb' < Mem.nextblock M)%positive)
   (Hid: encode_decode_ident TD M ($ blk2GV TD mb' # typ_pointer ty $) ty al),
   encode_decode_ident TD M' ($ blk2GV TD mb' # typ_pointer ty $) ty al.
 Proof.
@@ -2439,8 +2459,8 @@ Proof.
   apply malloc_inv in Hal.
   (* destruct Hal as [n [J1 [J2 J3]]]. *)
   rewrite simpl_blk2GV in HeqR. inv HeqR.
-  assert (update (Mem.nextblock M)
-                 (fun ofs => Undef)
+  assert (Maps.PMap.set (Mem.nextblock M)
+                 (Maps.PMap.init Undef)
                  (Mem.mem_contents M) = (Mem.mem_contents M')) as Hup.
     eapply Mem.alloc_mem_contents; eauto.
   remember (Int.signed 31 (Int.repr 31 0)) as ofs.
@@ -2457,12 +2477,12 @@ Definition zeroconst2GV_aux_disjoint_with_runtime_ptr_prop S td (t:typ) :=
   maxb gl g mb ofs m
   (Hwfg: wf_globals maxb gl)
   (Hc2g : zeroconst2GV_aux (los,nts') acc t = ret g)
-  (Hle: maxb < mb)
+  (Hle: (maxb < mb)%positive)
   (Hnc: forall id5 gv5, 
           lookupAL _ nts id5 <> None ->
           lookupAL _ acc id5 = Some (Some gv5) ->
-          no_alias gv5 [(Vptr mb ofs, m)] /\ valid_ptrs (maxb + 1) gv5),
-  no_alias g [(Vptr mb ofs, m)] /\ valid_ptrs (maxb + 1) g.
+          no_alias gv5 [(Vptr mb ofs, m)] /\ valid_ptrs ((maxb + 1)%positive) gv5),
+  no_alias g [(Vptr mb ofs, m)] /\ valid_ptrs ((maxb + 1)%positive) g.
 
 Definition zeroconsts2GV_aux_disjoint_with_runtime_ptr_prop sdt :=
   wf_styp_list sdt ->
@@ -2473,12 +2493,12 @@ Definition zeroconsts2GV_aux_disjoint_with_runtime_ptr_prop sdt :=
   (Hnc: forall id5 gv5, 
           lookupAL _ nts id5 <> None ->
           lookupAL _ acc id5 = Some (Some gv5) ->
-          no_alias gv5 [(Vptr mb ofs, m)] /\ valid_ptrs (maxb + 1) gv5)
+          no_alias gv5 [(Vptr mb ofs, m)] /\ valid_ptrs ((maxb + 1)%positive) gv5)
   (Heq': eq_system_targetdata S td lsd)
   (Hwfg: wf_globals maxb gl)
   (Hc2g : zeroconsts2GV_aux (los,nts') acc lt = ret g)
-  (Hle: maxb < mb),
-  no_alias g [(Vptr mb ofs, m)] /\ valid_ptrs (maxb + 1) g.
+  (Hle: (maxb < mb)%positive),
+  no_alias g [(Vptr mb ofs, m)] /\ valid_ptrs ((maxb + 1)%positive) g.
 
 Lemma zeroconst2GV_aux_disjoint_with_runtime_ptr_mutrec :
   (forall S TD t, zeroconst2GV_aux_disjoint_with_runtime_ptr_prop S TD t) /\
@@ -2491,8 +2511,11 @@ Proof.
 
 Case "wf_styp_function".
   split.
-    apply null_disjoint_with_ptr. destruct Hwfg. omega.
-    apply null_valid_ptrs. destruct Hwfg. omega.
+    apply null_disjoint_with_ptr. destruct Hwfg.
+      apply Pos.lt_gt.
+      eapply Pos.le_lt_trans; eauto.
+    apply null_valid_ptrs. destruct Hwfg.
+      apply Pos.lt_gt. rewrite <- Pplus_one_succ_r; apply Pos.lt_1_succ.
 
 Case "wf_styp_structure".
   simpl_split lsd lt.
@@ -2514,7 +2537,7 @@ Case "wf_styp_array".
     assert (no_alias
       (g0 ++ uninits (Size.to_nat s0 - sizeGenericValue g0))
       [(Vptr mb ofs, m)] /\
-      valid_ptrs (maxb + 1)
+      valid_ptrs ((maxb + 1)%positive)
         (g0 ++ uninits (Size.to_nat s0 - sizeGenericValue g0))) as J.
       destruct HeqR.
       split.
@@ -2532,8 +2555,10 @@ Case "wf_styp_array".
 
 Case "wf_styp_pointer".
   split.
-    apply null_disjoint_with_ptr. destruct Hwfg. omega.
-    apply null_valid_ptrs. destruct Hwfg. omega.
+    apply null_disjoint_with_ptr. destruct Hwfg.
+      apply Pos.lt_gt; eapply Pos.le_lt_trans; eauto.
+    apply null_valid_ptrs. destruct Hwfg.
+      apply Pos.lt_gt; rewrite <- Pplus_one_succ_r; eapply Pos.lt_1_succ.
 
 Case "wf_styp_namedt".
   inv_mbind. eauto.
@@ -2571,8 +2596,8 @@ Lemma noncycled__disjoint_with_runtime_ptr: forall S los nts maxb gl ofs mb m
   (Hz: zeroconst2GV_aux (los, nts')
          (zeroconst2GV_for_namedts (los, nts') los nts2) (typ_struct lt) = 
            Some gv)
-  (Hle: maxb < mb),
-  no_alias gv [(Vptr mb ofs, m)] /\ valid_ptrs (maxb + 1) gv.
+  (Hle: (maxb < mb)%positive),
+  no_alias gv [(Vptr mb ofs, m)] /\ valid_ptrs ((maxb + 1)%positive) gv.
 Proof.
 Local Opaque no_alias valid_ptrs.
   induction 2; simpl; intros; subst.
@@ -2606,8 +2631,8 @@ Qed.
 Lemma zeroconst2GV_disjoint_with_runtime_ptr: forall S t maxb gl g td mb ofs m
   (Hwft: wf_typ S td t) (Hwfg: wf_globals maxb gl)
   (Hc2g : ret g = zeroconst2GV td t)
-  (Hle: maxb < mb),
-  no_alias g [(Vptr mb ofs, m)] /\ valid_ptrs (maxb + 1) g.
+  (Hle: (maxb < mb)%positive),
+  no_alias g [(Vptr mb ofs, m)] /\ valid_ptrs ((maxb + 1)%positive) g.
 Proof. 
   intros. destruct td as [los nts].
   unfold zeroconst2GV in *. inv Hwft.
@@ -2626,8 +2651,8 @@ Qed.
 Lemma zeroconst2GV_disjoint_with_runtime_alloca: forall t maxb gl g td mb t0
   (Hwfg: wf_globals maxb gl) S (Hwft: wf_typ S td t)
   (Hc2g : ret g = zeroconst2GV td t)
-  (Hle: maxb < mb),
-  no_alias g ($ blk2GV td mb # typ_pointer t0 $) /\ valid_ptrs (maxb + 1) g.
+  (Hle: (maxb < mb)%positive),
+  no_alias g ($ blk2GV td mb # typ_pointer t0 $) /\ valid_ptrs ((maxb + 1)%positive) g.
 Proof.
   intros. rewrite simpl_blk2GV.
   eapply zeroconst2GV_disjoint_with_runtime_ptr; eauto.
@@ -2637,8 +2662,8 @@ Qed.
 (*****************************************************************)
 (* Properties of wf_global. *)
 Lemma wf_global_disjoint_with_runtime_ptr: forall maxb ofs m
-  mb (Hle : maxb < mb) g0 (Hwfg : wf_global maxb g0),
-  no_alias g0 [(Vptr mb ofs, m)] /\ valid_ptrs (maxb + 1) g0.
+  mb (Hle : (maxb < mb)%positive) g0 (Hwfg : wf_global maxb g0),
+  no_alias g0 [(Vptr mb ofs, m)] /\ valid_ptrs ((maxb + 1)%positive) g0.
 Proof.
   induction g0 as [|[]]; simpl; intros.
     split; auto using no_alias_nil.
@@ -2650,15 +2675,15 @@ Proof.
       split.
         split; auto.
         split; auto.
-          intro. subst. contradict J1. omega.
+          intro. subst. contradict J1. apply Pos.lt_nle; eauto.
 
-        split; auto. omega.
+        split; auto. rewrite <- Pplus_one_succ_r; apply Pos.lt_succ_r; auto.
 Qed.
 
 Lemma wf_globals_disjoint_with_runtime_ptr: forall maxb ofs m
-  (g0 : GenericValue) i0  mb (Hle : maxb < mb) gl (Hwfg : wf_globals maxb gl)
+  (g0 : GenericValue) i0  mb (Hle : (maxb < mb)%positive) gl (Hwfg : wf_globals maxb gl)
   (HeqR : ret g0 = lookupAL GenericValue gl i0),
-  no_alias g0 [(Vptr mb ofs, m)] /\ valid_ptrs (maxb + 1) g0.
+  no_alias g0 [(Vptr mb ofs, m)] /\ valid_ptrs ((maxb + 1)%positive) g0.
 Proof.
   induction gl as [|[]]; intros.
     inv HeqR.
@@ -2680,9 +2705,9 @@ Proof.
 Qed.
 
 Lemma wf_globals_disjoint_with_runtime_alloca: forall maxb td t0
-  (g0 : GenericValue) i0  mb (Hle : maxb < mb) gl (Hwfg : wf_globals maxb gl)
+  (g0 : GenericValue) i0  mb (Hle : (maxb < mb)%positive) gl (Hwfg : wf_globals maxb gl)
   (HeqR : ret g0 = lookupAL GenericValue gl i0),
-  no_alias g0 ($ blk2GV td mb # typ_pointer t0 $) /\ valid_ptrs (maxb + 1) g0.
+  no_alias g0 ($ blk2GV td mb # typ_pointer t0 $) /\ valid_ptrs ((maxb + 1)%positive) g0.
 Proof.
   intros. rewrite simpl_blk2GV.
   eapply wf_globals_disjoint_with_runtime_ptr; eauto.
@@ -2695,8 +2720,8 @@ Definition const2GV_disjoint_with_runtime_ptr_prop S td c t :=
   forall maxb gl g mb t0 ofs m
   (Hwfg: wf_globals maxb gl)
   (Hc2g : _const2GV td gl c = ret (g, t0))
-  (Hle: maxb < mb),
-  t = t0 /\ no_alias g [(Vptr mb ofs, m)] /\ valid_ptrs (maxb+1) g.
+  (Hle: (maxb < mb)%positive),
+  t = t0 /\ no_alias g [(Vptr mb ofs, m)] /\ valid_ptrs ((maxb+1)%positive) g.
 
 Definition list_const2GV_disjoint_with_runtime_ptr_prop sdct :=
   wf_const_list sdct ->
@@ -2707,16 +2732,16 @@ Definition list_const2GV_disjoint_with_runtime_ptr_prop sdct :=
   forall S td maxb gl mb ofs m 
   (Hwfls: wf_list_targetdata_typ' S td lsd)
   (Hwfg: wf_globals maxb gl)
-  (Hle: maxb < mb),
+  (Hle: (maxb < mb)%positive),
   (forall gv t,
     (forall t0, In t0 lt -> t0 = t) ->
     _list_const_arr2GV td gl t lc = Some gv ->
-    no_alias gv [(Vptr mb ofs, m)] /\ valid_ptrs (maxb+1) gv
+    no_alias gv [(Vptr mb ofs, m)] /\ valid_ptrs ((maxb+1)%positive) gv
   ) /\
   (forall gv lt',
     _list_const_struct2GV td gl lc = Some (gv,lt') ->
     lt' = lt /\ 
-    no_alias gv [(Vptr mb ofs, m)] /\ valid_ptrs (maxb+1) gv
+    no_alias gv [(Vptr mb ofs, m)] /\ valid_ptrs ((maxb+1)%positive) gv
   ).
 
 Lemma const2GV_disjoint_with_runtime_ptr_mutrec :
@@ -2739,8 +2764,12 @@ Case "wfconst_null".
   split; auto.
   inv Hwfg.
   split.
-    apply null_disjoint_with_ptr. omega.
-    apply null_valid_ptrs. omega.
+    apply null_disjoint_with_ptr.
+      apply Pos.lt_gt; eapply Pos.le_lt_trans; eauto.
+    apply null_valid_ptrs.
+      apply Pos.lt_gt; eapply Pos.le_lt_trans; eauto.
+      rewrite <- Pplus_one_succ_r; apply Plt_succ.
+
 Case "wfconst_array". Focus.
   inv_mbind.
   simpl_split lsdc lt.
@@ -2967,7 +2996,7 @@ Qed.
 Lemma const2GV_disjoint_with_runtime_alloca: forall c0 maxb gl g td mb t t'
   (Hwfg: wf_globals maxb gl) S (Hwfc: wf_const S td c0 t')
   (Hc2g : ret g = @Opsem.const2GV DGVs td gl c0)
-  (Hle: maxb < mb),
+  (Hle: (maxb < mb)%positive),
   no_alias g ($ blk2GV td mb # typ_pointer t $).
 Proof.
   unfold Opsem.const2GV.
@@ -2986,7 +3015,7 @@ Qed.
 Lemma const2GV_valid_ptrs: forall c0 maxb gl g S td t
   (Hwfg: wf_globals maxb gl) (Hwfc: wf_const S td c0 t)
   (Hc2g : ret g = @Opsem.const2GV DGVs td gl c0),
-  valid_ptrs (maxb + 1) g.
+  valid_ptrs ((maxb + 1)%positive) g.
 Proof.
   unfold Opsem.const2GV.
   intros.
@@ -2994,16 +3023,18 @@ Proof.
   destruct const2GV_disjoint_with_runtime_ptr_mutrec as [J1 J2].
   unfold const2GV_disjoint_with_runtime_ptr_prop in J1.
   symmetry in HeqR.
-  eapply J1 with (mb:=maxb+1)(ofs:=Int.repr 31 0)
+  eapply J1 with (mb:=(maxb+1)%positive)(ofs:=Int.repr 31 0)
     (m:=AST.Mint (Size.mul Size.Eight (getPointerSize td) - 1)) in HeqR;
     eauto; try omega.
   destruct HeqR as [J4 [J5 J3]]; subst.
   destruct Hwfg.
-  eapply cgv2gvs_preserves_valid_ptrs; eauto; try omega.
+  eapply cgv2gvs_preserves_valid_ptrs; eauto.
+    apply Pos.lt_gt; rewrite <- Pplus_one_succ_r; apply Pos.lt_1_succ.
+    rewrite <- Pplus_one_succ_r; apply Plt_succ.
 Qed.
 
 Lemma params2GVs_preserves_no_alias: forall maxb gl
-  (Hwfg : wf_globals maxb gl) los nts lc mb t (Hinbound: maxb < mb) S F Ps tavl
+  (Hwfg : wf_globals maxb gl) los nts lc mb t (Hinbound: (maxb < mb)%positive) S F Ps tavl
   lp (Hwf : forall (id1 : atom) (gvs1 : GVsT DGVs) t1,
          In (t1, value_id id1) lp ->
          lookupAL (GVsT DGVs) lc id1 = ret gvs1 ->
@@ -3039,7 +3070,7 @@ Proof.
 Qed.
 
 Lemma operand__lt_nextblock: forall maxb los nts M (lc:DGVMap) mptr gl
-  (Hwfgl : wf_globals maxb gl) v mptrs (Hlt: maxb < Mem.nextblock M)
+  (Hwfgl : wf_globals maxb gl) v mptrs (Hlt: (maxb < Mem.nextblock M)%positive)
   (Hwflc: wf_lc M lc)
   (Hin: mptr @ mptrs) S Ps t F
   (Hwft: wf_value S (module_intro los nts Ps) F v t)
@@ -3054,7 +3085,7 @@ Proof.
     inv Hwft.
     eapply const2GV_valid_ptrs in Hwfgl; eauto.
     eapply valid_ptrs__trans; eauto.
-      omega.
+      rewrite <- Pplus_one_succ_r; apply Pos.lt_succ_r; rewrite <- Pos.succ_lt_mono; auto.
 Qed.
 
 (**************************************************)
@@ -3068,9 +3099,9 @@ Axiom callExternalOrIntrinsics_preserves_mload: forall Mem fid gvsa gvs gvsv
 
 (**************************************************)
 (* Properties of inject_init *)
-Definition inject_init (maxb:Z) : MoreMem.meminj :=
+Definition inject_init (maxb:positive) : MoreMem.meminj :=
 fun (b:Values.block) => 
-if zle b maxb then Some (b, 0)
+if Pos.leb b maxb then Some (b, 0)
 else None.
 
 Lemma inject_init__inject_id: forall mb b1 b2 delta,
@@ -3093,9 +3124,9 @@ Qed.
 
 (**************************************************)
 (* Properties of free_allocas *)
-Lemma perm_mfree_alloca_3: forall TD b ofs p als M1 M2 
+Lemma perm_mfree_alloca_3: forall TD b ofs k p als M1 M2 
   (Hfree : free_allocas TD M1 als = ret M2),
-  Mem.perm M2 b ofs p -> Mem.perm M1 b ofs p.
+  Mem.perm M2 b ofs k p -> Mem.perm M1 b ofs k p.
 Proof.
   induction als; simpl; intros.
     congruence.
@@ -3108,7 +3139,7 @@ Lemma perm_mfree_alloca_2: forall TD als M1 M2
   (Hfree : free_allocas TD M1 als = ret M2),
   forall b lo hi, 
     In b als -> Mem.bounds M1 b = (lo, hi) ->
-    forall ofs p, lo <= ofs < hi -> ~Mem.perm M2 b ofs p.
+    forall ofs k p, lo <= ofs < hi -> ~Mem.perm M2 b ofs k p.
 Proof.
   induction als; simpl; intros.
     congruence.
@@ -3127,10 +3158,10 @@ Qed.
 
 Lemma perm_mfree_alloca_1: forall TD als M1 M2 
   (Hfree : free_allocas TD M1 als = ret M2),
-  forall b ofs p, 
+  forall b ofs k p, 
     ~ In b als ->
-    Mem.perm M1 b ofs p ->
-    Mem.perm M2 b ofs p.
+    Mem.perm M1 b ofs k p ->
+    Mem.perm M2 b ofs k p.
 Proof.
   induction als; simpl; intros.
     congruence.
@@ -3141,10 +3172,10 @@ Proof.
     unfold blk2GV, ptr2GV, val2GV. simpl. eauto.
 Qed.
 
-Lemma range_perm_mfree_alloca_1: forall TD M1 M2 als b lo hi p 
+Lemma range_perm_mfree_alloca_1: forall TD M1 M2 als b lo hi k p 
   (Hfree : free_allocas TD M1 als = ret M2) (Hnotin: ~ In b als)
-  (Hperm: Mem.range_perm M1 b lo hi p),
-  Mem.range_perm M2 b lo hi p.
+  (Hperm: Mem.range_perm M1 b lo hi k p),
+  Mem.range_perm M2 b lo hi k p.
 Proof.
   unfold Mem.range_perm.
   intros.

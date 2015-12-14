@@ -1,5 +1,6 @@
 Require Import Coqlib.
 Require Import Maps.
+Require Import maps_ext.
 Require Import syntax.
 Require Import infrastructure_props.
 Require Import Metatheory.
@@ -7,7 +8,6 @@ Require Import Program.Tactics.
 Require Import dom_libs.
 Require Import cfg.
 Require Import Dipaths.
-Require Import util.
 
 (* This file defines DFS. *)
 

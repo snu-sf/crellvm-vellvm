@@ -23,6 +23,7 @@ Require Import dom_list.
 Require Import analysis.
 Require Import util.
 Require Import datatype_base.
+Require Import maps_ext.
 
 Import LLVMinfra.
 Import LLVMtd.

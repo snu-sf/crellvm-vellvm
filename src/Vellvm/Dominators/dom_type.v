@@ -3,6 +3,7 @@ Require Import ListSet.
 Require Import Coqlib.
 Require Import Metatheory.
 Require Import Maps.
+Require Import maps_ext.
 Require Import Lattice.
 Require Import Kildall.
 Require Import Iteration.
@@ -64,7 +65,7 @@ Axiom sdom_in_bound: forall fh bs l5,
 Axiom dom_successors : forall
   (l3 : l) (l' : l) f
   (contents3 contents': ListSet.set atom)
-  (Hinscs : l' `in` (successors f) !!! l3)
+  (Hinscs : l' `in` XATree.successors_list (successors f) l3)
   (Heqdefs3 : contents3 = sdom f l3)
   (Heqdefs' : contents' = sdom f l'),
   contents' {<=} (l3 {+} contents3).
@@ -295,7 +296,7 @@ Axiom dtree_edge_iff_idom: forall (f:fdef)
   (dt: @DTree l)
   (Hcreate: create_dom_tree f = Some dt)
   (le:l) (Hentry: getEntryLabel f = Some le)
-  (Hnopreds: (XATree.make_predecessors (successors f)) !!! le = nil)
+  (Hnopreds: XATree.successors_list (XATree.make_predecessors (successors f)) le = nil)
   (Hwfcfg: branchs_in_fdef f)
   (Huniq: uniqFdef f),
   forall p0 ch0,
@@ -306,7 +307,7 @@ Axiom create_dom_tree__wf_dtree: forall (f:fdef)
   (dt: @DTree l)
   (Hcreate: create_dom_tree f = Some dt)
   (le:l) (Hentry: getEntryLabel f = Some le)
-  (Hnopreds: (XATree.make_predecessors (successors f)) !!! le = nil)
+  (Hnopreds: XATree.successors_list (XATree.make_predecessors (successors f)) le = nil)
   (Hwfcfg: branchs_in_fdef f)
   (Huniq: uniqFdef f),
   ADProps.wf_dtree (successors f) le eq_atom_dec dt.

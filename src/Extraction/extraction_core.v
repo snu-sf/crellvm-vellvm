@@ -10,6 +10,7 @@ Require Import Floats.
 Require Import opsem.
 Require Import interpreter.
 Require Import Maps.
+Require Import maps_ext.
 Require Import Iteration.
 
 Extract Inductive unit => "unit" [ "()" ].
@@ -18,8 +19,21 @@ Extract Inductive sumbool => "bool" [ "true" "false" ].
 Extract Inductive list => "list" [ "[]" "(::)" ].
 Extract Inductive prod => "(*)"  [ "(,)" ].
 Extract Inductive option => "option"  [ "Some" "None" ].
-
+Extract Constant Iteration.GenIter.iterate =>
+  "let rec iter f a =
+    match f a with Coq_inl b -> Some b | Coq_inr a' -> iter f a'
+   in iter".
+(*
 Extract Constant Iteration.dependent_description' => "fun x -> assert false".
+TODO: check 
+*)
+
+(* Cutting the dependency to R. *)
+Extract Inlined Constant Fcore_defs.F2R => "fun _ -> assert false".
+Extract Inlined Constant Fappli_IEEE.FF2R => "fun _ -> assert false".
+Extract Inlined Constant Fappli_IEEE.B2R => "fun _ -> assert false".
+Extract Inlined Constant Fappli_IEEE.round_mode => "fun _ -> assert false".
+Extract Inlined Constant Fcalc_bracket.inbetween_loc => "fun _ -> assert false".
 
 Extract Constant AtomImpl.atom => "String.t".
 Extract Constant AtomImpl.eq_atom_dec => "fun a b -> a = b".
@@ -138,12 +152,12 @@ Extract Constant LLVMgv.mbop => "Llvmcaml.GenericValue.mbop".
 Extract Constant LLVMgv.mfbop => "Llvmcaml.GenericValue.mfbop".
 Extract Constant LLVMgv.mtrunc => "Llvmcaml.GenericValue.mtrunc".
 Extract Constant LLVMgv.mcast => "Llvmcaml.GenericValue.mcast".
-Extract Constant LLVMgv.mptrtoint => "Llvmcaml.GenericValue.mptrtoint".
-Extract Constant LLVMgv.minttoptr => "Llvmcaml.GenericValue.minttoptr".
+(*Extract Constant LLVMgv.mptrtoint => "Llvmcaml.GenericValue.mptrtoint". TODO: check *)
+(*Extract Constant LLVMgv.minttoptr => "Llvmcaml.GenericValue.minttoptr". TODO: check *)
 Extract Constant LLVMgv.mext => "Llvmcaml.GenericValue.mext".
 Extract Constant LLVMgv.micmp => "Llvmcaml.GenericValue.micmp".
 Extract Constant LLVMgv.micmp_int => "Llvmcaml.GenericValue.micmp_int".
-Extract Constant LLVMgv.micmp_ptr => "Llvmcaml.GenericValue.micmp_ptr".
+(*Extract Constant LLVMgv.micmp_ptr => "Llvmcaml.GenericValue.micmp_ptr". TODO: check *)
 Extract Constant LLVMgv.mfcmp => "Llvmcaml.GenericValue.mfcmp".
 Extract Constant LLVMgv.eq_gv => "Llvmcaml.GenericValue.eq_gv".
 Extract Constant LLVMgv.cgv2gv => "Llvmcaml.GenericValue.cgv2gv".
@@ -260,33 +274,65 @@ Extract Constant LLVMtd.getStructAlignment =>
 Extract Constant LLVMtd.getFloatAlignmentInfo =>
   "Llvmcaml.TargetData.getFloatAlignmentInfo".
 
+(* AST *)
+Extract Constant AST.ident_of_string =>
+  "fun s -> Camlcoq.intern_string (Camlcoq.camlstring_of_coqstring s)".
+
 (* Float *)
 Extract Inlined Constant Floats.float => "float".
 Extract Constant Floats.Float.zero   => "0.".
-(* Extract Constant Floats.Float.one   => "1.". *)
+(*Extract Constant Floats.Float.one   => "1.".*)
 Extract Constant Floats.Float.neg => "( ~-. )".
 Extract Constant Floats.Float.abs => "abs_float".
-Extract Constant Floats.Float.singleoffloat => "Floataux.singleoffloat".
-Extract Constant Floats.Float.intoffloat => "Floataux.intoffloat".
-Extract Constant Floats.Float.intuoffloat => "Floataux.intuoffloat".
-Extract Constant Floats.Float.floatofint => "Floataux.floatofint".
-Extract Constant Floats.Float.floatofintu => "Floataux.floatofintu".
+Extract Constant Floats.Float.to_single => "Floataux.singleoffloat". (* TODO: check *)
+Extract Constant Floats.Float.of_single => "Floataux.floatofsingle". (* TODO: check *)
+Extract Constant Floats.Float.to_int => "Floataux.intoffloat". (* TODO: check *)
+Extract Constant Floats.Float.to_intu => "Floataux.intuoffloat". (* TODO: check *)
+Extract Constant Floats.Float.to_long => "Floataux.longoffloat". (* TODO: check *)
+Extract Constant Floats.Float.to_longu => "Floataux.longoffloat". (* TODO: check, not exact *)
+Extract Constant Floats.Float.of_int => "Floataux.floatofint". (* TODO: check *)
+Extract Constant Floats.Float.of_intu => "Floataux.floatofintu". (* TODO: check *)
+Extract Constant Floats.Float.of_long => "Floataux.floatoflong". (* TODO: check *)
+Extract Constant Floats.Float.of_longu => "Floataux.floatofintu". (* TODO: check *)
 Extract Constant Floats.Float.add => "( +. )".
 Extract Constant Floats.Float.sub => "( -. )".
 Extract Constant Floats.Float.mul => "( *. )".
 Extract Constant Floats.Float.div => "( /. )".
 Extract Constant Floats.Float.rem => "mod_float".
-Extract Constant Floats.Float.cmp => "Floataux.cmp".
+Extract Constant Floats.Float.cmp => "Floataux.cmp". (* TODO: check *)
 Extract Constant Floats.Float.eq_dec => "fun (x: float) (y: float) -> x = y".
-Extract Constant Floats.Float.bits_of_double => "Floataux.bits_of_double".
-Extract Constant Floats.Float.double_of_bits => "Floataux.double_of_bits".
-Extract Constant Floats.Float.bits_of_single => "Floataux.bits_of_single".
-Extract Constant Floats.Float.single_of_bits => "Floataux.single_of_bits".
+Extract Constant Floats.Float.to_bits => "Floataux.bits_of_double". (* TODO: check *)
+Extract Constant Floats.Float.of_bits => "Floataux.double_of_bits". (* TODO: check *)
+
+(* TODO: check *)
+Extract Inlined Constant Floats.float32 => "float".
+Extract Constant Floats.Float32.zero   => "0.".
+Extract Constant Floats.Float32.neg => "( ~-. )".
+Extract Constant Floats.Float32.abs => "abs_float".
+Extract Constant Floats.Float32.to_double => "Floataux.floatofsingle". (* TODO: check *)
+Extract Constant Floats.Float32.of_double => "Floataux.singleoffloat". (* TODO: check *)
+Extract Constant Floats.Float32.to_int => "Floataux.intoffloat". (* TODO: check *)
+Extract Constant Floats.Float32.to_intu => "Floataux.intuoffloat". (* TODO: check *)
+Extract Constant Floats.Float32.to_long => "Floataux.longoffloat". (* TODO: check *)
+Extract Constant Floats.Float32.to_longu => "Floataux.longoffloat". (* TODO: check, not exact *)
+Extract Constant Floats.Float32.of_int => "Floataux.floatofint". (* TODO: check *)
+Extract Constant Floats.Float32.of_intu => "Floataux.floatofintu". (* TODO: check *)
+Extract Constant Floats.Float32.of_long => "fun l -> Floataux.singleoffloat (Floataux.floatoflong l)". (* TODO: check *)
+Extract Constant Floats.Float32.of_longu => "fun l -> Floataux.singleoffloat (Floataux.floatofintu l)". (* TODO: check *)
+Extract Constant Floats.Float32.add => "( +. )".
+Extract Constant Floats.Float32.sub => "( -. )".
+Extract Constant Floats.Float32.mul => "( *. )".
+Extract Constant Floats.Float32.div => "( /. )".
+Extract Constant Floats.Float32.rem => "mod_float".
+Extract Constant Floats.Float32.cmp => "Floataux.cmp". (* TODO: check *)
+Extract Constant Floats.Float32.eq_dec => "fun (x: float) (y: float) -> x = y".
+Extract Constant Floats.Float32.to_bits => "Floataux.bits_of_single". (* TODO: check *)
+Extract Constant Floats.Float32.of_bits => "Floataux.single_of_bits". (* TODO: check *)
 
 (* Memdata *)
-Extract Constant Memdata.big_endian => "Memdataaux.big_endian".
-Extract Constant Memdata.encode_float => "Memdataaux.encode_float".
-Extract Constant Memdata.decode_float => "Memdataaux.decode_float".
+Extract Constant Archi.big_endian => "false". (* TODO: check *)
+(*Extract Constant Memdata.encode_float => "Memdataaux.encode_float". TODO: check *)
+(*Extract Constant Memdata.decode_float => "Memdataaux.decode_float". TODO: check *)
 
 (* Dominators *)
 Extract Constant cfg.Pcubeplus => "Camlcoq.pcubeplus".
@@ -301,4 +347,4 @@ Extraction Blacklist List String Int.
 
 Recursive Extraction Library Metatheory.
 Recursive Extraction Library analysis.
-(* Recursive Extraction Library interpreter. *)
+Recursive Extraction Library interpreter.

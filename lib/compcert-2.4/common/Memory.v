@@ -38,14 +38,39 @@ Require Import Floats.
 Require Import Values.
 Require Export Memdata.
 Require Export Memtype.
-(* 1. eliminate signed
-2. nat -> ...
-*)
+
 (* To avoid useless definitions of inductors in extracted code. *)
 Local Unset Elimination Schemes.
 Local Unset Case Analysis Schemes.
 
 Local Notation "a # b" := (PMap.get b a) (at level 1).
+
+(* update: added for Vellvm - bounds *)
+Definition update (A: Type) (x: positive) (v: A) (f: positive -> A) : positive -> A :=
+  fun y => if peq y x then v else f y.
+
+Implicit Arguments update [A].
+
+Lemma update_s:
+  forall (A: Type) (x: positive) (v: A) (f: positive -> A),
+  update x v f x = v.
+Proof.
+  intros; unfold update. apply peq_true.
+Qed.
+
+Lemma update_o:
+  forall (A: Type) (x: positive) (v: A) (f: positive -> A) (y: positive),
+  x <> y -> update x v f y = f y.
+Proof.
+  intros; unfold update. apply peq_false; auto.
+Qed.
+
+Lemma update_stable:
+  forall (A: Type) (x: positive) (v: A) (f: positive -> A) (y: positive),
+  update x (f x) f y = f y.
+Proof.
+  intros; unfold update. destruct (peq y x); subst; auto.
+Qed.
 
 Module Mem <: MEM.
 
@@ -66,21 +91,23 @@ Record mem' : Type := mkmem {
   mem_contents: PMap.t (ZMap.t memval);  (**r [block -> offset -> memval] *)
   mem_access: PMap.t (Z -> perm_kind -> option permission);
                                          (**r [block -> offset -> kind -> option permission] *)
+  bounds: block -> Z * Z; (* added for Vellvm *)
   nextblock: block;
   access_max: 
     forall b ofs, perm_order'' (mem_access#b ofs Max) (mem_access#b ofs Cur);
   nextblock_noaccess:
     forall b ofs k, ~(Plt b nextblock) -> mem_access#b ofs k = None;
   contents_default:
-    forall b, fst mem_contents#b = Undef
+    forall b, fst mem_contents#b = Undef;
+  bounds_noaccess: forall b ofs pk, ofs < fst(bounds b) \/ ofs >= snd(bounds b) -> mem_access # b ofs pk = None
 }.
 
 Definition mem := mem'.
 
 Lemma mkmem_ext:
- forall cont1 cont2 acc1 acc2 next1 next2 a1 a2 b1 b2 c1 c2,
-  cont1=cont2 -> acc1=acc2 -> next1=next2 ->
-  mkmem cont1 acc1 next1 a1 b1 c1 = mkmem cont2 acc2 next2 a2 b2 c2.
+ forall cont1 cont2 acc1 acc2 bounds1 bounds2 next1 next2 a1 a2 b1 b2 c1 c2 d1 d2,
+  cont1=cont2 -> acc1=acc2 -> bounds1=bounds2 -> next1=next2 ->
+  mkmem cont1 acc1 bounds1 next1 a1 b1 c1 d1 = mkmem cont2 acc2 bounds2 next2 a2 b2 c2 d2.
 Proof.
   intros. subst. f_equal; apply proof_irr.
 Qed.
@@ -269,6 +296,7 @@ Proof.
   intros. destruct H. apply perm_cur. apply H. generalize (size_chunk_pos chunk). omega.
 Qed.
 
+(*
 Lemma valid_access_compat:
   forall m chunk1 chunk2 b ofs p,
   size_chunk chunk1 = size_chunk chunk2 ->
@@ -279,6 +307,7 @@ Proof.
   intros. inv H1. rewrite H in H2. constructor; auto.
   eapply Zdivide_trans; eauto. eapply align_le_divides; eauto.
 Qed.
+*)
 
 Lemma valid_access_dec:
   forall m chunk b ofs p,
@@ -308,13 +337,13 @@ Qed.
 
 Theorem valid_pointer_valid_access:
   forall m b ofs,
-  valid_pointer m b ofs = true <-> valid_access m Mint8 b ofs Nonempty.
+  valid_pointer m b ofs = true <-> valid_access m (Mint 7) b ofs Nonempty.
 Proof.
   intros. rewrite valid_pointer_nonempty_perm. 
   split; intros.
-  split. simpl; red; intros. replace ofs0 with ofs by omega. auto.
+  split. simpl; red; intros. unfold bytesize_chunk, ZRdiv, Zdiv in H0; simpl in H0. replace ofs0 with ofs by omega. auto.
   simpl. apply Zone_divide. 
-  destruct H. apply H. simpl. omega.
+  destruct H. apply H. simpl. unfold bytesize_chunk, ZRdiv, Zdiv; simpl; omega.
 Qed.
 
 (** C allows pointers one past the last element of an array.  These are not
@@ -339,6 +368,50 @@ Proof.
   intros. apply weak_valid_pointer_spec. auto.
 Qed.
 
+(** Bounds *)
+
+(** Each block has a low bound and a high bound, determined at allocation time
+    and invariant afterward.  The crucial properties of bounds is
+    that any offset below the low bound or above the high bound is
+    empty. *)
+
+Notation low_bound m b := (fst(bounds m b)).
+Notation high_bound m b := (snd(bounds m b)).
+
+Theorem perm_in_bounds:
+  forall m b ofs pk p, perm m b ofs pk p -> low_bound m b <= ofs < high_bound m b.
+Proof.
+  unfold perm. intros.
+  destruct (zlt ofs (fst (bounds m b))).
+  exploit bounds_noaccess. left; eauto.
+  intros.
+  rewrite H0 in H. contradiction.
+  destruct (zlt ofs (snd (bounds m b))).
+  omega. 
+  exploit bounds_noaccess. right; eauto.
+  intro; rewrite H0 in H. contradiction.
+Qed.
+
+Theorem range_perm_in_bounds:
+  forall m b lo hi pk p, 
+  range_perm m b lo hi pk p -> lo < hi -> low_bound m b <= lo /\ hi <= high_bound m b.
+Proof.
+  intros. split. 
+  exploit (perm_in_bounds m b lo pk p). apply H. omega. omega.
+  exploit (perm_in_bounds m b (hi-1) pk p). apply H. omega. omega.
+Qed.
+
+Theorem valid_access_in_bounds:
+  forall m chunk b ofs p,
+  valid_access m chunk b ofs p ->
+  low_bound m b <= ofs /\ ofs + size_chunk chunk <= high_bound m b.
+Proof.
+  intros. inv H. apply range_perm_in_bounds with (Cur) (p); auto.
+  generalize (size_chunk_pos chunk). omega.
+Qed.
+
+Hint Local Resolve perm_in_bounds range_perm_in_bounds valid_access_in_bounds.
+
 (** * Operations over memory stores *)
 
 (** The initial store *)
@@ -346,9 +419,13 @@ Qed.
 Program Definition empty: mem :=
   mkmem (PMap.init (ZMap.init Undef))
         (PMap.init (fun ofs k => None))
-        1%positive _ _ _.
+        (fun b => (0,0))
+        1%positive _ _ _ _.
 Next Obligation.
   repeat rewrite PMap.gi. red; auto.
+Qed.
+Next Obligation.
+  rewrite PMap.gi. auto.
 Qed.
 Next Obligation.
   rewrite PMap.gi. auto.
@@ -371,8 +448,9 @@ Program Definition alloc (m: mem) (lo hi: Z) :=
          (PMap.set m.(nextblock)
                    (fun ofs k => if zle lo ofs && zlt ofs hi then Some Freeable else None)
                    m.(mem_access))
+         (update m.(nextblock) (lo, hi) m.(bounds))
          (Psucc m.(nextblock))
-         _ _ _,
+         _ _ _ _,
    m.(nextblock)).
 Next Obligation.
   repeat rewrite PMap.gsspec. destruct (peq b (nextblock m)). 
@@ -388,6 +466,12 @@ Qed.
 Next Obligation.
   rewrite PMap.gsspec. destruct (peq b (nextblock m)). auto. apply contents_default. 
 Qed.
+Next Obligation.
+  rewrite PMap.gsspec. unfold update in *. destruct (peq b (nextblock m)); subst.
+  destruct (zle lo ofs); destruct (zlt ofs hi); simpl; auto.
+  simpl in H. omegaContradiction.
+  eapply bounds_noaccess; eauto.
+Qed.
 
 (** Freeing a block between the given bounds.
   Return the updated memory state where the given range of the given block
@@ -399,7 +483,8 @@ Program Definition unchecked_free (m: mem) (b: block) (lo hi: Z): mem :=
         (PMap.set b 
                 (fun ofs k => if zle lo ofs && zlt ofs hi then None else m.(mem_access)#b ofs k)
                 m.(mem_access))
-        m.(nextblock) _ _ _.
+        m.(bounds)
+        m.(nextblock) _ _ _ _.
 Next Obligation.
   repeat rewrite PMap.gsspec. destruct (peq b0 b).
   destruct (zle lo ofs && zlt ofs hi). red; auto. apply access_max. 
@@ -412,6 +497,12 @@ Next Obligation.
 Qed.
 Next Obligation.
   apply contents_default.
+Qed.
+Next Obligation.
+  repeat rewrite PMap.gsspec. destruct (peq b0 b); subst; auto.
+  destruct (zle lo ofs && zlt ofs hi); subst; auto.
+  apply bounds_noaccess; auto.
+  apply bounds_noaccess; auto.
 Qed.
 
 Definition free (m: mem) (b: block) (lo hi: Z): option mem :=
@@ -455,7 +546,7 @@ Definition load (chunk: memory_chunk) (m: mem) (b: block) (ofs: Z): option val :
 
 Definition loadv (chunk: memory_chunk) (m: mem) (addr: val) : option val :=
   match addr with
-  | Vptr b ofs => load chunk m b (Int.unsigned ofs)
+  | Vptr b ofs => load chunk m b (Int.unsigned 31 ofs)
   | _ => None
   end.
 
@@ -537,6 +628,25 @@ Proof.
   intros. apply getN_setN_disjoint. apply Intv.disjoint_range. auto. 
 Qed.
 
+Lemma getN_update_setN_s: forall M mb n ofs bs (Heq: n = length bs),
+  bs = getN n ofs
+         ((PMap.set mb (setN bs ofs ((mem_contents M) # mb))
+            (mem_contents M)) # mb).
+Proof.
+  intros. subst.
+  Print PMap.
+  erewrite PMap.gss; eauto.
+  rewrite getN_setN_same; auto.
+Qed.
+
+Lemma getN_Undef__list_repeat_Undef: forall sz0 z,
+  getN sz0 z (ZMap.init Undef) = list_repeat sz0 Undef.
+Proof.
+  induction sz0; simpl; auto.
+    intro; rewrite ZMap.gi.
+    congruence.
+Qed.
+
 Remark setN_default:
   forall vl q c, fst (setN vl q c) = fst c.
 Proof.
@@ -554,8 +664,9 @@ Program Definition store (chunk: memory_chunk) (m: mem) (b: block) (ofs: Z) (v: 
                           (setN (encode_val chunk v) ofs (m.(mem_contents)#b))
                           m.(mem_contents))
                 m.(mem_access)
+                m.(bounds)
                 m.(nextblock)
-                _ _ _)
+                _ _ _ _)
   else
     None.
 Next Obligation. apply access_max. Qed.
@@ -565,13 +676,14 @@ Next Obligation.
   rewrite setN_default. apply contents_default. 
   apply contents_default.
 Qed.
+Next Obligation. apply bounds_noaccess; auto. Qed.
 
 (** [storev chunk m addr v] is similar, but the address and offset are given
   as a single value [addr], which must be a pointer value. *)
 
 Definition storev (chunk: memory_chunk) (m: mem) (addr v: val) : option mem :=
   match addr with
-  | Vptr b ofs => store chunk m b (Int.unsigned ofs) v
+  | Vptr b ofs => store chunk m b (Int.unsigned 31 ofs) v
   | _ => None
   end.
 
@@ -584,8 +696,9 @@ Program Definition storebytes (m: mem) (b: block) (ofs: Z) (bytes: list memval) 
     Some (mkmem
              (PMap.set b (setN bytes ofs (m.(mem_contents)#b)) m.(mem_contents))
              m.(mem_access)
+             m.(bounds)
              m.(nextblock)
-             _ _ _)
+             _ _ _ _)
   else
     None.
 Next Obligation. apply access_max. Qed.
@@ -595,6 +708,7 @@ Next Obligation.
   rewrite setN_default. apply contents_default. 
   apply contents_default.
 Qed.
+Next Obligation. apply bounds_noaccess; auto. Qed. 
 
 (** [drop_perm m b lo hi p] sets the max permissions of the byte range
     [(b, lo) ... (b, hi - 1)] to [p].  These bytes must have current permissions
@@ -607,7 +721,8 @@ Program Definition drop_perm (m: mem) (b: block) (lo hi: Z) (p: permission): opt
                 (PMap.set b
                         (fun ofs k => if zle lo ofs && zlt ofs hi then Some p else m.(mem_access)#b ofs k)
                         m.(mem_access))
-                m.(nextblock) _ _ _)
+                m.(bounds)
+                m.(nextblock) _ _ _ _)
   else None.
 Next Obligation.
   repeat rewrite PMap.gsspec. destruct (peq b0 b). subst b0.
@@ -625,7 +740,15 @@ Qed.
 Next Obligation.
   apply contents_default.
 Qed.
-
+Next Obligation.
+  repeat rewrite PMap.gsspec. destruct (peq b0 b); subst; auto.
+  destruct (zle lo ofs). destruct (zlt ofs hi).
+  exploit range_perm_in_bounds; eauto. omega. intros. omegaContradiction. 
+  simpl. eapply bounds_noaccess; eauto. 
+  simpl. eapply bounds_noaccess; eauto.
+  eapply bounds_noaccess; eauto.
+Qed.
+ 
 (** * Properties of the memory operations *)
 
 (** Properties of the empty store. *)
@@ -687,6 +810,16 @@ Proof.
   apply decode_val_type. 
 Qed.
 
+Theorem load_chunk:
+  forall m chunk b ofs v,
+  Mem.load chunk m b ofs = Some v ->
+  Val.has_chunk v chunk.
+Proof.
+  intros. exploit load_result; eauto; intros. rewrite H0.
+  apply decode_val_chunk.
+Qed.
+
+(* NOTE: not used
 Theorem load_cast:
   forall m chunk b ofs v,
   load chunk m b ofs = Some v ->
@@ -700,6 +833,7 @@ Proof.
   set (l := getN (size_chunk_nat chunk) ofs m.(mem_contents)#b).
   intros. subst v. apply decode_val_cast. 
 Qed.
+*)
 
 (** ** Properties related to [loadbytes] *)
 
@@ -846,6 +980,7 @@ Proof.
   rewrite inj_S. omega.
 Qed.
 
+(* NOTE: not used
 Theorem load_int64_split:
   forall m b ofs v,
   load Mint64 m b ofs = Some v ->
@@ -899,6 +1034,7 @@ Opaque Int.repr.
   split. simpl. rewrite NV. auto. 
   auto.
 Qed.
+*)
 
 (** ** Properties related to [store] *)
 
@@ -999,10 +1135,17 @@ Qed.
 
 Local Hint Resolve store_valid_access_1 store_valid_access_2 store_valid_access_3: mem.
 
+Theorem bounds_store:
+  forall b', bounds m2 b' = bounds m1 b'.
+Proof.
+  intros.
+  unfold store in STORE.
+  destruct ( valid_access_dec m1 chunk b ofs Writable); inv STORE. simpl. auto.
+Qed.
+(*
 Theorem load_store_similar:
   forall chunk',
   size_chunk chunk' = size_chunk chunk ->
-  align_chunk chunk' <= align_chunk chunk ->
   exists v', load chunk' m2 b ofs = Some v' /\ decode_encode_val v chunk chunk' v'.
 Proof.
   intros.
@@ -1036,6 +1179,24 @@ Proof.
   apply load_store_similar_2; auto. omega.
 Qed.
 
+Theorem load_store_exact_same:
+  Val.has_chunk v chunk ->
+  load chunk m2 b ofs = Some v.
+Proof.
+  intros.
+  destruct (load_store_similar chunk) as [v' [A B]]. auto.
+  rewrite A. decEq. clear A STORE.
+  destruct v, chunk, v'; simpl in *; try inv H; try inv B; try solve [
+    auto |
+    destruct (eq_nat_dec n n); congruence
+  ].
+
+    destruct (eq_nat_dec n n); try congruence.
+    rewrite Int.repr_unsigned in B. auto.
+
+    rewrite <- H in B. auto.
+Qed.
+*)
 Theorem load_store_other:
   forall chunk' b' ofs',
   b' <> b
@@ -1179,20 +1340,22 @@ Qed.
 
 Definition compat_pointer_chunks (chunk1 chunk2: memory_chunk) : Prop :=
   match chunk1, chunk2 with
-  | (Mint32 | Many32), (Mint32 | Many32) => True
-  | Many64, Many64 => True
+  | Mint wz1, Mint wz2 =>
+    if eq_nat_dec 31 wz1 then
+      if eq_nat_dec 31 wz2 then True
+      else False
+    else False
   | _, _ => False
   end.
 
 Lemma compat_pointer_chunks_true:
   forall chunk1 chunk2,
-  (chunk1 = Mint32 \/ chunk1 = Many32 \/ chunk1 = Many64) ->
-  (chunk2 = Mint32 \/ chunk2 = Many32 \/ chunk2 = Many64) ->
+  chunk1 = Mint 31 ->
+  chunk2 = Mint 31 ->
   quantity_chunk chunk1 = quantity_chunk chunk2 ->
   compat_pointer_chunks chunk1 chunk2.
 Proof.
-  intros. destruct H as [P|[P|P]]; destruct H0 as [Q|[Q|Q]];
-  subst; red; auto; discriminate.
+  intros; subst; red; destruct (eq_nat_dec _ _); auto.
 Qed.
 
 Theorem load_pointer_store:
@@ -1211,17 +1374,14 @@ Proof.
   inv DEC; try contradiction.
   destruct CASES as [(A & B) | [(A & B) | (A & B)]].
 - (* Same offset *)
-  subst. inv ENC. 
-  assert (chunk = Mint32 \/ chunk = Many32 \/ chunk = Many64)
-  by (destruct chunk; auto || contradiction). 
-  left; split. rewrite H3.
-  destruct H4 as [P|[P|P]]; subst chunk'; destruct v0; simpl in H3; congruence.
+  subst. inv ENC.
+  left; split. rewrite H3. destruct v0; simpl in H3; congruence.
   split. apply compat_pointer_chunks_true; auto.
   auto.
 - (* ofs' > ofs *)
   inv ENC. 
-  + exploit H10; eauto. intros (j & P & Q). inv P. congruence.
-  + exploit H8; eauto. intros (n & P); congruence.
+  + exploit H9; eauto. intros (j & P & Q). inv P. congruence.
+  + exploit H5; eauto. intros (n & P); congruence.
   + exploit H2; eauto. congruence.
 - (* ofs' < ofs *)
   exploit H7; eauto. intros (j & P & Q). subst mv1. inv ENC. congruence.
@@ -1269,6 +1429,123 @@ Proof.
 - contradiction.
 Qed.
 
+Definition ld_st_ld_rel v1 v1' v2 b1 b2 ofs1 ofs2 m1 m2 M :=
+  ((v1 = v1' /\ 
+   (b1 <> b2 \/ ofs1 + size_chunk m1 <= ofs2 \/ ofs2 + size_chunk m2 <= ofs1))
+  \/ 
+   (v1 = decode_val m1 (Mem.getN (size_chunk_nat m1) ofs1
+           (Mem.setN (encode_val m2 v2) ofs2 ((Mem.mem_contents M) # b2))) /\
+    v1' = decode_val m1 (Mem.getN (size_chunk_nat m1) ofs1 
+            ((Mem.mem_contents M) # b2)) /\
+    (b1 = b2 /\ ofs1 + size_chunk m1 > ofs2 /\ ofs2 + size_chunk m2 > ofs1))).
+
+Lemma store_preserves_load_inv_aux': forall chunk m1 b ofs v m2 (STORE: store chunk m1 b ofs v = Some m2)
+  b1 chunk1 ofs1 v1,
+  Mem.load chunk1 m2 b1 ofs1 = Some v1 ->
+  exists v1',
+    Mem.load chunk1 m1 b1 ofs1 = Some v1' /\
+    ld_st_ld_rel v1 v1' v b1 b ofs1 ofs chunk1 chunk m1.
+Proof.
+  intros. unfold ld_st_ld_rel.
+  destruct (peq b1 b); subst; 
+    try solve [erewrite <- load_store_other; eauto; exists v1; eauto].
+  destruct (zle (ofs1 + size_chunk chunk1) ofs);
+    try solve [erewrite <- load_store_other; eauto; exists v1; split; auto].
+  destruct (zle (ofs + size_chunk chunk) ofs1);
+    try solve [erewrite <- load_store_other; eauto; exists v1; split; auto].
+  assert (valid_access m1 chunk1 b ofs1 Readable) as J.
+    apply load_valid_access in H.
+    eapply store_valid_access_2; eauto.
+  unfold load in *.
+  destruct (valid_access_dec m1 chunk1 b ofs1 Readable); try congruence.
+  exists (decode_val chunk1
+           (getN (size_chunk_nat chunk1) ofs1 ((Mem.mem_contents m1) # b))).
+  split; auto.
+  right.
+  split; auto.
+  destruct (valid_access_dec m2 chunk1 b ofs1 Readable); inv H.
+  erewrite store_mem_contents; eauto.
+  rewrite PMap.gsspec.
+  destruct (peq b b); try congruence.
+Qed.
+
+Lemma store_preserves_load_inv_aux: forall chunk m1 b ofs v m2 (STORE: store chunk m1 b ofs v = Some m2) b1 chunk1 ofs1 v1,
+  Mem.load chunk1 m2 b1 ofs1 = Some v1 ->
+  exists v1',
+    Mem.load chunk1 m1 b1 ofs1 = Some v1' /\
+    ((v1 = v1' /\
+     (b1 <> b \/ ofs1 + size_chunk chunk1 <= ofs \/ 
+      ofs + size_chunk chunk <= ofs1))
+    \/
+     ((forall b0 ofs0, v1 = Vptr b0 ofs0 -> v1 = v /\ chunk1 = chunk) /\
+      (b1 = b /\ ofs1 + size_chunk chunk1 > ofs /\ 
+       ofs + size_chunk chunk > ofs1))).
+Proof.
+  intros.
+  destruct (peq b1 b); subst;
+    try solve [erewrite <- load_store_other; eauto; exists v1; eauto].
+  destruct (zle (ofs1 + size_chunk chunk1) ofs);
+    try solve [erewrite <- load_store_other; eauto; exists v1; split; auto].
+  destruct (zle (ofs + size_chunk chunk) ofs1);
+    try solve [erewrite <- load_store_other; eauto; exists v1; split; auto].
+  assert (exists v1', load chunk1 m1 b ofs1 = Some v1') as J.
+    apply load_valid_access in H.
+    apply valid_access_load.
+    eapply store_valid_access_2; eauto.
+  destruct J as [v1' J].
+  exists v1'.
+  split; auto.
+    right.
+    split; auto.
+      intros. subst.
+      eapply load_pointer_store in H; eauto.
+      destruct H as [H | H].
+        destruct H as [J1 [J2 [J3 J4]]]; subst; auto.
+        unfold compat_pointer_chunks in J2.
+        assert (chunk = Mint 31 /\ chunk1 = Mint 31) by
+          (destruct chunk; destruct chunk1;
+          try destruct (eq_nat_dec 31 n); try destruct (eq_nat_dec 31 _);
+          subst; tauto).
+        destruct H; subst; auto.
+        destruct H as [H | [H | H]]; try solve [congruence | omega].
+Qed.
+
+
+(*
+Variable chunk: memory_chunk.
+Variable m1: mem.
+Variable b: block.
+Variable ofs: Z.
+Variable v: val.
+Variable m2: mem.
+Hypothesis STORE: store chunk m1 b ofs v = Some m2.
+*)
+
+Lemma store_preserves_load_inv: forall chunk m1 b ofs v m2
+  (STORE: store chunk m1 b ofs v = Some m2)
+  b1 ofs1 v1 chunk1,
+  load chunk1 m2 b1 ofs1 = Some v1 ->
+  exists v1',
+    load chunk1 m1 b1 ofs1 = Some v1' /\
+    (v1 = v1' \/ 
+     (forall b0 ofs0, v1 = Vptr b0 ofs0 -> v1 = v /\ chunk1 = chunk)).
+Proof.
+  intros.
+  eapply store_preserves_load_inv_aux in H; eauto.
+  destruct H as [v1' [J1 [[J2 J3] | [J2 J3]]]]; subst; eauto.
+Qed.
+
+Lemma store_getN_out: forall chunk m1 b ofs v m2 (STORE: store chunk m1 b ofs v = Some m2)
+  blk ofs1 sz (Hneq: blk <> b),
+  getN sz ofs1 ((Mem.mem_contents m1) # blk) = 
+    getN sz ofs1 ((Mem.mem_contents m2) # blk).
+Proof.
+  intros.
+  erewrite store_mem_contents with (m2:=m2); eauto.
+  erewrite PMap.gso; eauto.
+Qed.
+
+(* NOTE: not used
 Lemma store_similar_chunks:
   forall chunk1 chunk2 v1 v2 m b ofs,
   encode_val chunk1 v1 = encode_val chunk2 v2 ->
@@ -1300,6 +1577,7 @@ Theorem store_int16_zero_ext:
   store Mint16 m b ofs (Vint (Int.zero_ext 16 n)) =
   store Mint16 m b ofs (Vint n).
 Proof. intros. apply store_similar_chunks. apply encode_val_int16_zero_ext. auto. Qed.
+*)
 
 (*
 Theorem store_float64al32:
@@ -1563,6 +1841,7 @@ Proof.
   exists m1; split; auto. 
 Qed.
 
+(* NOTE: not used
 Theorem store_int64_split:
   forall m b ofs v m',
   store Mint64 m b ofs v = Some m' ->
@@ -1600,6 +1879,7 @@ Proof.
     omega. apply Int.unsigned_range. auto. exists (two_p (32-3)); reflexivity. 
   change (Int.unsigned (Int.repr 4)) with 4. unfold Int.max_unsigned. omega. 
 Qed.
+*)
 
 (** ** Properties related to [alloc]. *)
 
@@ -1610,6 +1890,16 @@ Variables lo hi: Z.
 Variable m2: mem.
 Variable b: block.
 Hypothesis ALLOC: alloc m1 lo hi = (m2, b).
+
+Lemma alloc_mem_contents:
+  PMap.set (Mem.nextblock m1) 
+                 (PMap.init Undef)
+                 (Mem.mem_contents m1) = (Mem.mem_contents m2).
+Proof.
+  intros.
+  unfold alloc in ALLOC.
+  inversion ALLOC. auto.
+Qed.
 
 Theorem nextblock_alloc:
   nextblock m2 = Psucc (nextblock m1).
@@ -1733,6 +2023,25 @@ Proof.
   exploit perm_alloc_inv. apply H0. eauto. rewrite dec_eq_false; auto. 
 Qed.
 
+Theorem bounds_alloc:
+  forall b', bounds m2 b' = if eq_block b' b then (lo, hi) else bounds m1 b'.
+Proof.
+  injection ALLOC; intros. rewrite <- H; rewrite <- H0; simpl. 
+  unfold update. auto. 
+Qed.
+
+Theorem bounds_alloc_same:
+  bounds m2 b = (lo, hi).
+Proof.
+  rewrite bounds_alloc. apply dec_eq_true. 
+Qed. 
+
+Theorem bounds_alloc_other:
+  forall b', b' <> b -> bounds m2 b' = bounds m1 b'.
+Proof.
+  intros. rewrite bounds_alloc. apply dec_eq_false. auto.
+Qed.
+
 Theorem load_alloc_unchanged:
   forall chunk b' ofs,
   valid_block m1 b' ->
@@ -1764,7 +2073,9 @@ Theorem load_alloc_same:
 Proof.
   intros. exploit load_result; eauto. intro. rewrite H0. 
   injection ALLOC; intros. rewrite <- H2; simpl. rewrite <- H1.
-  rewrite PMap.gss. destruct chunk; simpl; repeat rewrite ZMap.gi; reflexivity.
+  rewrite PMap.gss. destruct chunk; simpl; repeat rewrite ZMap.gi; try reflexivity.
+  destruct (size_chunk_nat_pos (Mint n)) as [sz EQ]. rewrite EQ.
+  simpl. rewrite ZMap.gi. unfold decode_val. simpl. destruct (eq_nat_dec _ _);subst;auto.
 Qed.
 
 Theorem load_alloc_same':
@@ -1842,6 +2153,17 @@ Lemma free_result:
 Proof.
   unfold free in FREE. destruct (range_perm_dec m1 bf lo hi Cur Freeable).
   congruence. congruence.
+Qed.
+
+Lemma free_getN_out: forall b ofs sz (Hneq: bf <> b),
+  Mem.getN sz ofs ((Mem.mem_contents m1) # b) = 
+    Mem.getN sz ofs ((Mem.mem_contents m2) # b).
+Proof.
+  intros.
+  rewrite free_result. 
+  unfold unchecked_free. simpl.
+  generalize ofs.
+  induction sz; simpl; intros; auto.
 Qed.
 
 Theorem nextblock_free:
@@ -1960,6 +2282,12 @@ Proof.
   elim (valid_access_free_2 chunk ofs p); auto. omega.
 Qed.
 
+Theorem bounds_free:
+  forall b, bounds m2 b = bounds m1 b.
+Proof.
+  intros. rewrite free_result; simpl. auto.
+Qed.
+
 Theorem load_free:
   forall chunk b ofs,
   b <> bf \/ lo >= hi \/ ofs + size_chunk chunk <= lo \/ hi <= ofs ->
@@ -1981,6 +2309,23 @@ Proof.
   intros. unfold load. rewrite pred_dec_true. 
   rewrite (load_result _ _ _ _ _ H). rewrite free_result; auto. 
   apply valid_access_free_inv_1. eauto with mem.
+Qed.
+
+Theorem load_free': forall (b : block)
+  (a : memory_chunk) (ofs : Z) (v : val)
+  (HeqR : Some v = load a m2 b ofs),
+  b <> bf \/ lo >= hi \/ ofs + size_chunk a <= lo \/ hi <= ofs.
+Proof.
+  intros.
+  symmetry in HeqR.
+  apply load_valid_access in HeqR.
+  destruct (peq b bf); subst; auto.
+  right.
+  destruct (zlt lo hi); try omega.
+  destruct (zle (ofs + size_chunk a) lo); auto.
+  destruct (zle hi ofs); auto.
+  contradict HeqR.
+  eapply valid_access_free_2; eauto; try omega.
 Qed.
 
 Theorem loadbytes_free:
@@ -2099,6 +2444,14 @@ Proof.
   simpl. intros. apply perm_implies with p. apply perm_implies with Freeable. apply perm_cur.
   apply r. tauto. auto with mem. auto.
   auto. auto. auto.
+Qed.
+
+Theorem bounds_drop:
+  forall b', bounds m' b' = bounds m b'.
+Proof.
+  intros.
+  unfold drop_perm in DROP. destruct (range_perm_dec m b lo hi Cur Freeable); inv DROP.
+  unfold bounds; simpl. auto.
 Qed.
 
 Lemma valid_access_drop_1:
@@ -3062,8 +3415,8 @@ Record inject' (f: meminj) (m1 m2: mem) : Prop :=
     mi_representable:
       forall b b' delta ofs,
       f b = Some(b', delta) ->
-      perm m1 b (Int.unsigned ofs) Max Nonempty \/ perm m1 b (Int.unsigned ofs - 1) Max Nonempty ->
-      delta >= 0 /\ 0 <= Int.unsigned ofs + delta <= Int.max_unsigned
+      perm m1 b (Int.unsigned 31 ofs) Max Nonempty \/ perm m1 b (Int.unsigned 31 ofs - 1) Max Nonempty ->
+      delta >= 0 /\ 0 <= Int.unsigned 31 ofs + delta <= Int.max_unsigned 31
   }.
 Definition inject := inject'.
 
@@ -3151,24 +3504,24 @@ Qed.
 Lemma address_inject:
   forall f m1 m2 b1 ofs1 b2 delta p,
   inject f m1 m2 ->
-  perm m1 b1 (Int.unsigned ofs1) Cur p ->
+  perm m1 b1 (Int.unsigned 31 ofs1) Cur p ->
   f b1 = Some (b2, delta) ->
-  Int.unsigned (Int.add ofs1 (Int.repr delta)) = Int.unsigned ofs1 + delta.
+  Int.unsigned 31 (Int.add 31 ofs1 (Int.repr 31 delta)) = Int.unsigned 31 ofs1 + delta.
 Proof.
   intros.
-  assert (perm m1 b1 (Int.unsigned ofs1) Max Nonempty) by eauto with mem.
+  assert (perm m1 b1 (Int.unsigned 31 ofs1) Max Nonempty) by eauto with mem.
   exploit mi_representable; eauto. intros [A B].
-  assert (0 <= delta <= Int.max_unsigned).
-    generalize (Int.unsigned_range ofs1). omega.
+  assert (0 <= delta <= Int.max_unsigned 31).
+    generalize (Int.unsigned_range 31 ofs1). omega.
   unfold Int.add. repeat rewrite Int.unsigned_repr; omega.
 Qed.
 
 Lemma address_inject':
   forall f m1 m2 chunk b1 ofs1 b2 delta,
   inject f m1 m2 ->
-  valid_access m1 chunk b1 (Int.unsigned ofs1) Nonempty ->
+  valid_access m1 chunk b1 (Int.unsigned 31 ofs1) Nonempty ->
   f b1 = Some (b2, delta) ->
-  Int.unsigned (Int.add ofs1 (Int.repr delta)) = Int.unsigned ofs1 + delta.
+  Int.unsigned 31 (Int.add 31 ofs1 (Int.repr 31 delta)) = Int.unsigned 31 ofs1 + delta.
 Proof.
   intros. destruct H0. eapply address_inject; eauto. 
   apply H0. generalize (size_chunk_pos chunk). omega. 
@@ -3177,24 +3530,24 @@ Qed.
 Theorem weak_valid_pointer_inject_no_overflow:
   forall f m1 m2 b ofs b' delta,
   inject f m1 m2 ->
-  weak_valid_pointer m1 b (Int.unsigned ofs) = true ->
+  weak_valid_pointer m1 b (Int.unsigned 31 ofs) = true ->
   f b = Some(b', delta) ->
-  0 <= Int.unsigned ofs + Int.unsigned (Int.repr delta) <= Int.max_unsigned.
+  0 <= Int.unsigned 31 ofs + Int.unsigned 31 (Int.repr 31 delta) <= Int.max_unsigned 31.
 Proof.
   intros. rewrite weak_valid_pointer_spec in H0. 
   rewrite ! valid_pointer_nonempty_perm in H0.
   exploit mi_representable; eauto. destruct H0; eauto with mem.
   intros [A B].
-  pose proof (Int.unsigned_range ofs).
+  pose proof (Int.unsigned_range 31 ofs).
   rewrite Int.unsigned_repr; omega.
 Qed.
 
 Theorem valid_pointer_inject_no_overflow:
   forall f m1 m2 b ofs b' delta,
   inject f m1 m2 ->
-  valid_pointer m1 b (Int.unsigned ofs) = true ->
+  valid_pointer m1 b (Int.unsigned 31 ofs) = true ->
   f b = Some(b', delta) ->
-  0 <= Int.unsigned ofs + Int.unsigned (Int.repr delta) <= Int.max_unsigned.
+  0 <= Int.unsigned 31 ofs + Int.unsigned 31 (Int.repr 31 delta) <= Int.max_unsigned 31.
 Proof.
   eauto using weak_valid_pointer_inject_no_overflow, valid_pointer_implies.
 Qed.
@@ -3202,9 +3555,9 @@ Qed.
 Theorem valid_pointer_inject_val:
   forall f m1 m2 b ofs b' ofs',
   inject f m1 m2 ->
-  valid_pointer m1 b (Int.unsigned ofs) = true ->
+  valid_pointer m1 b (Int.unsigned 31 ofs) = true ->
   val_inject f (Vptr b ofs) (Vptr b' ofs') ->
-  valid_pointer m2 b' (Int.unsigned ofs') = true.
+  valid_pointer m2 b' (Int.unsigned 31 ofs') = true.
 Proof.
   intros. inv H1.
   erewrite address_inject'; eauto. 
@@ -3215,9 +3568,9 @@ Qed.
 Theorem weak_valid_pointer_inject_val:
   forall f m1 m2 b ofs b' ofs',
   inject f m1 m2 ->
-  weak_valid_pointer m1 b (Int.unsigned ofs) = true ->
+  weak_valid_pointer m1 b (Int.unsigned 31 ofs) = true ->
   val_inject f (Vptr b ofs) (Vptr b' ofs') ->
-  weak_valid_pointer m2 b' (Int.unsigned ofs') = true.
+  weak_valid_pointer m2 b' (Int.unsigned 31 ofs') = true.
 Proof.
   intros. inv H1.
   exploit weak_valid_pointer_inject; eauto. intros W.
@@ -3225,7 +3578,7 @@ Proof.
   rewrite ! valid_pointer_nonempty_perm in H0.
   exploit mi_representable; eauto. destruct H0; eauto with mem. 
   intros [A B].
-  pose proof (Int.unsigned_range ofs).
+  pose proof (Int.unsigned_range 31 ofs).
   unfold Int.add. repeat rewrite Int.unsigned_repr; auto; omega.
 Qed.
 
@@ -3246,13 +3599,13 @@ Theorem different_pointers_inject:
   forall f m m' b1 ofs1 b2 ofs2 b1' delta1 b2' delta2,
   inject f m m' ->
   b1 <> b2 ->
-  valid_pointer m b1 (Int.unsigned ofs1) = true ->
-  valid_pointer m b2 (Int.unsigned ofs2) = true ->
+  valid_pointer m b1 (Int.unsigned 31 ofs1) = true ->
+  valid_pointer m b2 (Int.unsigned 31 ofs2) = true ->
   f b1 = Some (b1', delta1) ->
   f b2 = Some (b2', delta2) ->
   b1' <> b2' \/
-  Int.unsigned (Int.add ofs1 (Int.repr delta1)) <>
-  Int.unsigned (Int.add ofs2 (Int.repr delta2)).
+  Int.unsigned 31 (Int.add 31 ofs1 (Int.repr 31 delta1)) <>
+  Int.unsigned 31 (Int.add 31 ofs2 (Int.repr 31 delta2)).
 Proof.
   intros. 
   rewrite valid_pointer_valid_access in H1. 
@@ -3261,8 +3614,8 @@ Proof.
   rewrite (address_inject' _ _ _ _ _ _ _ _ H H2 H4). 
   inv H1. simpl in H5. inv H2. simpl in H1.
   eapply mi_no_overlap; eauto.
-  apply perm_cur_max. apply (H5 (Int.unsigned ofs1)). omega.
-  apply perm_cur_max. apply (H1 (Int.unsigned ofs2)). omega.
+  apply perm_cur_max. apply (H5 (Int.unsigned 31 ofs1)). unfold bytesize_chunk, ZRdiv, Zdiv; simpl. omega.
+  apply perm_cur_max. apply (H1 (Int.unsigned 31 ofs2)). unfold bytesize_chunk, ZRdiv, Zdiv; simpl. omega.
 Qed.
 
 Require Intv.
@@ -3311,10 +3664,10 @@ Proof.
   assert (Q: Zabs al <= Zabs sz). apply Zdivide_bounds; auto. omega.
   rewrite Zabs_eq in Q; try omega. rewrite Zabs_eq in Q; try omega.
   assert (R: exists chunk, al = align_chunk chunk /\ al = size_chunk chunk).
-    destruct H0. subst; exists Mint8; auto.
-    destruct H0. subst; exists Mint16; auto.
-    destruct H0. subst; exists Mint32; auto.
-    subst; exists Mint64; auto.
+    destruct H0. subst; exists (Mint 7); auto.
+    destruct H0. subst; exists (Mint 15); auto.
+    destruct H0. subst; exists (Mint 31); auto.
+    subst; exists (Mint 63); auto.
   destruct R as [chunk [A B]].
   assert (valid_access m chunk b ofs Nonempty).
     split. red; intros; apply H3. omega. congruence.
@@ -3344,8 +3697,8 @@ Proof.
   intros. inv H1; simpl in H0; try discriminate.
   exploit load_inject; eauto. intros [v2 [LOAD INJ]].
   exists v2; split; auto. unfold loadv. 
-  replace (Int.unsigned (Int.add ofs1 (Int.repr delta)))
-     with (Int.unsigned ofs1 + delta).
+  replace (Int.unsigned 31 (Int.add 31 ofs1 (Int.repr 31 delta)))
+     with (Int.unsigned 31 ofs1 + delta).
   auto. symmetry. eapply address_inject'; eauto with mem.
 Qed.
 
@@ -3444,8 +3797,8 @@ Theorem storev_mapped_inject:
 Proof.
   intros. inv H1; simpl in H0; try discriminate.
   unfold storev.
-  replace (Int.unsigned (Int.add ofs1 (Int.repr delta)))
-    with (Int.unsigned ofs1 + delta).
+  replace (Int.unsigned 31 (Int.add 31 ofs1 (Int.repr 31 delta)))
+    with (Int.unsigned 31 ofs1 + delta).
   eapply store_mapped_inject; eauto.
   symmetry. eapply address_inject'; eauto with mem.
 Qed.
@@ -3618,8 +3971,8 @@ Theorem alloc_left_mapped_inject:
   inject f m1 m2 ->
   alloc m1 lo hi = (m1', b1) ->
   valid_block m2 b2 ->
-  0 <= delta <= Int.max_unsigned ->
-  (forall ofs k p, perm m2 b2 ofs k p -> delta = 0 \/ 0 <= ofs < Int.max_unsigned) ->
+  0 <= delta <= Int.max_unsigned 31 ->
+  (forall ofs k p, perm m2 b2 ofs k p -> delta = 0 \/ 0 <= ofs < Int.max_unsigned 31) ->
   (forall ofs k p, lo <= ofs < hi -> perm m2 b2 (ofs + delta) k p) ->
   inj_offset_aligned delta (hi-lo) ->
   (forall b delta' ofs k p,
@@ -3681,10 +4034,10 @@ Proof.
    subst. injection H9; intros; subst b' delta0. destruct H10.
     exploit perm_alloc_inv; eauto; rewrite dec_eq_true; intro.
     exploit H3. apply H4 with (k := Max) (p := Nonempty); eauto.
-    generalize (Int.unsigned_range_2 ofs). omega.
+    generalize (Int.unsigned_range_2 31 ofs). omega.
    exploit perm_alloc_inv; eauto; rewrite dec_eq_true; intro.
    exploit H3. apply H4 with (k := Max) (p := Nonempty); eauto.
-   generalize (Int.unsigned_range_2 ofs). omega.
+   generalize (Int.unsigned_range_2 31 ofs). omega.
   eapply mi_representable0; try eassumption.
   destruct H10; eauto using perm_alloc_4.
 (* incr *)
@@ -3713,7 +4066,7 @@ Proof.
   eapply alloc_right_inject; eauto.
   eauto.
   instantiate (1 := b2). eauto with mem.
-  instantiate (1 := 0). unfold Int.max_unsigned. generalize Int.modulus_pos; omega.
+  instantiate (1 := 0). unfold Int.max_unsigned. generalize (Int.modulus_pos 31); omega.
   auto.
   intros. apply perm_implies with Freeable; auto with mem.
   eapply perm_alloc_2; eauto. omega.
@@ -3917,13 +4270,13 @@ Proof.
   destruct (f b) as [[b1 delta1] |] eqn:?; try discriminate.
   destruct (f' b1) as [[b2 delta2] |] eqn:?; inv H. 
   exploit mi_representable0; eauto. intros [A B].
-  set (ofs' := Int.repr (Int.unsigned ofs + delta1)).
-  assert (Int.unsigned ofs' = Int.unsigned ofs + delta1). 
+  set (ofs' := Int.repr 31 (Int.unsigned 31 ofs + delta1)).
+  assert (Int.unsigned 31 ofs' = Int.unsigned 31 ofs + delta1). 
     unfold ofs'; apply Int.unsigned_repr. auto.
   exploit mi_representable1. eauto. instantiate (1 := ofs').
   rewrite H.
-  replace (Int.unsigned ofs + delta1 - 1) with
-    ((Int.unsigned ofs - 1) + delta1) by omega.
+  replace (Int.unsigned 31 ofs + delta1 - 1) with
+    ((Int.unsigned 31 ofs - 1) + delta1) by omega.
   destruct H0; eauto using perm_inj.
   rewrite H. omega.
 Qed.
@@ -4027,7 +4380,7 @@ Proof.
   apply flat_inj_no_overlap.
 (* range *)
   unfold flat_inj; intros.
-  destruct (plt b (nextblock m)); inv H0. generalize (Int.unsigned_range_2 ofs); omega.
+  destruct (plt b (nextblock m)); inv H0. generalize (Int.unsigned_range_2 31 ofs); omega.
 Qed.
 
 Theorem empty_inject_neutral:

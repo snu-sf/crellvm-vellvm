@@ -124,13 +124,13 @@ Parameter store: forall (chunk: memory_chunk) (m: mem) (b: block) (ofs: Z) (v: v
 
 Definition loadv (chunk: memory_chunk) (m: mem) (addr: val) : option val :=
   match addr with
-  | Vptr b ofs => load chunk m b (Int.unsigned ofs)
+  | Vptr b ofs => load chunk m b (Int.unsigned 31 ofs)
   | _ => None
   end.
 
 Definition storev (chunk: memory_chunk) (m: mem) (addr v: val) : option mem :=
   match addr with
-  | Vptr b ofs => store chunk m b (Int.unsigned ofs) v
+  | Vptr b ofs => store chunk m b (Int.unsigned 31 ofs) v
   | _ => None
   end.
 
@@ -253,7 +253,7 @@ Axiom valid_pointer_nonempty_perm:
   valid_pointer m b ofs = true <-> perm m b ofs Cur Nonempty.
 Axiom valid_pointer_valid_access:
   forall m b ofs,
-  valid_pointer m b ofs = true <-> valid_access m Mint8 b ofs Nonempty.
+  valid_pointer m b ofs = true <-> valid_access m (Mint 7) b ofs Nonempty.
 
 (** C allows pointers one past the last element of an array.  These are not
   valid according to the previously defined [valid_pointer]. The property
@@ -270,6 +270,30 @@ Axiom weak_valid_pointer_spec:
 Axiom valid_pointer_implies:
   forall m b ofs,
   valid_pointer m b ofs = true -> weak_valid_pointer m b ofs = true.
+
+(** Each block has associated low and high bounds.  These are the bounds 
+    that were given when the block was allocated.  *)
+
+Parameter bounds: forall (m: mem) (b: block), Z*Z.
+
+Notation low_bound m b := (fst(bounds m b)).
+Notation high_bound m b := (snd(bounds m b)).
+
+(** The crucial properties of bounds is that any offset below the low
+    bound or above the high bound is empty. *)
+
+Axiom perm_in_bounds:
+  forall m b ofs pk p, perm m b ofs pk p -> low_bound m b <= ofs < high_bound m b.
+
+Axiom range_perm_in_bounds:
+  forall m b lo hi pk p, 
+  range_perm m b lo hi pk p -> lo < hi ->
+  low_bound m b <= lo /\ hi <= high_bound m b.
+
+Axiom valid_access_in_bounds:
+  forall m chunk b ofs p,
+  valid_access m chunk b ofs p ->
+  low_bound m b <= ofs /\ ofs + size_chunk chunk <= high_bound m b.
 
 (** * Properties of the memory operations *)
 
@@ -302,6 +326,7 @@ Axiom load_type:
 
 (** For a small integer or float type, the value returned by [load]
   is invariant under the corresponding cast. *)
+(* NOTE: not used
 Axiom load_cast:
   forall m chunk b ofs v,
   load chunk m b ofs = Some v ->
@@ -310,7 +335,7 @@ Axiom load_cast:
   | Mint16 => v = Val.zero_ext 16 v
   | _ => True
   end.
-
+*)
 (** ** Properties of [loadbytes]. *)
 
 (** [loadbytes] succeeds if and only if we have read permissions on the accessed
@@ -408,8 +433,12 @@ Axiom store_valid_access_3:
   forall chunk m1 b ofs v m2, store chunk m1 b ofs v = Some m2 ->
   valid_access m1 chunk b ofs Writable.
 
-(** Load-store properties. *)
+Axiom bounds_store:
+  forall chunk m1 b ofs v m2, store chunk m1 b ofs v = Some m2 ->
+  forall b', bounds m2 b' = bounds m1 b'.
 
+(** Load-store properties. *)
+(* NOTE: not used
 Axiom load_store_similar:
   forall chunk m1 b ofs v m2, store chunk m1 b ofs v = Some m2 ->
   forall chunk',
@@ -420,7 +449,7 @@ Axiom load_store_similar:
 Axiom load_store_same:
   forall chunk m1 b ofs v m2, store chunk m1 b ofs v = Some m2 ->
   load chunk m2 b ofs = Some (Val.load_result chunk v).
-
+*)
 Axiom load_store_other:
   forall chunk m1 b ofs v m2, store chunk m1 b ofs v = Some m2 ->
   forall chunk' b' ofs',
@@ -433,8 +462,11 @@ Axiom load_store_other:
 
 Definition compat_pointer_chunks (chunk1 chunk2: memory_chunk) : Prop :=
   match chunk1, chunk2 with
-  | (Mint32 | Many32), (Mint32 | Many32) => True
-  | Many64, Many64 => True
+  | Mint wz1, Mint wz2 =>
+    if eq_nat_dec 31 wz1 then
+      if eq_nat_dec 31 wz2 then True
+      else False
+    else False
   | _, _ => False
   end.
 
@@ -472,7 +504,7 @@ Axiom loadbytes_store_other:
 
 (** [store] is insensitive to the signedness or the high bits of
   small integer quantities. *)
-
+(* NOTE: not used
 Axiom store_int8_zero_ext:
   forall m b ofs n,
   store Mint8 m b ofs (Vint (Int.zero_ext 8 n)) =
@@ -481,6 +513,7 @@ Axiom store_int16_zero_ext:
   forall m b ofs n,
   store Mint16 m b ofs (Vint (Int.zero_ext 16 n)) =
   store Mint16 m b ofs (Vint n).
+*)
 
 (** ** Properties of [storebytes]. *)
 
@@ -635,6 +668,20 @@ Axiom valid_access_alloc_inv:
   then lo <= ofs /\ ofs + size_chunk chunk <= hi /\ (align_chunk chunk | ofs)
   else valid_access m1 chunk b' ofs p.
 
+(** Effect of [alloc] on bounds. *)
+
+Axiom bounds_alloc:
+  forall m1 lo hi m2 b, alloc m1 lo hi = (m2, b) ->
+  forall b', bounds m2 b' = if eq_block b' b then (lo, hi) else bounds m1 b'.
+
+Axiom bounds_alloc_same:
+  forall m1 lo hi m2 b, alloc m1 lo hi = (m2, b) ->
+  bounds m2 b = (lo, hi).
+
+Axiom bounds_alloc_other:
+  forall m1 lo hi m2 b, alloc m1 lo hi = (m2, b) ->
+  forall b', b' <> b -> bounds m2 b' = bounds m1 b'.
+
 (** Load-alloc properties. *)
 
 Axiom load_alloc_unchanged:
@@ -723,6 +770,12 @@ Axiom valid_access_free_inv_2:
   valid_access m2 chunk bf ofs p ->
   lo >= hi \/ ofs + size_chunk chunk <= lo \/ hi <= ofs.
 
+(** [free] preserves bounds. *)
+
+Axiom bounds_free:
+  forall m1 bf lo hi m2, free m1 bf lo hi = Some m2 ->
+  forall b, bounds m2 b = bounds m1 b.
+
 (** Load-free properties *)
 
 Axiom load_free:
@@ -762,6 +815,10 @@ Axiom perm_drop_3:
 Axiom perm_drop_4:
   forall m b lo hi p m', drop_perm m b lo hi p = Some m' ->
   forall b' ofs k p', perm m' b' ofs k p' -> perm m b' ofs k p'.
+
+Axiom bounds_drop:
+  forall m b lo hi p m', drop_perm m b lo hi p = Some m' ->
+  forall b', bounds m' b' = bounds m b'.
 
 Axiom load_drop:
   forall m b lo hi p m', drop_perm m b lo hi p = Some m' ->
@@ -953,37 +1010,37 @@ Axiom weak_valid_pointer_inject:
 Axiom address_inject:
   forall f m1 m2 b1 ofs1 b2 delta p,
   inject f m1 m2 ->
-  perm m1 b1 (Int.unsigned ofs1) Cur p ->
+  perm m1 b1 (Int.unsigned 31 ofs1) Cur p ->
   f b1 = Some (b2, delta) ->
-  Int.unsigned (Int.add ofs1 (Int.repr delta)) = Int.unsigned ofs1 + delta.
+  Int.unsigned 31 (Int.add 31 ofs1 (Int.repr 31 delta)) = Int.unsigned 31 ofs1 + delta.
 
 Axiom valid_pointer_inject_no_overflow:
   forall f m1 m2 b ofs b' delta,
   inject f m1 m2 ->
-  valid_pointer m1 b (Int.unsigned ofs) = true ->
+  valid_pointer m1 b (Int.unsigned 31 ofs) = true ->
   f b = Some(b', delta) ->
-  0 <= Int.unsigned ofs + Int.unsigned (Int.repr delta) <= Int.max_unsigned.
+  0 <= Int.unsigned 31 ofs + Int.unsigned 31 (Int.repr 31 delta) <= Int.max_unsigned 31.
 
 Axiom weak_valid_pointer_inject_no_overflow:
   forall f m1 m2 b ofs b' delta,
   inject f m1 m2 ->
-  weak_valid_pointer m1 b (Int.unsigned ofs) = true ->
+  weak_valid_pointer m1 b (Int.unsigned 31 ofs) = true ->
   f b = Some(b', delta) ->
-  0 <= Int.unsigned ofs + Int.unsigned (Int.repr delta) <= Int.max_unsigned.
+  0 <= Int.unsigned 31 ofs + Int.unsigned 31 (Int.repr 31 delta) <= Int.max_unsigned 31.
 
 Axiom valid_pointer_inject_val:
   forall f m1 m2 b ofs b' ofs',
   inject f m1 m2 ->
-  valid_pointer m1 b (Int.unsigned ofs) = true ->
+  valid_pointer m1 b (Int.unsigned 31 ofs) = true ->
   val_inject f (Vptr b ofs) (Vptr b' ofs') ->
-  valid_pointer m2 b' (Int.unsigned ofs') = true.
+  valid_pointer m2 b' (Int.unsigned 31 ofs') = true.
 
 Axiom weak_valid_pointer_inject_val:
   forall f m1 m2 b ofs b' ofs',
   inject f m1 m2 ->
-  weak_valid_pointer m1 b (Int.unsigned ofs) = true ->
+  weak_valid_pointer m1 b (Int.unsigned 31 ofs) = true ->
   val_inject f (Vptr b ofs) (Vptr b' ofs') ->
-  weak_valid_pointer m2 b' (Int.unsigned ofs') = true.
+  weak_valid_pointer m2 b' (Int.unsigned 31 ofs') = true.
 
 Axiom inject_no_overlap:
   forall f m1 m2 b1 b2 b1' b2' delta1 delta2 ofs1 ofs2,
@@ -999,13 +1056,13 @@ Axiom different_pointers_inject:
   forall f m m' b1 ofs1 b2 ofs2 b1' delta1 b2' delta2,
   inject f m m' ->
   b1 <> b2 ->
-  valid_pointer m b1 (Int.unsigned ofs1) = true ->
-  valid_pointer m b2 (Int.unsigned ofs2) = true ->
+  valid_pointer m b1 (Int.unsigned 31 ofs1) = true ->
+  valid_pointer m b2 (Int.unsigned 31 ofs2) = true ->
   f b1 = Some (b1', delta1) ->
   f b2 = Some (b2', delta2) ->
   b1' <> b2' \/
-  Int.unsigned (Int.add ofs1 (Int.repr delta1)) <>
-  Int.unsigned (Int.add ofs2 (Int.repr delta2)).
+  Int.unsigned 31 (Int.add 31 ofs1 (Int.repr 31 delta1)) <>
+  Int.unsigned 31 (Int.add 31 ofs2 (Int.repr 31 delta2)).
 
 Axiom load_inject:
   forall f m1 m2 chunk b1 ofs b2 delta v1,
@@ -1116,8 +1173,8 @@ Axiom alloc_left_mapped_inject:
   inject f m1 m2 ->
   alloc m1 lo hi = (m1', b1) ->
   valid_block m2 b2 ->
-  0 <= delta <= Int.max_unsigned ->
-  (forall ofs k p, perm m2 b2 ofs k p -> delta = 0 \/ 0 <= ofs < Int.max_unsigned) ->
+  0 <= delta <= Int.max_unsigned 31 ->
+  (forall ofs k p, perm m2 b2 ofs k p -> delta = 0 \/ 0 <= ofs < Int.max_unsigned 31) ->
   (forall ofs k p, lo <= ofs < hi -> perm m2 b2 (ofs + delta) k p) ->
   inj_offset_aligned delta (hi-lo) ->
   (forall b delta' ofs k p,

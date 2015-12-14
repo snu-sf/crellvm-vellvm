@@ -40,10 +40,7 @@ Parameter ident_of_string : String.string -> ident.
 Inductive typ : Type :=
   | Tint                (**r 32-bit integers or pointers *)
   | Tfloat              (**r 64-bit double-precision floats *)
-  | Tlong               (**r 64-bit integers *)
-  | Tsingle             (**r 32-bit single-precision floats *)
-  | Tany32              (**r any 32-bit value *)
-  | Tany64.             (**r any 64-bit value, i.e. any value *)
+  | Tsingle.             (**r 32-bit single-precision floats *)
 
 Lemma typ_eq: forall (t1 t2: typ), {t1=t2} + {t1<>t2}.
 Proof. decide equality. Defined.
@@ -57,12 +54,9 @@ Definition list_typ_eq: forall (l1 l2: list typ), {l1=l2} + {l1<>l2}
 
 Definition typesize (ty: typ) : Z :=
   match ty with
-  | Tint => 4
+  | Tint => 8
   | Tfloat => 8
-  | Tlong => 8
   | Tsingle => 4
-  | Tany32 => 4
-  | Tany64 => 8
   end.
 
 Lemma typesize_pos: forall ty, typesize ty > 0.
@@ -75,11 +69,8 @@ Proof. destruct ty; simpl; omega. Qed.
 Definition subtype (ty1 ty2: typ) : bool :=
   match ty1, ty2 with
   | Tint, Tint => true
-  | Tlong, Tlong => true
   | Tfloat, Tfloat => true
   | Tsingle, Tsingle => true
-  | (Tint | Tsingle | Tany32), Tany32 => true
-  | _, Tany64 => true
   | _, _ => false
   end.
 
@@ -135,44 +126,30 @@ Definition signature_main :=
   fixed: signedness is not used in vellvm *)
 
 Inductive memory_chunk : Type :=
-  | Mint8           (**r 8-bit unsigned integer *)
-  | Mint16          (**r 16-bit unsigned integer *)
-  | Mint32          (**r 32-bit integer, or pointer *)
-  | Mint64          (**r 64-bit integer *)
-  | Mfloat32        (**r 32-bit single-precision float *)
-  | Mfloat64        (**r 64-bit double-precision float *)
-  | Many32          (**r any value that fits in 32 bits *)
-  | Many64.         (**r any value *)
+  | Mint: nat -> memory_chunk    (**r integer or pointer *)
+  | Mfloat32                     (**r 32-bit single-precision float *)
+  | Mfloat64                     (**r 64-bit double-precision float *)
+.
 
 Definition memory_chunk_eq (c1 c2: memory_chunk) : bool := 
   match c1, c2 with
-  | Mint8, Mint8 => true
-  | Mint16, Mint16 => true
-  | Mint32, Mint32 => true
-  | Mint64, Mint64 => true
+  | Mint n1, Mint n2 => beq_nat n1 n2
   | Mfloat32, Mfloat32 => true
   | Mfloat64, Mfloat64 => true
-  | Many32, Many32 => true
-  | Many64, Many64 => true
   | _, _ => false
   end.
 
 Definition chunk_eq: forall (c1 c2: memory_chunk), {c1=c2} + {c1<>c2}.
-Proof. decide equality. Defined.
+Proof. decide equality. apply eq_nat_dec. Defined.
 Global Opaque chunk_eq.
 
 (** The type (integer/pointer or float) of a chunk. *)
 
 Definition type_of_chunk (c: memory_chunk) : typ :=
   match c with
-  | Mint8 => Tint
-  | Mint16 => Tint
-  | Mint32 => Tint
-  | Mint64 => Tlong
+  | Mint _ => Tint
   | Mfloat32 => Tsingle
   | Mfloat64 => Tfloat
-  | Many32 => Tany32
-  | Many64 => Tany64
   end.
 
 (** The chunk that is appropriate to store and reload a value of
@@ -180,25 +157,22 @@ Definition type_of_chunk (c: memory_chunk) : typ :=
 
 Definition chunk_of_type (ty: typ) :=
   match ty with
-  | Tint => Mint32
+  | Tint => Mint 31
   | Tfloat => Mfloat64
-  | Tlong => Mint64
   | Tsingle => Mfloat32
-  | Tany32 => Many32
-  | Tany64 => Many64
   end.
 
 (** Initialization data for global variables. *)
 
 Inductive init_data: Type :=
-  | Init_int8: int -> init_data
-  | Init_int16: int -> init_data
-  | Init_int32: int -> init_data
+  | Init_int8: int32 -> init_data
+  | Init_int16: int32 -> init_data
+  | Init_int32: int32 -> init_data
   | Init_int64: int64 -> init_data
   | Init_float32: float32 -> init_data
   | Init_float64: float -> init_data
   | Init_space: Z -> init_data
-  | Init_addrof: ident -> int -> init_data.  (**r address of symbol + offset *)
+  | Init_addrof: ident -> int32 -> init_data.  (**r address of symbol + offset *)
 
 (** Information attached to global variables. *)
 
@@ -232,7 +206,7 @@ Record program (F V: Type) : Type := mkprogram {
 }.
 
 Definition prog_defs_names (F V: Type) (p: program F V) : list ident :=
-  List.map fst p.(prog_defs).
+  List.map (@fst ident (globdef F V)) p.(prog_defs).
 
 (** * Generic transformations over programs *)
 
@@ -547,10 +521,10 @@ Inductive external_function : Type :=
      (** A volatile store operation.   If the adress given as first argument
          points within a volatile global variable, generate an event.
          Otherwise, produce no event and behave like a regular memory store. *)
-  | EF_vload_global (chunk: memory_chunk) (id: ident) (ofs: int)
+  | EF_vload_global (chunk: memory_chunk) (id: ident) (ofs: int32)
      (** A volatile load operation from a global variable. 
          Specialized version of [EF_vload]. *)
-  | EF_vstore_global (chunk: memory_chunk) (id: ident) (ofs: int)
+  | EF_vstore_global (chunk: memory_chunk) (id: ident) (ofs: int32)
      (** A volatile store operation in a global variable. 
          Specialized version of [EF_vstore]. *)
   | EF_malloc
@@ -581,7 +555,7 @@ Inductive external_function : Type :=
 
 with annot_arg : Type :=
   | AA_arg (ty: typ)
-  | AA_int (n: int)
+  | AA_int (n: int32)
   | AA_float (n: float).
 
 (** The type signature of an external function. *)

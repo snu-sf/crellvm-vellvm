@@ -58,7 +58,7 @@ Record state : Type := mkstate {
 }.
 
 Definition init_state (g: graph) (root: node) :=
-  match g!root with
+  match g ? root with
   | Some succs =>
      {| gr := PTree.remove root g;
         wrk := (root, Sort.sort succs) :: nil;
@@ -81,7 +81,7 @@ Definition transition (s: state) : PTree.t positive + state :=
                map := PTree.set x s.(next) s.(map);
                next := Psucc s.(next) |}
   | (x, y :: succs_x) :: l =>           (**r consider [y], the next unnumbered successor of [x] *)
-      match s.(gr)!y with
+      match s.(gr) ? y with
       | None =>                         (**r [y] is already numbered: discard from worklist *)
           inr _ {| gr := s.(gr);
                    wrk := (x, succs_x) :: l;
@@ -103,33 +103,33 @@ Variable root: node.
 Inductive invariant (s: state) : Prop :=
   Invariant
     (* current graph is a subset of ginit *)
-    (SUB: forall x y, s.(gr)!x = Some y -> ginit!x = Some y)
+    (SUB: forall x y, s.(gr) ? x = Some y -> ginit ? x = Some y)
     (* root is not in current graph *)
-    (ROOT: s.(gr)!root = None)
+    (ROOT: s.(gr) ? root = None)
     (* mapped nodes have their numbers below next *)
-    (BELOW: forall x y, s.(map)!x = Some y -> Plt y s.(next))
+    (BELOW: forall x y, s.(map) ? x = Some y -> Plt y s.(next))
     (* mapping is injective *)
-    (INJ: forall x1 x2 y, s.(map)!x1 = Some y -> s.(map)!x2 = Some y -> x1 = x2)
+    (INJ: forall x1 x2 y, s.(map) ? x1 = Some y -> s.(map) ? x2 = Some y -> x1 = x2)
     (* nodes not yet visited have no number *)
-    (REM: forall x y, s.(gr)!x = Some y -> s.(map)!x = None)
+    (REM: forall x y, s.(gr) ? x = Some y -> s.(map) ? x = None)
     (* black nodes have no white son *)
     (COLOR: forall x succs n y,
-            ginit!x = Some succs -> s.(map)!x = Some n -> 
-            In y succs -> s.(gr)!y = None)
+            ginit ? x = Some succs -> s.(map) ? x = Some n -> 
+            In y succs -> s.(gr) ? y = None)
     (* worklist is well-formed *)
     (WKLIST: forall x l, In (x, l) s.(wrk) ->
-             s.(gr)!x = None /\
-             exists l', ginit!x = Some l'
-                    /\ forall y, In y l' -> ~In y l -> s.(gr)!y = None)
+             s.(gr) ? x = None /\
+             exists l', ginit ? x = Some l'
+                    /\ forall y, In y l' -> ~In y l -> s.(gr) ? y = None)
     (* all grey nodes are on the worklist *)
-    (GREY: forall x, ginit!x <> None -> s.(gr)!x = None -> s.(map)!x = None ->
+    (GREY: forall x, ginit ? x <> None -> s.(gr) ? x = None -> s.(map) ? x = None ->
            exists l, In (x,l) s.(wrk)).
 
 Inductive postcondition (map: PTree.t positive) : Prop :=
   Postcondition
-    (INJ: forall x1 x2 y, map!x1 = Some y -> map!x2 = Some y -> x1 = x2)
-    (ROOT: ginit!root <> None -> map!root <> None)
-    (SUCCS: forall x succs y, ginit!x = Some succs -> map!x <> None -> In y succs -> ginit!y <> None -> map!y <> None).
+    (INJ: forall x1 x2 y, map ? x1 = Some y -> map ? x2 = Some y -> x1 = x2)
+    (ROOT: ginit ? root <> None -> map ? root <> None)
+    (SUCCS: forall x succs y, ginit ? x = Some succs -> map ? x <> None -> In y succs -> ginit ? y <> None -> map ? y <> None).
 
 Remark In_sort:
   forall x l, In x l <-> In x (Sort.sort l).
@@ -147,9 +147,9 @@ Proof.
   (* finished *)
   constructor; intros.
   eauto.
-  caseEq (s.(map)!root); intros. congruence. exploit GREY; eauto. intros [? ?]; contradiction.
-  destruct (s.(map)!x) eqn:?; try congruence. 
-  destruct (s.(map)!y) eqn:?; try congruence.
+  caseEq (s.(map) ? root); intros. congruence. exploit GREY; eauto. intros [? ?]; contradiction.
+  destruct (s.(map) ? x) eqn:?; try congruence. 
+  destruct (s.(map) ? y) eqn:?; try congruence.
   exploit COLOR; eauto. intros. exploit GREY; eauto. intros [? ?]; contradiction.
   (* not finished *)
   destruct succ_x as [ | y succ_x ].
@@ -189,7 +189,7 @@ Proof.
   exists l'; auto.
 
   (* children y needs traversing *)
-  destruct ((gr s)!y) as [ succs_y | ] eqn:?.
+  destruct ((gr s) ? y) as [ succs_y | ] eqn:?.
   (* y has children *)
   constructor; simpl; intros. 
   (* sub *)
@@ -241,7 +241,7 @@ Qed.
 Lemma initial_state_spec:
   invariant (init_state ginit root).
 Proof.
-  unfold init_state. destruct (ginit!root) as [succs|] eqn:?.
+  unfold init_state. destruct (ginit ? root) as [succs|] eqn:?.
   (* root has succs *)
   constructor; simpl; intros.
   (* sub *)
@@ -315,7 +315,7 @@ Proof.
   discriminate.
   destruct succs as [ | y succs ].
   inv H. simpl. apply lex_ord_right. omega.
-  destruct ((gr s)!y) as [succs'|] eqn:?.
+  destruct ((gr s) ? y) as [succs'|] eqn:?.
   inv H. simpl. apply lex_ord_left. eapply PTree_Properties.cardinal_remove; eauto.
   inv H. simpl. apply lex_ord_right. omega.
 Qed.
@@ -329,14 +329,14 @@ Inductive reachable (g: graph) (root: positive) : positive -> Prop :=
   | reachable_root:
       reachable g root root
   | reachable_succ: forall x succs y,
-      reachable g root x -> g!x = Some succs -> In y succs ->
+      reachable g root x -> g ? x = Some succs -> In y succs ->
       reachable g root y.
 
 Theorem postorder_correct:
   forall g root,
   let m := postorder g root in
-  (forall x1 x2 y, m!x1 = Some y -> m!x2 = Some y -> x1 = x2)
-  /\ (forall x, reachable g root x -> g!x <> None -> m!x <> None).
+  (forall x1 x2 y, m ? x1 = Some y -> m ? x2 = Some y -> x1 = x2)
+  /\ (forall x, reachable g root x -> g ? x <> None -> m ? x <> None).
 Proof.
   intros. 
   assert (postcondition g root m).

@@ -19,6 +19,7 @@ Require Import Coqlib.
 Require Import targetdata.
 Require Import AST.
 Require Import Maps.
+Require Import maps_ext.
 Require Import opsem.
 Require Import vellvm_tactics.
 Require Import util.

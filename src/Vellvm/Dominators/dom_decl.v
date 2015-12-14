@@ -3,6 +3,7 @@ Require Import ListSet.
 Require Import Coqlib.
 Require Import Metatheory.
 Require Import Maps.
+Require Import maps_ext.
 Require Import Lattice.
 Require Import Kildall.
 Require Import Iteration.
@@ -130,7 +131,7 @@ Hypothesis getEntryBlock_inv : forall
 
 Lemma entry_has_no_preds: forall (l5 : l) s5
   (HeqR : Some (l5, s5) = getEntryBlock f)
-  (a0 : ATree.elt) (Hin: In l5 ((successors f) !!! a0)),
+  (a0 : ATree.elt) (Hin: In l5 (XATree.successors_list (successors f) a0)),
   False.
 Proof.
   intros.

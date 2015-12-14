@@ -1,6 +1,7 @@
 Require Import Coqlib.
 Require Import Iteration.
 Require Import Maps.
+Require Import maps_ext.
 Require Import syntax.
 Require Import infrastructure_props.
 Require Import Metatheory.

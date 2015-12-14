@@ -1,6 +1,5 @@
 coq_makefile \
-*.v \
--arg -impredicative-set \
+Archi.v \
 -I ../common/ \
 -I ../flocq/Prop \
 -I ../flocq/Appli \

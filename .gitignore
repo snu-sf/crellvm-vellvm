@@ -11,6 +11,8 @@
 
 /lib/*
 !/lib/compcert-2.4/*
+!/lib/GraphBasics
+!/lib/GraphBasics/*
 
 Makefile.coq
 .coqrc

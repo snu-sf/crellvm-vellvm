@@ -152,6 +152,17 @@ Definition iter_step (x: positive)
 
 Definition iter: positive -> A -> option B := Fix Plt_wf iter_step.
 
+(** We then prove the expected unrolling equations for [iter]. *)
+
+Remark unroll_iter:
+  forall x, iter x = iter_step x (fun y _ => iter y).
+Proof.
+  unfold iter; apply (Fix_eq Plt_wf (fun _ => A -> option B) iter_step).
+  intros. unfold iter_step. apply extensionality. intro s. 
+  case (peq x xH); intro. auto. 
+  rewrite H. auto. 
+Qed.
+
 (** The [iterate] function is defined as [iter] up to
     [num_iterations] through the loop. *)
 
@@ -187,7 +198,188 @@ Qed.
 
 End ITERATION.
 
+Section MoreITERATION.
+
+Variable A1 A2 B1 B2 : Type. 
+Variable step1 : A1 -> B1 + A1.
+Variable step2 : A2 -> B2 + A2.
+Variable P : A1 -> A2 -> Prop.
+
+Hypothesis step_none2: forall (a1 : A1) (a2 : A2),
+  P a1 a2 -> 
+  match step1 a1, step2 a2 with
+  | inl b1, inl b2 => True
+  | inr a1', inr a2' => P a1' a2'
+  | _, _ => False
+  end.
+
+Definition P_iter_none2_right p := forall a1 a2, 
+  P a1 a2 -> 
+  iter _ _ step2 p a2 = None -> iter _ _ step1 p a1 = None.
+
+Lemma iter_none2_right: forall n, P_iter_none2_right n.
+Proof.
+  apply (well_founded_ind Plt_wf (fun p => P_iter_none2_right p)).
+  unfold P_iter_none2_right.
+  intros until a2. intro H0. repeat rewrite unroll_iter.
+  unfold iter_step. 
+  case (peq x 1); intro; try congruence.
+  generalize (step_none2 a1 a2 H0).
+  case (step1 a1).
+    case (step2 a2); intros; try congruence; inv H1.
+    case (step2 a2); intros; try inv H1.
+      apply H with (a2:=a); auto.
+      apply Ppred_Plt; auto. 
+Qed.
+
+Lemma iterate_none2_right: forall (a1: A1) (a2: A2),
+  P a1 a2 ->
+  PrimIter.iterate A2 B2 step2 a2 = None ->
+  PrimIter.iterate A1 B1 step1 a1 = None. 
+Proof.
+  intros. unfold PrimIter.iterate in *.
+  assert (J:=@iter_none2_right num_iterations). eauto.
+Qed.
+
+Definition P_iter_none2_left p := forall a1 a2, 
+  P a1 a2 -> 
+  iter _ _ step1 p a1 = None -> iter _ _ step2 p a2 = None.
+
+Lemma iter_none2_left: forall n, P_iter_none2_left n.
+Proof.
+  apply (well_founded_ind Plt_wf (fun p => P_iter_none2_left p)).
+  unfold P_iter_none2_left.
+  intros until a2. intro H0. repeat rewrite unroll_iter.
+  unfold iter_step. 
+  case (peq x 1); intro; try congruence.
+  generalize (step_none2 a1 a2 H0).
+  case (step1 a1).
+    case (step2 a2); intros; try congruence; inv H1.
+    case (step2 a2); intros; try inv H1.
+      apply H with (a1:=a0); auto.
+      apply Ppred_Plt; auto. 
+Qed.
+
+Lemma iterate_none2_left: forall (a1: A1) (a2: A2),
+  P a1 a2 ->
+  PrimIter.iterate A1 B1 step1 a1 = None -> 
+  PrimIter.iterate A2 B2 step2 a2 = None.
+Proof.
+  intros. unfold PrimIter.iterate in *.
+  assert (J:=@iter_none2_left num_iterations). eauto.
+Qed.
+
+Variable Q : B1 -> B2 -> Prop.
+
+Hypothesis step_some2: forall (a1 : A1) (a2 : A2),
+  P a1 a2 -> 
+  match step1 a1, step2 a2 with
+  | inl b1, inl b2 => Q b1 b2
+  | inr a1', inr a2' => P a1' a2'
+  | _, _ => False
+  end.
+
+Definition P_iter_some2 p := forall a1 a2 b1 b2, 
+  P a1 a2 -> 
+  iter _ _ step1 p a1 = Some b1 -> iter _ _ step2 p a2 = Some b2 -> 
+  Q b1 b2.
+
+Lemma iter_some2: forall n, P_iter_some2 n.
+Proof.
+  apply (well_founded_ind Plt_wf (fun p => P_iter_some2 p)).
+  unfold P_iter_some2.
+  intros until b2. intro H0. repeat rewrite unroll_iter.
+  unfold iter_step. 
+  case (peq x 1); intro; try congruence.
+  generalize (step_some2 a1 a2 H0).
+  case (step1 a1).
+    case (step2 a2); intros; try congruence; inv H1.
+    case (step2 a2); intros; try inv H1.
+      apply H with (Ppred x) a0 a; auto.
+      apply Ppred_Plt; auto. 
+Qed.
+
+Lemma iterate_some2: forall (a1: A1) (b1: B1) (a2: A2) (b2: B2),
+  PrimIter.iterate A1 B1 step1 a1 = Some b1 -> 
+  PrimIter.iterate A2 B2 step2 a2 = Some b2 -> 
+  P a1 a2 -> Q b1 b2.
+Proof.
+  intros. apply iter_some2 with num_iterations a1 a2; assumption.
+Qed.
+
+End MoreITERATION.
+
 End PrimIter.
+
+Module SafePrimIter.
+
+Section ITERATION.
+
+Variables A: Type.
+Variable step: A -> A + A.
+
+Definition iter_step (x: positive)
+                     (next: forall y, Plt y x -> A -> A)
+                     (s: A) : A :=
+  match peq x xH with
+  | left EQ => s
+  | right NOTEQ =>
+      match step s with
+      | inl res => res
+      | inr s'  => next (Ppred x) (Ppred_Plt x NOTEQ) s'
+      end
+  end.
+Check Fix.
+Definition iter: positive -> A -> A :=
+  Fix Plt_wf iter_step.
+
+Definition num_iterations := 1000000000000%positive.
+
+(** We then prove the expected unrolling equations for [iter]. *)
+
+Remark unroll_iter:
+  forall x, iter x = iter_step x (fun y _ => iter y).
+Proof.
+  unfold iter; apply (Fix_eq Plt_wf (fun _ => A -> A) iter_step).
+  intros. unfold iter_step. apply extensionality. intro s. 
+  case (peq x xH); intro. auto. 
+  rewrite H. auto. 
+Qed.
+
+(** The [iterate] function is defined as [iter] up to
+    [num_iterations] through the loop. *)
+
+Definition iterate := iter num_iterations.
+
+(** We now prove the invariance property [iterate_prop]. *)
+
+Variable P: A -> Prop.
+
+Hypothesis step_prop:
+  forall a : A, P a ->
+  match step a with inl b => P b | inr a' => P a' end.
+
+Lemma iter_prop:
+  forall n a b, P a -> iter n a = b -> P b.
+Proof.
+  apply (well_founded_ind Plt_wf 
+         (fun p => forall a b, P a -> iter p a = b -> P b)).
+  intros until b. intro. rewrite unroll_iter.
+  unfold iter_step. case (peq x 1); intro. congruence.
+  generalize (step_prop a H0).
+  case (step a); intros. congruence. 
+  apply H with (Ppred x) a0. apply Ppred_Plt; auto. auto. auto.
+Qed.
+
+Lemma iterate_prop:
+  forall a b, iterate a = b -> P a -> P b.
+Proof.
+  intros. apply iter_prop with num_iterations a; assumption.
+Qed.
+
+End ITERATION.
+
+End SafePrimIter.
 
 (** * General iteration *)
 

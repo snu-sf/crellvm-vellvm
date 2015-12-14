@@ -1,6 +1,5 @@
 coq_makefile \
 *.v \
--arg -impredicative-set \
 -I ../ia32/ \
 -I ../flocq/Prop \
 -I ../flocq/Appli \
@@ -9,4 +8,5 @@ coq_makefile \
 -I ../flocq/ \
 -I ../lib/ \
 -I ./ \
+-I ../../metalib-20090714/ \
 > Makefile

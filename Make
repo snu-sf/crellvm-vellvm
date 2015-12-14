@@ -1,4 +1,3 @@
--arg -impredicative-set
 -install none
 
 ./lib/cpdtlib/CpdtTactics.v
@@ -38,10 +37,9 @@
 ./src/Vellvm/genericvalues.v
 ./src/Vellvm/infrastructure.v
 ./src/Vellvm/infrastructure_props.v
+./src/Vellvm/interpreter.v
 ./src/Vellvm/memory_sim.v
 ./src/Vellvm/ndopsem.v
-./src/Vellvm/opsem_dom.v
-./src/Vellvm/opsem_inst.v
 ./src/Vellvm/opsem_props.v
 ./src/Vellvm/opsem.v
 ./src/Vellvm/opsem_wf.v
@@ -49,6 +47,7 @@
 ./src/Vellvm/ott_list_eq_dec.v
 ./src/Vellvm/static.v
 ./src/Vellvm/syntax.v
+./src/Vellvm/monad.v
 ./src/Vellvm/syntax_base.v
 ./src/Vellvm/tactics.v
 ./src/Vellvm/targetdata.v
@@ -58,9 +57,11 @@
 ./src/Vellvm/typings_props.v
 ./src/Vellvm/typings.v
 ./src/Vellvm/vellvm.v
+./src/Vellvm/vellvm_tactics.v
 ./src/Vellvm/memory_props.v
 ./src/Vellvm/program_sim.v
-./src/Vellvm/interpreter.v
+./src/Vellvm/util.v
+./src/Vellvm/maps_ext.v
 
 ./src/Vellvm/Dominators/dom_type.v
 ./src/Vellvm/Dominators/dom_libs.v
@@ -77,8 +78,4 @@
 ./src/Vellvm/Dominators/dom_set_tree.v
 ./src/Vellvm/Dominators/dom_list_tree_wf.v
 ./src/Vellvm/Dominators/dom_list_df.v
-
-./src/Vellvm/extraction_core.v
-./src/Vellvm/extraction_dom.v
-
 

@@ -193,10 +193,10 @@ Proof.
   + rewrite Raw.join_spec. intuition. 
   + assert (X.eq x x0 \/ X.lt x0 x -> False).
     { intros. exploit below_monotone; eauto. congruence. }
-    intuition. elim H7. apply g. auto.
+    intuition.
   + assert (X.eq x x0 \/ X.lt x x0 -> False).
     { intros. exploit above_monotone; eauto. congruence. }
-    intuition. elim H7. apply l0. auto.
+    intuition.
 Qed.
 
 Theorem elements_between_iff:

@@ -13,6 +13,7 @@ Require Import alist.
 Require Import Integers.
 Require Import Coqlib.
 Require Import Maps.
+Require Import maps_ext.
 Require Import Memory.
 Require Import Lattice.
 Require Import targetdata.

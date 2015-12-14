@@ -6,7 +6,6 @@ Require Import Metatheory.
 Require Import Coqlib.
 
 Require Import alist_old.
-Require Import Coqlib_old.
 (* In *)
 
 Lemma In_weakening : forall A (l2 l3 l1:list A) a,
@@ -1180,3 +1179,2100 @@ Proof.
     right. congruence.
 Qed.
 
+(* node set *)
+
+Require Import Iteration.
+Require Import Maps.
+Require Import maps_ext.
+Require Import Lattice.
+
+Module Type NODE_SET0.
+
+  Variable t: Type.
+  Variable add: atom -> t -> t.
+  Variable pick: t -> option (atom * t).
+  Variable initial: ATree.t (list atom) -> t.
+
+  Variable In: atom -> t -> Prop.
+  Hypothesis add_spec:
+    forall n n' s, In n' (add n s) <-> n = n' \/ In n' s.
+  Hypothesis pick_none:
+    forall s n, pick s = None -> ~In n s.
+  Hypothesis pick_some:
+    forall s n s', pick s = Some(n, s') ->
+    forall n', In n' s <-> n = n' \/ In n' s'.
+  Hypothesis initial_spec:
+    forall successors n s,
+    successors!n = Some s -> In n (initial successors).
+
+End NODE_SET0.
+
+Module AtomNodeSet <: NODE_SET0.
+  Definition t := set atom.
+  Definition add (n: atom) (s: t) : t := set_add eq_atom_dec n s.
+  Definition pick (s: t) :=
+    match s with
+    | n::s' => Some(n, set_remove eq_atom_dec n s')
+    | nil => None
+    end.
+  Definition initial (successors: ATree.t (list atom)) :=
+    ATree.fold (fun s pc scs => add pc s) successors (empty_set atom).
+  Definition In := (@set_In atom).
+
+  Lemma add_spec:
+    forall n n' s, In n' (add n s) <-> n = n' \/ In n' s.
+  Proof.
+    intros.
+    split; intro J.
+      apply (@set_add_elim atom eq_atom_dec n' n s) in J.
+      destruct J; auto.
+
+      apply (@set_add_intro atom eq_atom_dec).
+      destruct J; auto.
+  Qed.
+
+  Lemma pick_none:
+    forall s n, pick s = None -> ~In n s.
+  Proof.
+    intros until n; unfold pick.
+    destruct s; auto.
+      intro J. inversion J.
+  Qed.
+
+  Lemma pick_some:
+    forall s n s', pick s = Some(n, s') ->
+    forall n', In n' s <-> n = n' \/ In n' s'.
+  Proof.
+    intros until s'; unfold pick.
+    destruct s; intro H0; inv H0.
+    intros n'.
+    split; intros.
+      simpl in H.
+      inv H; auto.
+        destruct (eq_atom_dec n n') as [J1 | J2]; subst; auto.
+          right. apply AtomSet.set_remove_spec1; auto.
+
+      destruct H as [H | H]; subst; simpl; auto.
+          right. eapply AtomSet.set_remove_spec2; eauto.
+  Qed.
+
+  Lemma initial_spec:
+    forall successors n s,
+    successors!n = Some s -> In n (initial successors).
+  Proof.
+    intros successors.
+    apply ATree_Properties.fold_rec with
+      (P := fun succ set =>
+              forall n s, succ!n = Some s -> In n set).
+    (* extensionality *)
+    intros. rewrite <- H in H1. eauto.
+    (* base case *)
+    intros. rewrite ATree.gempty in H. congruence.
+    (* inductive case *)
+    intros. rewrite ATree.gsspec in H2. rewrite add_spec.
+    destruct (ATree.elt_eq n k). auto. eauto.
+  Qed.
+
+  Lemma pick_in:
+    forall s n s', pick s = Some(n, s') -> In n s.
+  Proof.
+    intros until s'; unfold pick. 
+    caseEq s; intros; try congruence.
+    inv H0. simpl. auto.
+  Qed.
+  
+  Lemma initial_spec':
+    forall successors n,
+    In n (initial successors) -> 
+    exists s, successors ! n = Some s.
+  Proof.
+    intros successors.
+    apply ATree_Properties.fold_rec with
+      (P := fun succ set =>
+              forall n, In n set -> exists s, succ ! n = Some s).
+    (* extensionality *)
+    intros. rewrite <- H. eauto.
+    (* base case *)
+    intros. inv H.
+    (* inductive case *)
+    intros. rewrite ATree.gsspec. apply add_spec in H2.
+    destruct (ATree.elt_eq n k); eauto.
+      destruct H2 as [H2 | H2]; subst.
+        congruence.
+        eauto.
+  Qed.
+
+  Lemma NoDup__initial: forall successors, NoDup (initial successors).
+  Proof.
+    intro successors.
+    apply ATree_Properties.fold_rec with
+      (P := fun succ set => NoDup set).
+      (* extensionality *)
+      intros. auto.
+      (* base case *)
+      constructor.
+      (* inductive case *)
+      intros. apply AtomSet.set_add_NoDup; auto.
+  Qed.
+
+End AtomNodeSet.
+
+(* Lattice *)
+Require Import FSets.
+Module Type SEMILATTICE0.
+
+  Variable t: Type.
+  Variable eq: t -> t -> Prop.
+  Hypothesis eq_refl: forall x, eq x x.
+  Hypothesis eq_sym: forall x y, eq x y -> eq y x.
+  Hypothesis eq_trans: forall x y z, eq x y -> eq y z -> eq x z.
+  Variable beq: t -> t -> bool.
+  Hypothesis beq_correct: forall x y, beq x y = true -> eq x y.
+  Variable ge: t -> t -> Prop.
+  Hypothesis ge_refl: forall x y, eq x y -> ge x y.
+  Hypothesis ge_trans: forall x y z, ge x y -> ge y z -> ge x z.
+  Hypothesis ge_compat: forall x x' y y', eq x x' -> eq y y' -> ge x y -> ge x' y'.
+  Variable bot: t.
+  Hypothesis ge_bot: forall x, ge x bot.
+  Variable lub: t -> t -> t.
+  Hypothesis lub_commut: forall x y, eq (lub x y) (lub y x).
+  Hypothesis ge_lub_left: forall x y, ge (lub x y) x.
+
+End SEMILATTICE0.
+
+Module Type SEMILATTICE_WITH_TOP0.
+
+  Include Type SEMILATTICE0.
+  Variable top: t.
+  Hypothesis ge_top: forall x, ge top x.
+
+End SEMILATTICE_WITH_TOP0.
+
+Module LBoolean <: SEMILATTICE_WITH_TOP0.
+
+Definition t := bool.
+
+Definition eq (x y: t) := (x = y).
+Definition eq_refl: forall x, eq x x := (@refl_equal t).
+Definition eq_sym: forall x y, eq x y -> eq y x := (@sym_equal t).
+Definition eq_trans: forall x y z, eq x y -> eq y z -> eq x z := (@trans_equal t).
+
+Definition beq : t -> t -> bool := eqb.
+
+Lemma beq_correct: forall x y, beq x y = true -> eq x y.
+Proof eqb_prop.
+
+Definition ge (x y: t) : Prop := x = y \/ x = true.
+
+Lemma ge_refl: forall x y, eq x y -> ge x y.
+Proof. unfold ge; tauto. Qed.
+
+Lemma ge_trans: forall x y z, ge x y -> ge y z -> ge x z.
+Proof. unfold ge; intuition congruence. Qed.
+
+Lemma ge_compat: forall x x' y y', eq x x' -> eq y y' -> ge x y -> ge x' y'.
+Proof.
+  unfold eq; intros; congruence.
+Qed.
+
+Definition bot := false.
+
+Lemma ge_bot: forall x, ge x bot.
+Proof. destruct x; compute; tauto. Qed.
+
+Definition top := true.
+
+Lemma ge_top: forall x, ge top x.
+Proof. unfold ge, top; tauto. Qed.
+
+Definition lub (x y: t) := x || y.
+
+Lemma lub_commut: forall x y, eq (lub x y) (lub y x).
+Proof. intros; unfold eq, lub. apply orb_comm. Qed.
+
+Lemma ge_lub_left: forall x y, ge (lub x y) x.
+Proof. destruct x; destruct y; compute; tauto. Qed.
+
+Lemma ge_lub: forall x y1 y2, ge y1 y2 -> ge (lub x y1) (lub x y2).
+Proof. unfold ge. intros. destruct x, y1, y2; tauto. Qed.
+
+End LBoolean.
+
+(** * Semi-lattice over maps *)
+
+(** Given a semi-lattice with top [L], the following functor implements
+  a semi-lattice structure over finite maps from positive numbers to [L.t].
+  The default value for these maps is either [L.top] or [L.bot]. *)
+
+Module LPMap(L: SEMILATTICE_WITH_TOP0) <: SEMILATTICE_WITH_TOP0.
+
+Inductive t_ : Type :=
+  | Bot_except: ATree'.t L.t -> t_
+  | Top_except: ATree'.t L.t -> t_.
+
+Definition t: Type := t_.
+
+Definition get (p: atom) (x: t) : L.t :=
+  match x with
+  | Bot_except m =>
+      match ATree'.get p m with None => L.bot | Some x => x end
+  | Top_except m =>
+      match ATree'.get p m with None => L.top | Some x => x end
+  end.
+
+Definition set (p: atom) (v: L.t) (x: t) : t :=
+  match x with
+  | Bot_except m =>
+      Bot_except (if L.beq v L.bot then ATree'.remove p m else ATree'.set p v m)
+  | Top_except m =>
+      Top_except (if L.beq v L.top then ATree'.remove p m else ATree'.set p v m)
+  end.
+
+Lemma gss:
+  forall p v x,
+  L.eq (get p (set p v x)) v.
+Proof.
+  intros. destruct x; simpl.
+  case_eq (L.beq v L.bot); intros.
+  rewrite ATree'.grs. apply L.eq_sym. apply L.beq_correct; auto.
+  rewrite ATree'.gss. apply L.eq_refl.
+  case_eq (L.beq v L.top); intros.
+  rewrite ATree'.grs. apply L.eq_sym. apply L.beq_correct; auto.
+  rewrite ATree'.gss. apply L.eq_refl.
+Qed.
+
+Lemma gso:
+  forall p q v x,
+  p <> q -> get p (set q v x) = get p x.
+Proof.
+  intros. destruct x; simpl.
+  destruct (L.beq v L.bot). rewrite ATree'.gro; auto. rewrite ATree'.gso; auto.
+  destruct (L.beq v L.top). rewrite ATree'.gro; auto. rewrite ATree'.gso; auto.
+Qed.
+
+Definition eq (x y: t) : Prop :=
+  forall p, L.eq (get p x) (get p y).
+
+Lemma eq_refl: forall x, eq x x.
+Proof.
+  unfold eq; intros. apply L.eq_refl.
+Qed.
+
+Lemma eq_sym: forall x y, eq x y -> eq y x.
+Proof.
+  unfold eq; intros. apply L.eq_sym; auto.
+Qed.
+
+Lemma eq_trans: forall x y z, eq x y -> eq y z -> eq x z.
+Proof.
+  unfold eq; intros. eapply L.eq_trans; eauto.
+Qed.
+
+Definition beq (x y: t) : bool :=
+  match x, y with
+  | Bot_except m, Bot_except n => ATree'.beq L.beq m n
+  | Top_except m, Top_except n => ATree'.beq L.beq m n
+  | _, _ => false
+  end.
+
+Lemma beq_correct: forall x y, beq x y = true -> eq x y.
+Proof.
+  destruct x; destruct y; simpl; intro; try congruence.
+  red; intro; simpl.
+  generalize (@ATree'.beq_correct _ L.eq L.beq L.beq_correct t0 t1 H p).
+  destruct (ATree'.get p t0); destruct (ATree'.get p t1); intuition. apply L.eq_refl.
+  red; intro; simpl.
+  generalize (@ATree'.beq_correct _ L.eq L.beq L.beq_correct t0 t1 H p).
+  destruct (ATree'.get p t0); destruct (ATree'.get p t1); intuition. apply L.eq_refl.
+Qed.
+
+Definition ge (x y: t) : Prop :=
+  forall p, L.ge (get p x) (get p y).
+
+Lemma ge_refl: forall x y, eq x y -> ge x y.
+Proof.
+  unfold ge, eq; intros. apply L.ge_refl. auto.
+Qed.
+
+Lemma ge_trans: forall x y z, ge x y -> ge y z -> ge x z.
+Proof.
+  unfold ge; intros. apply L.ge_trans with (get p y); auto.
+Qed.
+
+Lemma ge_compat: forall x x' y y', eq x x' -> eq y y' -> ge x y -> ge x' y'.
+Proof.
+  unfold eq,ge; intros. eapply L.ge_compat; eauto.
+Qed.
+
+Definition bot := Bot_except (ATree'.empty L.t).
+
+Lemma get_bot: forall p, get p bot = L.bot.
+Proof.
+  unfold bot; intros; simpl. rewrite ATree'.gempty. auto.
+Qed.
+
+Lemma ge_bot: forall x, ge x bot.
+Proof.
+  unfold ge; intros. rewrite get_bot. apply L.ge_bot.
+Qed.
+
+Definition top := Top_except (ATree'.empty L.t).
+
+Lemma get_top: forall p, get p top = L.top.
+Proof.
+  unfold top; intros; simpl. rewrite ATree'.gempty. auto.
+Qed.
+
+Lemma ge_top: forall x, ge top x.
+Proof.
+  unfold ge; intros. rewrite get_top. apply L.ge_top.
+Qed.
+
+Definition opt_lub (x y: L.t) : option L.t :=
+  let z := L.lub x y in
+  if L.beq z L.top then None else Some z.
+
+Definition lub (x y: t) : t :=
+  match x, y with
+  | Bot_except m, Bot_except n =>
+      Bot_except
+        (ATree'.combine
+           (fun a b =>
+              match a, b with
+              | Some u, Some v => Some (L.lub u v)
+              | None, _ => b
+              | _, None => a
+              end)
+           m n)
+  | Bot_except m, Top_except n =>
+      Top_except
+        (ATree'.combine
+           (fun a b =>
+              match a, b with
+              | Some u, Some v => opt_lub u v
+              | None, _ => b
+              | _, None => None
+              end)
+        m n)
+  | Top_except m, Bot_except n =>
+      Top_except
+        (ATree'.combine
+           (fun a b =>
+              match a, b with
+              | Some u, Some v => opt_lub u v
+              | None, _ => None
+              | _, None => a
+              end)
+        m n)
+  | Top_except m, Top_except n =>
+      Top_except
+        (ATree'.combine
+           (fun a b =>
+              match a, b with
+              | Some u, Some v => opt_lub u v
+              | _, _ => None
+              end)
+           m n)
+  end.
+
+Lemma lub_commut:
+  forall x y, eq (lub x y) (lub y x).
+Proof.
+  intros x y p.
+  assert (forall u v,
+    L.eq (match opt_lub u v with
+          | Some x => x
+          | None => L.top end)
+         (match opt_lub v u with
+         | Some x => x
+         | None => L.top
+         end)).
+  intros. unfold opt_lub.
+  case_eq (L.beq (L.lub u v) L.top);
+  case_eq (L.beq (L.lub v u) L.top); intros.
+  apply L.eq_refl.
+  eapply L.eq_trans. apply L.eq_sym. apply L.beq_correct; eauto. apply L.lub_commut.
+  eapply L.eq_trans. apply L.lub_commut. apply L.beq_correct; auto.
+  apply L.lub_commut.
+  destruct x; destruct y; simpl;
+  repeat rewrite ATree'.gcombine; auto;
+  destruct (ATree'.get p t0); destruct (ATree'.get p t1);
+  auto; apply L.eq_refl || apply L.lub_commut.
+Qed.
+
+Lemma ge_lub_left:
+  forall x y, ge (lub x y) x.
+Proof.
+  assert (forall u v,
+    L.ge (match opt_lub u v with Some x => x | None => L.top end) u).
+  intros; unfold opt_lub.
+  case_eq (L.beq (L.lub u v) L.top); intros. apply L.ge_top. apply L.ge_lub_left.
+
+  unfold ge, get, lub; intros; destruct x; destruct y.
+
+  rewrite ATree'.gcombine; auto.
+  destruct (ATree'.get p t0); destruct (ATree'.get p t1).
+  apply L.ge_lub_left.
+  apply L.ge_refl. apply L.eq_refl.
+  apply L.ge_bot.
+  apply L.ge_refl. apply L.eq_refl.
+
+  rewrite ATree'.gcombine; auto.
+  destruct (ATree'.get p t0); destruct (ATree'.get p t1).
+  auto.
+  apply L.ge_top.
+  apply L.ge_bot.
+  apply L.ge_top.
+
+  rewrite ATree'.gcombine; auto.
+  destruct (ATree'.get p t0); destruct (ATree'.get p t1).
+  auto.
+  apply L.ge_refl. apply L.eq_refl.
+  apply L.ge_top.
+  apply L.ge_top.
+
+  rewrite ATree'.gcombine; auto.
+  destruct (ATree'.get p t0); destruct (ATree'.get p t1).
+  auto.
+  apply L.ge_top.
+  apply L.ge_top.
+  apply L.ge_top.
+Qed.
+
+End LPMap.
+
+(** * Domination analysis *)
+
+(** The type [Dominators] of compile-time approximations of domination. *)
+
+(** We equip this type of approximations with a semi-lattice structure.
+  The ordering is inclusion between the sets of values denoted by
+  the approximations. *)
+
+Module Dominators <: SEMILATTICE_WITH_TOP0.
+
+  Require Import ListSet.
+  Export AtomSet.
+
+  Definition t := option (set atom).
+
+  Definition eq (x y: t) :=
+    match x, y with
+    | Some cx, Some cy => set_eq cx cy
+    | None, None => True
+    | _, _ => False
+    end.
+
+  Definition eq_refl: forall x, eq x x.
+  Proof.
+    unfold eq. intro x. destruct x; auto with atomset.
+  Qed.
+
+  Definition eq_sym: forall x y, eq x y -> eq y x.
+  Proof.
+    unfold eq. intros x y J. destruct x; destruct y; auto with atomset.
+  Qed.
+
+  Definition eq_trans: forall x y z, eq x y -> eq y z -> eq x z.
+  Proof.
+    unfold eq. intros x y z J1 J2. 
+    destruct x; destruct y; destruct z; eauto with atomset. tauto.
+  Qed.
+
+  Lemma eq_dec: forall (x y: t), {eq x y} + {~ eq x y}.
+  Proof.
+    unfold eq. destruct x; destruct y; auto.
+    apply set_eq_dec. apply eq_atom_dec.
+  Qed.
+
+  Definition beq (x y: t) := if eq_dec x y then true else false.
+
+  Lemma beq_correct: forall x y, beq x y = true -> eq x y.
+  Proof.
+    unfold beq; intros.  destruct (eq_dec x y). auto. congruence.
+  Qed.
+
+  Definition sub (x y: t) :=
+    match x, y with
+    | Some cx, Some cy => incl cx cy
+    | _, None => True
+    | _, _ => False
+    end.
+
+  Definition top : t := Some (empty_set atom).
+
+  Definition bot : t := None.
+
+  Definition ge (x y: t) : Prop := sub x y.
+
+  Lemma ge_refl: forall x y, eq x y -> ge x y.
+  Proof.
+    unfold ge, eq. destruct x, y; simpl; auto. 
+    intro J. destruct J; auto.
+  Qed.
+
+  Lemma ge_trans: forall x y z, ge x y -> ge y z -> ge x z.
+  Proof.
+    unfold ge. 
+    destruct x, y, z; simpl; eauto 2 with datatypes v62.
+      tauto.
+  Qed.
+
+  Lemma ge_compat: forall x x' y y', eq x x' -> eq y y' -> ge x y -> ge x' y'.
+  Proof.
+    unfold ge, eq. 
+    destruct x, x', y, y'; simpl; try solve [eauto 2 with atomset | tauto].
+  Qed.
+
+  Lemma ge_bot: forall x, ge x bot.
+  Proof.
+    unfold ge, eq, sub. destruct x; simpl; auto with atomset.
+  Qed.
+
+  Lemma ge_top: forall x, ge top x.
+  Proof.
+    unfold ge, eq, sub. destruct x; simpl; auto with atomset.
+  Qed.
+
+  Definition lub (x y: t) : t :=
+    match x, y with
+    | Some cx, Some cy => Some (set_inter eq_atom_dec cx cy)
+    | None, _ => y
+    | _, None => x
+    end.
+
+  Lemma lub_commut: forall x y, eq (lub x y) (lub y x).
+  Proof.
+    unfold lub, eq. destruct x, y; auto with atomset.
+  Qed.
+
+  Lemma ge_lub_left: forall x y, ge (lub x y) x.
+  Proof.
+    unfold lub, ge, sub. destruct x, y; simpl; auto with datatypes v62.
+    intros a J.
+    apply set_inter_elim in J. destruct J. auto.
+  Qed.
+
+  Lemma ge_lub_right:
+    forall x y, ge (lub x y) y.
+  Proof.
+    intros.
+    apply ge_compat with (x:=lub y x)(y:=y).
+      apply lub_commut.
+      apply eq_refl.
+      apply ge_lub_left.
+  Qed.
+
+  Lemma lub_preserves_ge : forall x y, ge x y -> eq (lub x y) x.
+  Proof.
+    unfold lub, ge, eq. destruct x, y; simpl; auto with atomset.
+  Qed.
+
+  Lemma lub_compat : forall x y x' y',
+    ge x x' -> ge y y' -> ge (lub x y) (lub x' y').
+  Proof.
+    unfold lub, ge, eq. 
+    destruct x, y, x', y'; simpl; try solve [
+      tauto | eauto 2 with atomset | 
+      intros; eapply incl_tran; eauto; eauto 2 with atomset
+    ].
+  Qed.
+
+  Lemma lub_refl : forall x, eq x (lub x x).
+  Proof.
+    unfold eq, lub. destruct x; auto with atomset.
+  Qed.
+
+  Lemma ge_top_inv : forall x, ge x top -> eq x top.
+  Proof.
+    unfold ge, top. destruct x; simpl; auto.
+    intros J.
+    apply incl_empty_inv in J. subst. auto with atomset.
+  Qed.
+
+  Lemma ge_antisym : forall x y, ge x y -> ge y x -> eq x y.
+  Proof.
+    destruct x, y; simpl; auto.
+    intros J1 J2. split; auto.
+  Qed.
+
+  Lemma lub_compat' : forall x y1 y2, ge x y1 -> ge x y2 -> ge x (lub y1 y2).
+  Proof.
+    intros.
+    apply ge_trans with (y:=lub x x).
+      apply ge_refl. apply lub_refl.
+      apply lub_compat; auto.
+  Qed.
+
+  Lemma ge_lub_left' : forall a p1 p2, ge p2 p1 -> ge (lub p2 a) p1.
+  Proof.
+    intros.
+    apply ge_trans with (y:=p2); auto.
+    apply ge_lub_left.
+  Qed.
+
+  Lemma ge_refl' : forall x, ge x x.
+  Proof.
+    intros. apply ge_refl. apply eq_refl.
+  Qed.
+
+  Definition add (x:t) (a:atom) : t :=
+    match x with
+    | Some cx => Some (a::cx)
+    | None => None
+    end.
+
+  Lemma add_mono: forall a x y, ge x y -> ge (add x a) (add y a).
+  Proof.
+    unfold ge, add, eq, sub. destruct x, y; simpl; auto.
+    intros.
+    intros x J. simpl in J.
+    destruct J as [J | J]; subst; simpl; auto.
+  Qed.
+
+  Definition member (a:atom) (x: t) :=
+    match x with
+    | Some cx => In a cx
+    | None => True
+    end.
+
+  Lemma add_member1: forall a x,
+    member a (add x a).
+  Proof.
+    unfold member, add. destruct x; simpl; auto.
+  Qed.
+
+  Lemma add_member2: forall a b x,
+    member a x -> member a (add x b).
+  Proof.
+    unfold member, add. destruct x; simpl; auto.
+  Qed.
+
+  Lemma member_eq : forall a x1 x2, eq x1 x2 -> member a x2 -> member a x1.
+  Proof.
+    unfold member, eq. destruct x1, x2; simpl; try solve [auto | tauto].
+    intros H H1. destruct H. auto.
+  Qed.
+
+  Lemma member_lub : forall a x1 x2,
+    member a x2 -> member a x1 -> member a (lub x1 x2).
+  Proof.
+    unfold member, lub. destruct x1, x2; simpl; auto.
+    intros. apply set_inter_intro; auto.
+  Qed.
+
+  Lemma ge_elim : forall a x y, ge x y -> member a x -> member a y.
+  Proof.
+    unfold member, ge. destruct x, y; simpl; try solve [auto | tauto].
+  Qed.
+
+  Lemma member_dec: forall a x, member a x \/ ~ member a x.
+  Proof.
+    unfold member. destruct x; simpl; auto.
+    destruct (in_dec eq_atom_dec a s); auto.
+  Qed.
+
+  Lemma lub_compat_eq : forall x y x' y',
+    eq x x' -> eq y y' -> eq (lub x y) (lub x' y').
+  Proof.
+    unfold lub, eq. destruct x, y, x', y'; simpl; try solve [auto | tauto].
+    intros J1 J2. auto with atomset.
+  Qed.
+
+  Lemma add_bot: forall a, eq (add bot a) bot.
+  Proof.
+    unfold eq, add, bot. intros. auto.
+  Qed.
+
+  Lemma add_eq: forall a x y, eq x y -> eq (add x a) (add y a).
+  Proof.
+    unfold eq, add. destruct x, y; simpl; auto.
+    intros [H1 H2].
+    split; intros x J; simpl in *; destruct J; subst; auto.
+  Qed.
+
+  Lemma lub_intro: forall a x y, member a x -> member a y -> member a (lub x y).
+  Proof.
+    unfold member, lub. destruct x, y; simpl; auto.
+    intros. apply set_inter_intro; auto.
+  Qed.
+
+  Definition lubs (pds: list t) : t :=
+    fold_left (fun acc => fun p => lub acc p) pds bot.
+
+  Lemma lubs_spec1: forall pds p2 p1,
+    ge p2 p1 -> ge (fold_left (fun acc => fun p => lub acc p) pds p2) p1.
+  Proof.
+    induction pds; simpl; intros; auto.
+      apply IHpds. apply ge_lub_left'; auto.
+  Qed.
+
+  Lemma lubs_spec2_aux: forall pds p2 p1, In p1 pds ->
+    ge (fold_left (fun acc => fun p => lub acc p) pds p2) p1.
+  Proof.
+    induction pds; simpl; intros.
+      inversion H.
+      destruct H as [H | H]; subst.
+        apply lubs_spec1.
+          apply ge_lub_right; auto.
+        apply IHpds; auto.
+  Qed.
+
+  Lemma lubs_spec2: forall pds p1, In p1 pds ->
+    ge (lubs pds) p1.
+  Proof.
+    unfold lubs. intros. apply lubs_spec2_aux; auto.
+  Qed.
+
+  Lemma lubs_spec3_aux: forall p0 pds p2,
+    ge p0 p2 ->
+    (forall p, In p pds -> ge p0 p) ->
+    ge p0 (fold_left (fun acc => fun p => lub acc p) pds p2).
+  Proof.
+    induction pds; simpl; intros; auto.
+      apply IHpds; auto.
+        apply lub_compat'; auto.
+  Qed.
+
+  Lemma lubs_spec3: forall pds p1,
+    (forall p, In p pds -> ge p1 p) -> ge p1 (lubs pds).
+  Proof.
+    unfold lubs. intros. apply lubs_spec3_aux; auto.
+      apply ge_bot.
+  Qed.
+
+  Definition gt (x y: t) : Prop := 
+  match x, y with
+  | Some _, None => True
+  | Some x', Some y' => incl x' y' /\ exists a, In a y' /\ ~ In a x'
+  | _, _ => False
+  end.
+
+  Lemma beq_correct': forall x y, beq x y = false -> ~ eq x y.
+  Proof.
+    unfold beq; intros. 
+    destruct (eq_dec x y). 
+      congruence.
+      auto. 
+  Qed.
+
+  Lemma ge__gt_or_eq: forall x y (Hge: ge x y), eq x y \/ gt x y.
+  Proof.
+    unfold ge, gt.
+    intros.
+    destruct x as [x|].
+      destruct y as [y|]; auto.
+        simpl in Hge. assert (J:=Hge). 
+        apply incl__eq_or_exact in J; auto.
+        destruct J as [EQ | [e [Hin Hnotin]]]; subst; auto.
+          right. split; eauto.
+      left.
+      destruct y as [y|]; try tauto.
+  Qed.
+
+End Dominators.
+
+Module Type DATAFLOW_SOLVER0.
+
+  Declare Module L: SEMILATTICE0.
+
+  Variable fixpoint:
+    forall (successors: ATree.t (list atom))
+           (transf: atom -> L.t -> L.t)
+           (entrypoints: list (atom * L.t)),
+    option (AMap.t L.t).
+
+  (** [fixpoint successors transf entrypoints] is the solver.
+    It returns either an error or a mapping from program points to
+    values of type [L.t] representing the solution.  [successors]
+    is a finite map returning the list of successors of the given program
+    point. [transf] is the transfer function, and [entrypoints] the additional
+    constraints imposed on the solution. *)
+
+  Hypothesis fixpoint_solution:
+    forall successors transf entrypoints res n s,
+    fixpoint successors transf entrypoints = Some res ->
+    In s successors!!!n ->
+    L.ge res!!s (transf n res!!n).
+
+  (** The [fixpoint_solution] theorem shows that the returned solution,
+    if any, satisfies the dataflow inequations. *)
+
+  Hypothesis fixpoint_entry:
+    forall successors transf entrypoints res n v,
+    fixpoint successors transf entrypoints = Some res ->
+    In (n, v) entrypoints ->
+    L.ge res!!n v.
+
+  (** The [fixpoint_entry] theorem shows that the returned solution,
+    if any, satisfies the additional constraints expressed
+    by [entrypoints]. *)
+
+  Hypothesis fixpoint_invariant:
+    forall successors transf entrypoints
+           (P: L.t -> Prop),
+    P L.bot ->
+    (forall x y, P x -> P y -> P (L.lub x y)) ->
+    (forall pc x, P x -> P (transf pc x)) ->
+    (forall n v, In (n, v) entrypoints -> P v) ->
+    forall res pc,
+    fixpoint successors transf entrypoints = Some res ->
+    P res!!pc.
+
+  (** Finally, any property that is preserved by [L.lub] and [transf]
+      and that holds for [L.bot] also holds for the results of
+      the analysis. *)
+
+  Hypothesis fixpoint_inv:
+    forall (successors: ATree.t (list atom)) (transf: atom -> L.t -> L.t)
+           (entrypoints: list (atom * L.t)) (P: atom -> L.t -> Prop)
+    (P_bot: forall n, P n L.bot)
+    (P_lub: forall n x y, P n x -> P n y -> P n (L.lub x y))
+    (P_transf: forall pc sc x y (Hin: In sc (successors!!!pc))
+      (HPx: P pc x) (HPy: P sc y), P sc (L.lub y (transf pc x)))
+    (P_entrypoints: forall n v, In (n, v) entrypoints -> P n v)
+    (transf_mono: forall p x y,
+       L.ge x y -> L.ge (transf p x) (transf p y))
+    (ge_lub: forall x y1 y2, 
+       L.ge y1 y2 -> L.ge (L.lub x y1) (L.lub x y2))
+    (P_ge: forall n x y, L.ge x y -> P n x -> P n y),
+    forall res,
+    fixpoint successors transf entrypoints = Some res ->
+    forall pc, P pc res!!pc.
+
+  (** A variant of fixpoint_invariant *)
+
+End DATAFLOW_SOLVER0.
+
+(** We now define a generic solver that works over
+    any semi-lattice structure. *)
+
+Module Dataflow_Solver (LAT: SEMILATTICE0) (NS: NODE_SET0):
+                          DATAFLOW_SOLVER0 with Module L := LAT.
+
+Module L := LAT.
+
+Section Kildall.
+
+Variable successors: ATree.t (list atom).
+Variable transf: atom -> L.t -> L.t.
+Variable entrypoints: list (atom * L.t).
+
+(** The state of the iteration has two components:
+- A mapping from program points to values of type [L.t] representing
+  the candidate solution found so far.
+- A worklist of program points that remain to be considered.
+*)
+
+Record state : Type :=
+  mkstate { st_in: AMap.t L.t; st_wrk: NS.t }.
+
+(** Kildall's algorithm, in pseudo-code, is as follows:
+<<
+    while st_wrk is not empty, do
+        extract a node n from st_wrk
+        compute out = transf n st_in[n]
+        for each successor s of n:
+            compute in = lub st_in[s] out
+            if in <> st_in[s]:
+                st_in[s] := in
+                st_wrk := st_wrk union {s}
+            end if
+        end for
+    end while
+    return st_in
+>>
+
+The initial state is built as follows:
+- The initial mapping sets all program points to [L.bot], except
+  those mentioned in the [entrypoints] list, for which we take
+  the associated approximation as initial value.  Since a program
+  point can be mentioned several times in [entrypoints], with different
+  approximations, we actually take the l.u.b. of these approximations.
+- The initial worklist contains all the program points. *)
+
+Fixpoint start_state_in (ep: list (atom * L.t)) : AMap.t L.t :=
+  match ep with
+  | nil =>
+      AMap.init L.bot
+  | (n, v) :: rem =>
+      let m := start_state_in rem in AMap.set n (L.lub m!!n v) m
+  end.
+
+Definition start_state :=
+  mkstate (start_state_in entrypoints) (NS.initial successors).
+
+(** [propagate_succ] corresponds, in the pseudocode,
+  to the body of the [for] loop iterating over all successors. *)
+
+Definition propagate_succ (s: state) (out: L.t) (n: atom) :=
+  let oldl := s.(st_in)!!n in
+  let newl := L.lub oldl out in
+  if L.beq oldl newl
+  then s
+  else mkstate (AMap.set n newl s.(st_in)) (NS.add n s.(st_wrk)).
+
+(** [propagate_succ_list] corresponds, in the pseudocode,
+  to the [for] loop iterating over all successors. *)
+
+Fixpoint propagate_succ_list (s: state) (out: L.t) (succs: list atom)
+                             {struct succs} : state :=
+  match succs with
+  | nil => s
+  | n :: rem => propagate_succ_list (propagate_succ s out n) out rem
+  end.
+
+(** [step] corresponds to the body of the outer [while] loop in the
+  pseudocode. *)
+
+Definition step (s: state) : AMap.t L.t + state :=
+  match NS.pick s.(st_wrk) with
+  | None =>
+      inl _ s.(st_in)
+  | Some(n, rem) =>
+      inr _ (propagate_succ_list
+              (mkstate s.(st_in) rem)
+              (transf n s.(st_in)!!n)
+              (successors!!!n))
+  end.
+
+(** The whole fixpoint computation is the iteration of [step] from
+  the start state. *)
+
+Definition fixpoint : option (AMap.t L.t) :=
+  PrimIter.iterate _ _ step start_state.
+
+(** ** Monotonicity properties *)
+
+(** We first show that the [st_in] part of the state evolves monotonically:
+  at each step, the values of the [st_in[n]] either remain the same or
+  increase with respect to the [L.ge] ordering. *)
+
+Definition in_incr (in1 in2: AMap.t L.t) : Prop :=
+  forall n, L.ge in2!!n in1!!n.
+
+Lemma in_incr_refl:
+  forall in1, in_incr in1 in1.
+Proof.
+  unfold in_incr; intros. apply L.ge_refl. apply L.eq_refl.
+Qed.
+
+Lemma in_incr_trans:
+  forall in1 in2 in3, in_incr in1 in2 -> in_incr in2 in3 -> in_incr in1 in3.
+Proof.
+  unfold in_incr; intros. apply L.ge_trans with in2!!n; auto.
+Qed.
+
+Lemma propagate_succ_incr:
+  forall st out n,
+  in_incr st.(st_in) (propagate_succ st out n).(st_in).
+Proof.
+  unfold in_incr, propagate_succ; simpl; intros.
+  match goal with [|- context[if ?b then _ else _]] => 
+      case b
+  end.
+  apply L.ge_refl. apply L.eq_refl.
+  simpl. case (eq_atom_dec n n0); intro.
+  subst n0. rewrite AMap.gss. apply L.ge_lub_left.
+  rewrite AMap.gso; auto. apply L.ge_refl. apply L.eq_refl.
+Qed.
+
+Lemma propagate_succ_list_incr:
+  forall out scs st,
+  in_incr st.(st_in) (propagate_succ_list st out scs).(st_in).
+Proof.
+  induction scs; simpl; intros.
+  apply in_incr_refl.
+  apply in_incr_trans with (propagate_succ st out a).(st_in).
+  apply propagate_succ_incr. auto.
+Qed.
+
+Lemma fixpoint_incr:
+  forall res,
+  fixpoint = Some res -> in_incr (start_state_in entrypoints) res.
+Proof.
+  unfold fixpoint; intros.
+  change (start_state_in entrypoints) with start_state.(st_in).
+  eapply (PrimIter.iterate_prop _ _ step
+    (fun st => in_incr start_state.(st_in) st.(st_in))
+    (fun res => in_incr start_state.(st_in) res)).
+
+  intros st INCR. unfold step.
+  destruct (NS.pick st.(st_wrk)) as [ [n rem] | ].
+  apply in_incr_trans with st.(st_in). auto.
+  change st.(st_in) with (mkstate st.(st_in) rem).(st_in).
+  apply propagate_succ_list_incr.
+  auto.
+
+  eauto. apply in_incr_refl.
+Qed.
+
+(** ** Correctness invariant *)
+
+(** The following invariant is preserved at each iteration of Kildall's
+  algorithm: for all program points [n], either
+  [n] is in the worklist, or the inequations associated with [n]
+  ([st_in[s] >= transf n st_in[n]] for all successors [s] of [n])
+  hold.  In other terms, the worklist contains all nodes that do not
+  yet satisfy their inequations. *)
+
+Definition good_state (st: state) : Prop :=
+  forall n,
+  NS.In n st.(st_wrk) \/
+  (forall s, In s (successors!!!n) ->
+             L.ge st.(st_in)!!s (transf n st.(st_in)!!n)).
+
+(** We show that the start state satisfies the invariant, and that
+  the [step] function preserves it. *)
+
+Lemma start_state_good:
+  good_state start_state.
+Proof.
+  unfold good_state, start_state; intros.
+  case_eq (successors!n); intros.
+  left; simpl. eapply NS.initial_spec. eauto.
+  unfold XATree.successors_list. rewrite H. right; intros. contradiction.
+Qed.
+
+Lemma propagate_succ_charact:
+  forall st out n,
+  let st' := propagate_succ st out n in
+  L.ge st'.(st_in)!!n out /\
+  (forall s, n <> s -> st'.(st_in)!!s = st.(st_in)!!s).
+Proof.
+  unfold propagate_succ; intros; simpl.
+  match goal with
+    [|- context[if L.beq ?l1 ?l2 then _ else _]] =>
+      predSpec L.beq L.beq_correct l1 l2
+  end.
+  split.
+  eapply L.ge_trans. apply L.ge_refl. apply H; auto.
+  eapply L.ge_compat. apply L.lub_commut. apply L.eq_refl.
+  apply L.ge_lub_left.
+  auto.
+
+  simpl. split.
+  rewrite AMap.gss.
+  eapply L.ge_compat. apply L.lub_commut. apply L.eq_refl.
+  apply L.ge_lub_left.
+  intros. rewrite AMap.gso; auto.
+Qed.
+
+Lemma propagate_succ_list_charact:
+  forall out scs st,
+  let st' := propagate_succ_list st out scs in
+  forall s,
+  (In s scs -> L.ge st'.(st_in)!!s out) /\
+  (~(In s scs) -> st'.(st_in)!!s = st.(st_in)!!s).
+Proof.
+  induction scs; simpl; intros.
+  tauto.
+  generalize (IHscs (propagate_succ st out a) s). intros [A B].
+  generalize (propagate_succ_charact st out a). intros [C D].
+  split; intros.
+  elim H; intro.
+  subst s.
+  apply L.ge_trans with (propagate_succ st out a).(st_in)!!a.
+  apply propagate_succ_list_incr. assumption.
+
+  apply A. auto.
+  transitivity (propagate_succ st out a).(st_in)!!s.
+  apply B. tauto.
+  apply D. tauto.
+Qed.
+
+Lemma propagate_succ_incr_worklist:
+  forall st out n x,
+  NS.In x st.(st_wrk) -> NS.In x (propagate_succ st out n).(st_wrk).
+Proof.
+  intros. unfold propagate_succ.
+  match goal with
+    [|- context[if ?c then _ else _]] =>
+      case c
+  end.
+  auto.
+  simpl. rewrite NS.add_spec. auto.
+Qed.
+
+Lemma propagate_succ_list_incr_worklist:
+  forall out scs st x,
+  NS.In x st.(st_wrk) -> NS.In x (propagate_succ_list st out scs).(st_wrk).
+Proof.
+  induction scs; simpl; intros.
+  auto.
+  apply IHscs. apply propagate_succ_incr_worklist. auto.
+Qed.
+
+Lemma propagate_succ_records_changes:
+  forall st out n s,
+  let st' := propagate_succ st out n in
+  NS.In s st'.(st_wrk) \/ st'.(st_in)!!s = st.(st_in)!!s.
+Proof.
+  simpl. intros. unfold propagate_succ.
+  case (L.beq (st_in st) !! n (L.lub (st_in st) !! n out)).
+  right; auto.
+  case (eq_atom_dec s n); intro.
+  subst s. left. simpl. rewrite NS.add_spec. auto.
+  right. simpl. apply AMap.gso. auto.
+Qed.
+
+Lemma propagate_succ_list_records_changes:
+  forall out scs st s,
+  let st' := propagate_succ_list st out scs in
+  NS.In s st'.(st_wrk) \/ st'.(st_in)!!s = st.(st_in)!!s.
+Proof.
+  induction scs; simpl; intros.
+  right; auto.
+  elim (propagate_succ_records_changes st out a s); intro.
+  left. apply propagate_succ_list_incr_worklist. auto.
+  rewrite <- H. auto.
+Qed.
+
+Lemma step_state_good:
+  forall st n rem,
+  NS.pick st.(st_wrk) = Some(n, rem) ->
+  good_state st ->
+  good_state (propagate_succ_list (mkstate st.(st_in) rem)
+                                  (transf n st.(st_in)!!n)
+                                  (successors!!!n)).
+Proof.
+  unfold good_state. intros st n rem WKL GOOD x.
+  generalize (NS.pick_some _ _ _ WKL); intro PICK.
+  set (out := transf n st.(st_in)!!n).
+  match goal with
+    [|- context[propagate_succ_list _ _ ?k]] =>
+      elim (propagate_succ_list_records_changes
+          out k (mkstate st.(st_in) rem) x)
+  end.
+  (*elim (propagate_succ_list_records_changes
+          out (successors!!!n) (mkstate st.(st_in) rem) x).*)
+  intro; left; auto.
+  simpl; intros EQ. rewrite EQ.
+  case (eq_atom_dec x n); intro.
+  (* Case 1: x = n *)
+  subst x.
+  right; intros.
+  elim (propagate_succ_list_charact out (successors!!!n)
+          (mkstate st.(st_in) rem) s); intros.
+  auto.
+  (* Case 2: x <> n *)
+  elim (GOOD x); intro.
+  (* Case 2.1: x was already in worklist, still is *)
+  left. apply propagate_succ_list_incr_worklist.
+  simpl. rewrite PICK in H. elim H; intro. congruence. auto.
+  (* Case 2.2: x was not in worklist *)
+  right; intros.
+  case (In_dec eq_atom_dec s (successors!!!n)); intro.
+  (* Case 2.2.1: s is a successor of n, it may have increased *)
+  apply L.ge_trans with st.(st_in)!!s.
+  change st.(st_in)!!s with (mkstate st.(st_in) rem).(st_in)!!s.
+  apply propagate_succ_list_incr.
+  auto.
+  (* Case 2.2.2: s is not a successor of n, it did not change *)
+  elim (propagate_succ_list_charact out (successors!!!n)
+          (mkstate st.(st_in) rem) s); intros.
+  rewrite H2. simpl. auto. auto.
+Qed.
+
+(** ** Correctness of the solution returned by [iterate]. *)
+
+(** As a consequence of the [good_state] invariant, the result of
+  [fixpoint], if defined, is a solution of the dataflow inequations,
+  since [st_wrk] is empty when the iteration terminates. *)
+
+Theorem fixpoint_solution:
+  forall res n s,
+  fixpoint = Some res ->
+  In s (successors!!!n) ->
+  L.ge res!!s (transf n res!!n).
+Proof.
+  assert (forall res, fixpoint = Some res ->
+          forall n s,
+          In s successors!!!n ->
+          L.ge res!!s (transf n res!!n)).
+  unfold fixpoint. intros res PI. pattern res.
+  eapply (PrimIter.iterate_prop _ _ step good_state).
+
+  intros st GOOD. unfold step.
+  caseEq (NS.pick st.(st_wrk)).
+  intros [n rem] PICK. apply step_state_good; auto.
+  intros.
+  elim (GOOD n); intro.
+  elim (NS.pick_none _ n H). auto.
+  auto.
+
+  eauto. apply start_state_good. eauto.
+Qed.
+
+(** As a consequence of the monotonicity property, the result of
+  [fixpoint], if defined, is pointwise greater than or equal the
+  initial mapping.  Therefore, it satisfies the additional constraints
+  stated in [entrypoints]. *)
+
+Lemma start_state_in_entry:
+  forall ep n v,
+  In (n, v) ep ->
+  L.ge (start_state_in ep)!!n v.
+Proof.
+  induction ep; simpl; intros.
+  elim H.
+  elim H; intros.
+  subst a. rewrite AMap.gss.
+  eapply L.ge_compat. apply L.lub_commut. apply L.eq_refl.
+  apply L.ge_lub_left.
+  destruct a. rewrite AMap.gsspec. case (eq_atom_dec n a); intro.
+  subst a. apply L.ge_trans with (start_state_in ep)!!n.
+  apply L.ge_lub_left. auto.
+  auto.
+Qed.
+
+Theorem fixpoint_entry:
+  forall res n v,
+  fixpoint = Some res ->
+  In (n, v) entrypoints ->
+  L.ge res!!n v.
+Proof.
+  intros.
+  apply L.ge_trans with (start_state_in entrypoints)!!n.
+  apply fixpoint_incr. auto.
+  apply start_state_in_entry. auto.
+Qed.
+
+(** ** Preservation of a property over solutions *)
+
+Variable P: L.t -> Prop.
+Hypothesis P_bot: P L.bot.
+Hypothesis P_lub: forall x y, P x -> P y -> P (L.lub x y).
+Hypothesis P_transf: forall pc x, P x -> P (transf pc x).
+Hypothesis P_entrypoints: forall n v, In (n, v) entrypoints -> P v.
+
+Theorem fixpoint_invariant:
+  forall res pc,
+  fixpoint = Some res ->
+  P res!!pc.
+Proof.
+  assert (forall ep,
+          (forall n v, In (n, v) ep -> P v) ->
+          forall pc, P (start_state_in ep)!!pc).
+    induction ep; intros; simpl.
+    rewrite AMap.gi. auto.
+    simpl in H.
+    assert (P (start_state_in ep)!!pc). apply IHep. eauto.
+    destruct a as [n v]. rewrite AMap.gsspec. destruct (eq_atom_dec pc n).
+    apply P_lub. subst. auto. eapply H. left; reflexivity. auto.
+  set (inv := fun st => forall pc, P (st.(st_in)!!pc)).
+  assert (forall st v n, inv st -> P v -> inv (propagate_succ st v n)).
+    unfold inv, propagate_succ. intros.
+    destruct (LAT.beq (st_in st)!!n (LAT.lub (st_in st)!!n v)).
+    auto. simpl. rewrite AMap.gsspec. destruct (eq_atom_dec pc n).
+    apply P_lub. subst n; auto. auto.
+    auto.
+  assert (forall l st v, inv st -> P v -> inv (propagate_succ_list st v l)).
+    induction l; intros; simpl. auto.
+    apply IHl; auto.
+  assert (forall res, fixpoint = Some res -> forall pc, P res!!pc).
+    unfold fixpoint. intros res0 RES0. pattern res0.
+    eapply (PrimIter.iterate_prop _ _ step inv).
+    intros. unfold step. destruct (NS.pick (st_wrk a)) as [[n rem] | ].
+    apply H1. auto. apply P_transf. apply H2.
+    assumption.
+    eauto.
+    unfold inv, start_state; simpl. auto.
+  intros. auto.
+Qed.
+
+End Kildall.
+
+Section FixpointInv.
+
+(* A variant of fixpoint_invariant *)
+
+Variable successors: ATree.t (list atom).
+Variable transf: atom -> L.t -> L.t.
+Variable entrypoints: list (atom * L.t).
+
+Variable P: atom -> L.t -> Prop.
+Definition inv := fun st => forall pc, P pc (st.(st_in)!!pc).
+Hypothesis P_bot: forall n, P n L.bot.
+Hypothesis P_lub: forall n x y, P n x -> P n y -> P n (L.lub x y).
+Hypothesis P_transf: 
+  forall pc sc x y (Hin: In sc (successors!!!pc))
+    (HPx: P pc x) (HPy: P sc y), P sc (L.lub y (transf pc x)).
+Hypothesis P_entrypoints: forall n v, In (n, v) entrypoints -> P n v.
+Hypothesis transf_mono: forall p x y,
+  L.ge x y -> L.ge (transf p x) (transf p y).
+Hypothesis ge_lub: forall x y1 y2, 
+  L.ge y1 y2 -> L.ge (L.lub x y1) (L.lub x y2).
+Hypothesis P_ge: forall n x y, L.ge x y -> P n x -> P n y.
+
+Lemma propagate_succ_inv: forall st n sc out
+  (Hin: In sc successors!!!n)
+  (Hge: L.ge (transf n st.(st_in)!!n) out)
+  (Hinv: inv st),
+  inv (propagate_succ st out sc).
+Proof.
+  unfold inv.
+  intros.
+  destruct (eq_atom_dec sc pc) as [Heq | Hneq]; subst.
+    unfold propagate_succ.
+    destruct (L.beq (st_in st) !! pc (L.lub (st_in st) !! pc out)); auto.
+    simpl.
+    rewrite AMap.gss. 
+    eapply P_transf in Hin; eauto.
+
+    destruct (propagate_succ_charact st out sc) as [J1 J2].
+    rewrite J2; auto.
+Qed.
+
+Lemma propagate_succ_list_inv_aux: forall n scs st out,
+  (forall s, In s scs -> In s successors!!!n) ->
+  L.ge (transf n st.(st_in)!!n) out ->
+  inv st ->
+  inv (propagate_succ_list st out scs).
+Proof.
+  induction scs; simpl; intros; auto.
+    apply IHscs; auto.
+      apply L.ge_trans with (y:=(transf n (st_in st) !! n)); auto.
+        apply transf_mono.
+        apply propagate_succ_incr.
+      eapply propagate_succ_inv; eauto.
+Qed.
+
+Lemma propagate_succ_list_inv: forall n scs st,
+  (forall s, In s scs -> In s successors!!!n) ->
+  inv st ->
+  inv (propagate_succ_list st (transf n st.(st_in)!!n) scs).
+Proof.
+  intros.
+  eapply propagate_succ_list_inv_aux; eauto.
+    apply L.ge_refl. apply L.eq_refl.
+Qed.
+
+Lemma step_inv: forall st n rem,
+  NS.pick st.(st_wrk) = Some(n, rem) ->
+  inv st ->
+  inv (propagate_succ_list (mkstate st.(st_in) rem)
+                           (transf n st.(st_in)!!n)
+                           (successors!!!n)).
+Proof.
+  intros st n rem WKL GOOD.
+  destruct st. simpl.
+  apply propagate_succ_list_inv; auto.
+Qed.
+
+Lemma entry_inv: inv (start_state successors entrypoints).
+Proof.
+  unfold inv.
+  unfold start_state. simpl.
+  induction entrypoints as [|[n v] ep]; intros; simpl.
+    rewrite AMap.gi. auto.
+
+    simpl in P_entrypoints.
+    assert (P pc (start_state_in ep)!!pc) as J. 
+      apply IHep. eauto.
+    rewrite AMap.gsspec.
+    destruct (eq_atom_dec pc n); subst.
+      apply P_lub. auto. 
+        eapply P_entrypoints. left; reflexivity. 
+      auto.
+Qed.
+
+Theorem fixpoint_inv:
+  forall res,
+  fixpoint successors transf entrypoints = Some res ->
+  forall pc, P pc res!!pc.
+Proof.
+  unfold fixpoint. intros res PI. pattern res.
+  eapply (PrimIter.iterate_prop _ _ (step _ _) inv); eauto.
+    intros st GOOD. unfold step.
+    caseEq (NS.pick st.(st_wrk)); auto. 
+    intros [n rem] PICK. 
+    apply step_inv; auto.
+
+    apply entry_inv; auto.
+Qed.
+
+End FixpointInv.
+
+End Dataflow_Solver.
+
+Module Dataflow_Solver_Var_Top (NS: NODE_SET0).
+
+Module L := Dominators.
+
+Section Kildall.
+
+Variable successors: ATree.t (list atom).
+Variable transf: atom -> L.t -> L.t.
+Variable entrypoints: list (atom * L.t).
+
+(** The state of the iteration has two components:
+- A mapping from program points to values of type [L.t] representing
+  the candidate solution found so far.
+- A worklist of program points that remain to be considered.
+*)
+
+Record state : Type :=
+  mkstate { st_in: AMap.t L.t; st_wrk: NS.t }.
+
+(** Kildall's algorithm, in pseudo-code, is as follows:
+<<
+    while st_wrk is not empty, do
+        extract a node n from st_wrk
+        compute out = transf n st_in[n]
+        for each successor s of n:
+            compute in = lub st_in[s] out
+            if in <> st_in[s]:
+                st_in[s] := in
+                st_wrk := st_wrk union {s}
+            end if
+        end for
+    end while
+    return st_in
+>>
+
+The initial state is built as follows:
+- The initial mapping sets all program points to [L.bot], except
+  those mentioned in the [entrypoints] list, for which we take
+  the associated approximation as initial value.  Since a program
+  point can be mentioned several times in [entrypoints], with different
+  approximations, we actually take the l.u.b. of these approximations.
+- The initial worklist contains all the program points. *)
+
+Fixpoint start_state_in (ep: list (atom * L.t)) : AMap.t L.t :=
+  match ep with
+  | nil =>
+      AMap.init L.bot
+  | (n, v) :: rem =>
+      let m := start_state_in rem in AMap.set n (L.lub m!!n v) m
+  end.
+
+Definition start_state :=
+  mkstate (start_state_in entrypoints) (NS.initial successors).
+
+(** [propagate_succ] corresponds, in the pseudocode,
+  to the body of the [for] loop iterating over all successors. *)
+
+Definition propagate_succ (s: state) (out: L.t) (n: atom) :=
+  let oldl := s.(st_in)!!n in
+  let newl := L.lub oldl out in
+  if L.beq oldl newl
+  then s
+  else mkstate (AMap.set n newl s.(st_in)) (NS.add n s.(st_wrk)).
+
+(** [propagate_succ_list] corresponds, in the pseudocode,
+  to the [for] loop iterating over all successors. *)
+
+Fixpoint propagate_succ_list (s: state) (out: L.t) (succs: set atom)
+                             {struct succs} : state :=
+  match succs with
+  | nil => s
+  | n :: rem => propagate_succ_list (propagate_succ s out n) out rem
+  end.
+
+(** [step] corresponds to the body of the outer [while] loop in the
+  pseudocode. *)
+
+Definition step (s: state) : AMap.t L.t + state :=
+  match NS.pick s.(st_wrk) with
+  | None =>
+      inl _ s.(st_in)
+  | Some(n, rem) =>
+      inr _ (propagate_succ_list
+              (mkstate s.(st_in) rem)
+              (transf n s.(st_in)!!n)
+              (successors!!!n))
+  end.
+
+(** The whole fixpoint computation is the iteration of [step] from
+  the start state. *)
+
+Definition fixpoint num_iterations : option (AMap.t L.t) :=
+  PrimIter.iter _ _ step num_iterations start_state.
+
+(** ** Monotonicity properties *)
+
+(** We first show that the [st_in] part of the state evolves monotonically:
+  at each step, the values of the [st_in[n]] either remain the same or
+  increase with respect to the [L.ge] ordering. *)
+
+Definition in_incr (in1 in2: AMap.t L.t) : Prop :=
+  forall n, L.ge in2!!n in1!!n.
+
+Lemma in_incr_refl:
+  forall in1, in_incr in1 in1.
+Proof.
+  unfold in_incr; intros. apply L.ge_refl. apply L.eq_refl.
+Qed.
+
+Lemma in_incr_trans:
+  forall in1 in2 in3, in_incr in1 in2 -> in_incr in2 in3 -> in_incr in1 in3.
+Proof.
+  unfold in_incr; intros. apply L.ge_trans with in2!!n; auto.
+Qed.
+
+Lemma propagate_succ_incr:
+  forall st out n,
+  in_incr st.(st_in) (propagate_succ st out n).(st_in).
+Proof.
+  unfold in_incr, propagate_succ; simpl; intros.
+  case (L.beq st.(st_in)!!n (L.lub st.(st_in)!!n out)).
+  apply L.ge_refl. apply L.eq_refl.
+  simpl. case (eq_atom_dec n n0); intro.
+  subst n0. rewrite AMap.gss. apply L.ge_lub_left.
+  rewrite AMap.gso; auto. apply L.ge_refl. apply L.eq_refl.
+Qed.
+
+Lemma propagate_succ_list_incr:
+  forall out scs st,
+  in_incr st.(st_in) (propagate_succ_list st out scs).(st_in).
+Proof.
+  induction scs; simpl; intros.
+  apply in_incr_refl.
+  apply in_incr_trans with (propagate_succ st out a).(st_in).
+  apply propagate_succ_incr. auto.
+Qed.
+
+Lemma step_incr: forall st st' 
+  (Hstep: step st = inr st'),
+  in_incr (st_in st) (st_in st').
+Proof.
+  unfold step.
+  intros.
+  remember (NS.pick (st_wrk st)) as R.
+  destruct R as [ [n rem] | ]; inv Hstep.
+  change st.(st_in) with (mkstate st.(st_in) rem).(st_in).
+  apply propagate_succ_list_incr; auto.
+Qed.
+
+Lemma fixpoint_incr:
+  forall res ni,
+  fixpoint ni = Some res -> in_incr (start_state_in entrypoints) res.
+Proof.
+  unfold fixpoint; intros.
+  change (start_state_in entrypoints) with start_state.(st_in).
+  eapply (PrimIter.iter_prop _ _ step
+    (fun st => in_incr start_state.(st_in) st.(st_in))
+    (fun res => in_incr start_state.(st_in) res)) in H; eauto.
+
+  intros st INCR. unfold step.
+  destruct (NS.pick st.(st_wrk)) as [ [n rem] | ].
+  apply in_incr_trans with st.(st_in). auto.
+  change st.(st_in) with (mkstate st.(st_in) rem).(st_in).
+  apply propagate_succ_list_incr.
+  auto.
+
+  eauto. apply in_incr_refl.
+Qed.
+
+(** ** Correctness invariant *)
+
+(** The following invariant is preserved at each iteration of Kildall's
+  algorithm: for all program points [n], either
+  [n] is in the worklist, or the inequations associated with [n]
+  ([st_in[s] >= transf n st_in[n]] for all successors [s] of [n])
+  hold.  In other terms, the worklist contains all nodes that do not
+  yet satisfy their inequations. *)
+
+Definition good_state (st: state) : Prop :=
+  forall n,
+  NS.In n st.(st_wrk) \/
+  (forall s, In s (successors!!!n) ->
+             L.ge st.(st_in)!!s (transf n st.(st_in)!!n)).
+
+(** We show that the start state satisfies the invariant, and that
+  the [step] function preserves it. *)
+
+Lemma start_state_good:
+  good_state start_state.
+Proof.
+  unfold good_state, start_state; intros.
+  case_eq (successors!n); intros.
+  left; simpl. eapply NS.initial_spec. eauto.
+  unfold XATree.successors_list. rewrite H. right; intros. contradiction.
+Qed.
+
+Lemma propagate_succ_spec:
+  forall st out n,
+  let st' := propagate_succ st out n in
+  (L.eq st'.(st_in)!!n (L.lub st.(st_in)!!n out)) /\
+  (forall s, n <> s -> st'.(st_in)!!s = st.(st_in)!!s).
+Proof.
+  unfold propagate_succ; intros; simpl.
+  predSpec L.beq L.beq_correct
+           ((st_in st) !! n) (L.lub (st_in st) !! n out).
+  split; auto.
+
+  simpl. split.
+    rewrite AMap.gss. apply L.eq_refl.
+    intros. rewrite AMap.gso; auto.
+Qed.
+
+Lemma propagate_succ_charact:
+  forall st out n,
+  let st' := propagate_succ st out n in
+  L.ge st'.(st_in)!!n out /\
+  (forall s, n <> s -> st'.(st_in)!!s = st.(st_in)!!s).
+Proof.
+  unfold propagate_succ; intros; simpl.
+  predSpec L.beq L.beq_correct
+           ((st_in st) !! n) (L.lub (st_in st) !! n out).
+  split.
+  eapply L.ge_trans. apply L.ge_refl. apply H; auto.
+  eapply L.ge_compat. apply L.lub_commut. apply L.eq_refl.
+  apply L.ge_lub_left.
+  auto.
+
+  simpl. split.
+  rewrite AMap.gss.
+  eapply L.ge_compat. apply L.lub_commut. apply L.eq_refl.
+  apply L.ge_lub_left.
+  intros. rewrite AMap.gso; auto.
+Qed.
+
+Lemma propagate_succ_list_charact:
+  forall out scs st,
+  let st' := propagate_succ_list st out scs in
+  forall s,
+  (In s scs -> L.ge st'.(st_in)!!s out) /\
+  (~(In s scs) -> st'.(st_in)!!s = st.(st_in)!!s).
+Proof.
+  induction scs; simpl; intros.
+  tauto.
+  generalize (IHscs (propagate_succ st out a) s). intros [A B].
+  generalize (propagate_succ_charact st out a). intros [C D].
+  split; intros.
+  elim H; intro.
+  subst s.
+  apply L.ge_trans with (propagate_succ st out a).(st_in)!!a.
+  apply propagate_succ_list_incr. assumption.
+  apply A. auto.
+  transitivity (propagate_succ st out a).(st_in)!!s.
+  apply B. tauto.
+  apply D. tauto.
+Qed.
+
+Lemma propagate_succ_incr_worklist:
+  forall st out n x,
+  NS.In x st.(st_wrk) -> NS.In x (propagate_succ st out n).(st_wrk).
+Proof.
+  intros. unfold propagate_succ.
+  case (L.beq (st_in st) !! n (L.lub (st_in st) !! n out)).
+  auto.
+  simpl. rewrite NS.add_spec. auto.
+Qed.
+
+Lemma propagate_succ_list_incr_worklist:
+  forall out scs st x,
+  NS.In x st.(st_wrk) -> NS.In x (propagate_succ_list st out scs).(st_wrk).
+Proof.
+  induction scs; simpl; intros.
+  auto.
+  apply IHscs. apply propagate_succ_incr_worklist. auto.
+Qed.
+
+Lemma propagate_succ_records_changes:
+  forall st out n s,
+  let st' := propagate_succ st out n in
+  NS.In s st'.(st_wrk) \/ st'.(st_in)!!s = st.(st_in)!!s.
+Proof.
+  simpl. intros. unfold propagate_succ.
+  case (L.beq (st_in st) !! n (L.lub (st_in st) !! n out)).
+  right; auto.
+  case (eq_atom_dec s n); intro.
+  subst s. left. simpl. rewrite NS.add_spec. auto.
+  right. simpl. apply AMap.gso. auto.
+Qed.
+
+Lemma propagate_succ_list_records_changes:
+  forall out scs st s,
+  let st' := propagate_succ_list st out scs in
+  NS.In s st'.(st_wrk) \/ st'.(st_in)!!s = st.(st_in)!!s.
+Proof.
+  induction scs; simpl; intros.
+  right; auto.
+  elim (propagate_succ_records_changes st out a s); intro.
+  left. apply propagate_succ_list_incr_worklist. auto.
+  rewrite <- H. auto.
+Qed.
+
+Lemma step_state_good:
+  forall st n rem,
+  NS.pick st.(st_wrk) = Some(n, rem) ->
+  good_state st ->
+  good_state (propagate_succ_list (mkstate st.(st_in) rem)
+                                  (transf n st.(st_in)!!n)
+                                  (successors!!!n)).
+Proof.
+  unfold good_state. intros st n rem WKL GOOD x.
+  generalize (NS.pick_some _ _ _ WKL); intro PICK.
+  set (out := transf n st.(st_in)!!n).
+  elim (propagate_succ_list_records_changes
+          out (successors!!!n) (mkstate st.(st_in) rem) x).
+  intro; left; auto.
+  simpl; intros EQ. rewrite EQ.
+  (* Case 1: x = n *)
+  case (eq_atom_dec x n); intro.
+  subst x.
+  right; intros.
+  elim (propagate_succ_list_charact out (successors!!!n)
+          (mkstate st.(st_in) rem) s); intros.
+  auto.
+  (* Case 2: x <> n *)
+  elim (GOOD x); intro.
+  (* Case 2.1: x was already in worklist, still is *)
+  left. apply propagate_succ_list_incr_worklist.
+  simpl. rewrite PICK in H. elim H; intro. congruence. auto.
+  (* Case 2.2: x was not in worklist *)
+  right; intros.
+  case (In_dec eq_atom_dec s (successors!!!n)); intro.
+  (* Case 2.2.1: s is a successor of n, it may have increased *)
+  apply L.ge_trans with st.(st_in)!!s.
+  change st.(st_in)!!s with (mkstate st.(st_in) rem).(st_in)!!s.
+  apply propagate_succ_list_incr.
+  auto.
+  (* Case 2.2.2: s is not a successor of n, it did not change *)
+  elim (propagate_succ_list_charact out (successors!!!n)
+          (mkstate st.(st_in) rem) s); intros.
+  rewrite H2. simpl. auto. auto.
+Qed.
+
+(** ** Correctness of the solution returned by [iterate]. *)
+
+(** As a consequence of the [good_state] invariant, the result of
+  [fixpoint], if defined, is a solution of the dataflow inequations,
+  since [st_wrk] is empty when the iteration terminates. *)
+
+Theorem fixpoint_solution:
+  forall res ni n s,
+  fixpoint ni = Some res ->
+  In s (successors!!!n) ->
+  L.ge res!!s (transf n res!!n).
+Proof.
+  assert (forall res ni, fixpoint ni = Some res ->
+          forall n s,
+          In s successors!!!n ->
+          L.ge res!!s (transf n res!!n)).
+    unfold fixpoint. intros res ni PI. pattern res.
+    eapply (PrimIter.iter_prop _ _ step good_state) in PI; eauto.
+      intros st GOOD. unfold step.
+      caseEq (NS.pick st.(st_wrk)); auto.
+        intros [n rem] PICK. apply step_state_good; auto.
+
+        intros.  
+        elim (GOOD n); intro; auto.
+        elim (NS.pick_none _ n H); auto.
+      eauto. apply start_state_good. 
+  eauto.
+Qed.
+
+(** As a consequence of the monotonicity property, the result of
+  [fixpoint], if defined, is pointwise greater than or equal the
+  initial mapping.  Therefore, it satisfies the additional constraints
+  stated in [entrypoints]. *)
+
+Lemma start_state_in_entry:
+  forall ep n v,
+  In (n, v) ep ->
+  L.ge (start_state_in ep)!!n v.
+Proof.
+  induction ep; simpl; intros.
+  elim H.
+  elim H; intros.
+  subst a. rewrite AMap.gss.
+  eapply L.ge_compat. apply L.lub_commut. apply L.eq_refl.
+  apply L.ge_lub_left.
+  destruct a. rewrite AMap.gsspec. case (eq_atom_dec n a); intro.
+  subst a. apply L.ge_trans with (start_state_in ep)!!n.
+  apply L.ge_lub_left. auto.
+  auto.
+Qed.
+
+Theorem fixpoint_entry:
+  forall res ni n v,
+  fixpoint ni = Some res ->
+  In (n, v) entrypoints ->
+  L.ge res!!n v.
+Proof.
+  intros.
+  apply L.ge_trans with (start_state_in entrypoints)!!n.
+    eapply fixpoint_incr. eauto.
+    apply start_state_in_entry. auto.
+Qed.
+
+(** ** Preservation of a property over solutions *)
+
+Variable P: L.t -> Prop.
+Hypothesis P_bot: P L.bot.
+Hypothesis P_lub: forall x y, P x -> P y -> P (L.lub x y).
+Hypothesis P_transf: forall pc x, P x -> P (transf pc x).
+Hypothesis P_entrypoints: forall n v, In (n, v) entrypoints -> P v.
+
+Theorem fixpoint_invariant:
+  forall res ni pc,
+  fixpoint ni = Some res ->
+  P res!!pc.
+Proof.
+  assert (forall ep,
+          (forall n v, In (n, v) ep -> P v) ->
+          forall pc, P (start_state_in ep)!!pc).
+    induction ep; intros; simpl.
+    rewrite AMap.gi. auto.
+    simpl in H.
+    assert (P (start_state_in ep)!!pc). apply IHep. eauto.
+    destruct a as [n v]. rewrite AMap.gsspec. destruct (eq_atom_dec pc n).
+    apply P_lub. subst. auto. eapply H. left; reflexivity. auto.
+  set (inv := fun st => forall pc, P (st.(st_in)!!pc)).
+  assert (forall st v n, inv st -> P v -> inv (propagate_succ st v n)).
+    unfold inv, propagate_succ. intros.
+    destruct (L.beq (st_in st)!!n (L.lub (st_in st)!!n v)).
+    auto. simpl. rewrite AMap.gsspec. destruct (eq_atom_dec pc n).
+    apply P_lub. subst n; auto. auto.
+    auto.
+  assert (forall l0 st v, inv st -> P v -> inv (propagate_succ_list st v l0)).
+    induction l0; intros; simpl. auto.
+    apply IHl0; auto.
+  assert (forall res ni, fixpoint ni = Some res -> forall pc, P res!!pc).
+    unfold fixpoint. intros res0 ni0 RES0. pattern res0.
+    eapply (PrimIter.iter_prop _ _ step inv); eauto.
+      intros. unfold step. 
+      destruct (NS.pick (st_wrk a)) as [[n rem] | ].
+        apply H1. auto. apply P_transf. apply H2.
+        assumption.
+      unfold inv, start_state; simpl. auto.
+  intros. eauto.
+Qed.
+
+(** ** Another invariant for unreachable nodes *)
+
+Definition good_unreach (res: AMap.t L.t) : Prop :=
+  forall n,
+  ((XATree.make_predecessors successors)!!!n = nil ->
+    res!!n = (start_state_in entrypoints)!!n).
+
+(** We show that the start state satisfies the invariant, and that
+  the [step] function preserves it. *)
+
+Lemma propagate_succ_good_unreach: forall st n out,
+  (XATree.make_predecessors successors)!!!n <> nil ->
+  good_unreach st.(st_in) -> good_unreach (propagate_succ st out n).(st_in).
+Proof.
+  unfold good_unreach.
+  intros.
+  destruct (@propagate_succ_spec st out n) as [J1 J2].
+  destruct (eq_atom_dec n n0); subst.
+    contradict H; auto.
+    apply H0 in H1. rewrite <- H1. auto.
+Qed.
+
+Lemma propagate_succ_list_good_unreach:
+  forall scs st out,
+  (forall s, In s scs -> (XATree.make_predecessors successors)!!!s <> nil) ->
+  good_unreach st.(st_in) ->
+  good_unreach (propagate_succ_list st out scs).(st_in).
+Proof.
+  induction scs; simpl; intros; auto.
+    apply IHscs; auto.
+      eapply propagate_succ_good_unreach; eauto.
+Qed.
+
+Lemma step_unreach_good:
+  forall st n rem,
+  NS.pick st.(st_wrk) = Some(n, rem) ->
+  good_unreach st.(st_in) ->
+  good_unreach (propagate_succ_list (mkstate st.(st_in) rem)
+                                    (transf n st.(st_in)!!n)
+                                    (successors!!!n)).(st_in).
+Proof.
+  intros st n rem WKL GOOD.
+  destruct st. simpl.
+  apply propagate_succ_list_good_unreach; auto.
+  intros.
+  apply XATree.make_predecessors_correct in H. intro J. rewrite J in H. inv H.
+Qed.
+
+Theorem fixpoint_good_unreach: forall res ni,
+  fixpoint ni = Some res -> good_unreach res.
+Proof.
+  unfold fixpoint. intros res ni PI. pattern res.
+  eapply (PrimIter.iter_prop _ _ step
+    (fun st => good_unreach st.(st_in))); eauto.
+  intros st GOOD. unfold step.
+  caseEq (NS.pick st.(st_wrk)); auto.
+  intros [n rem] PICK. apply step_unreach_good; auto.
+  intros x J. unfold start_state. simpl. auto.
+Qed.
+
+End Kildall.
+
+Section FixpointInvariant2.
+
+Variable successors: ATree.t (list atom).
+Variable transf1: atom -> L.t -> L.t.
+Variable transf2: atom -> L.t -> L.t.
+Variable entrypoints1: list (atom * L.t).
+Variable entrypoints2: list (atom * L.t).
+
+Variable P: L.t -> L.t -> Prop.
+Hypothesis P_bot: P L.bot L.bot.
+Hypothesis P_lub: forall x1 x2 y1 y2,
+  P x1 x2 -> P y1 y2 -> P (L.lub x1 y1) (L.lub x2 y2).
+Hypothesis P_transf: forall pc x1 x2,
+  P x1 x2 -> P (transf1 pc x1) (transf2 pc x2).
+Definition P_entrypoints_aux (ep1: list (atom * L.t)) (ep2: list (atom * L.t))
+  := Forall2 (fun el1 el2 =>
+           match el1, el2 with
+           | (n1,v1), (n2,v2) => n1 = n2 /\ P v1 v2
+           end) ep1 ep2.
+Hypothesis P_entrypoints: P_entrypoints_aux entrypoints1 entrypoints2.
+Hypothesis P_beq : forall x1 x2 y1 y2,
+  P x1 x2 -> P y1 y2 ->
+  L.beq y1 (L.lub y1 x1) =
+  L.beq y2 (L.lub y2 x2).
+
+Lemma start_state_in_invariant2 : forall ep1 ep2
+  (H:P_entrypoints_aux ep1 ep2) pc,
+  P (start_state_in ep1)!!pc (start_state_in ep2)!!pc.
+Proof.
+  induction ep1; destruct ep2; intros; simpl; inv H.
+    repeat rewrite AMap.gi. auto.
+
+    destruct a as [n1 v1]. destruct p as [n2 v2].
+    destruct H3 as [Heq H3]; subst.
+    assert (P (start_state_in ep1)!!pc
+              (start_state_in ep2)!!pc).
+      apply IHep1. eauto.
+    repeat rewrite AMap.gsspec.
+    destruct (eq_atom_dec pc n2); subst; auto.
+Qed.
+
+Hint Resolve start_state_in_invariant2.
+
+Definition invariant2 := fun st1 st2 =>
+    st1.(st_wrk) = st2.(st_wrk) /\
+    forall pc, P (st1.(st_in)!!pc) (st2.(st_in)!!pc).
+
+Lemma propagate_succ_invariant2 : forall st1 st2 v1 v2 n
+  (H:invariant2 st1 st2) (H0:P v1 v2),
+  invariant2 (propagate_succ st1 v1 n) (propagate_succ st2 v2 n).
+Proof.
+  unfold invariant2, propagate_succ. intros.
+  destruct H as [J1 J2].
+  case_eq (L.beq (st_in st1)!!n (L.lub (st_in st1)!!n v1)).
+    intros Hbeq.
+    erewrite P_beq in Hbeq; eauto. rewrite Hbeq. auto.
+
+    intros Hbeq.
+    erewrite P_beq in Hbeq; eauto. rewrite Hbeq.
+    simpl. rewrite J1. split; auto.
+    intro pc. repeat rewrite AMap.gsspec.
+    destruct (eq_atom_dec pc n); subst; auto.
+Qed.
+
+Hint Resolve propagate_succ_invariant2.
+
+Lemma propagate_succ_list_invariant2 : forall l0 st1 st2 v1 v2,
+  invariant2 st1 st2 -> P v1 v2 ->
+  invariant2 (propagate_succ_list st1 v1 l0)
+             (propagate_succ_list st2 v2 l0).
+Proof.
+  induction l0; intros; simpl. auto.
+  apply IHl0; auto.
+Qed.
+
+Hint Resolve propagate_succ_list_invariant2.
+
+Theorem fixpoint_some2:
+  forall res1 res2 ni pc,
+  fixpoint successors transf1 entrypoints1 ni = Some res1 ->
+  fixpoint successors transf2 entrypoints2 ni = Some res2 ->
+  P res1!!pc res2!!pc.
+Proof.
+  intros res1 res2 ni pc Hinter1 Hinter2.
+  revert pc.
+  unfold fixpoint. pattern res1, res2.
+  eapply (PrimIter.iter_some2 _ _ _ _
+    (step successors transf1)
+    (step successors transf2) invariant2); eauto.
+    intros a1 a2 H2. unfold step.
+    destruct H2 as [J1 J2]. rewrite J1.
+    destruct (NS.pick (st_wrk a2))
+      as [[n rem] | ]; eauto.
+      apply propagate_succ_list_invariant2; auto.
+        split; auto.
+    unfold invariant2, start_state; simpl. auto.
+Qed.
+
+Theorem fixpoint_none2_right: forall ni,
+  fixpoint successors transf2 entrypoints2 ni = None ->
+  fixpoint successors transf1 entrypoints1 ni = None.
+Proof.
+  unfold fixpoint.
+  intros Hinter2.
+  eapply (PrimIter.iter_none2_right _ _ _ _
+    (step successors transf1)
+    (step successors transf2) invariant2); eauto.
+    intros a1 a2 H2. unfold step.
+    destruct H2 as [J1 J2]. rewrite J1.
+    destruct (NS.pick (st_wrk a2))
+      as [[n rem] | ]; eauto.
+      apply propagate_succ_list_invariant2; auto.
+        split; auto.
+    unfold invariant2, start_state; simpl. auto.
+Qed.
+
+Theorem fixpoint_none2_left: forall ni,
+  fixpoint successors transf1 entrypoints1 ni = None ->
+  fixpoint successors transf2 entrypoints2 ni = None.
+Proof.
+  unfold fixpoint.
+  intros Hinter1.
+  eapply (PrimIter.iter_none2_left _ _ _ _
+    (step successors transf1)
+    (step successors transf2) invariant2); eauto.
+    intros a1 a2 H2. unfold step.
+    destruct H2 as [J1 J2]. rewrite J1.
+    destruct (NS.pick (st_wrk a2))
+      as [[n rem] | ]; eauto.
+      apply propagate_succ_list_invariant2; auto.
+        split; auto.
+    unfold invariant2, start_state; simpl. auto.
+Qed.
+
+Theorem fixpoint_some2_right:
+  forall res2 ni pc,
+  fixpoint successors transf2 entrypoints2 ni = Some res2 ->
+  exists res1,
+    fixpoint successors transf1 entrypoints1 ni = Some res1 /\
+    P res1!!pc res2!!pc.
+Proof.
+  intros res2 ni pc Hfix2.
+  case_eq (fixpoint successors transf1 entrypoints1 ni).
+    intros res1 Hfix1.
+    exists res1. split; eauto using fixpoint_some2.
+
+    intros Hfix1.
+    eapply fixpoint_none2_left in Hfix1; eauto.
+    rewrite Hfix1 in Hfix2. congruence.
+Qed.
+
+Theorem fixpoint_some2_left:
+  forall res1 ni pc,
+  fixpoint successors transf1 entrypoints1 ni = Some res1 ->
+  exists res2,
+    fixpoint successors transf2 entrypoints2 ni = Some res2 /\
+    P res1!!pc res2!!pc.
+Proof.
+  intros res1 ni pc Hfix1.
+  case_eq (fixpoint successors transf2 entrypoints2 ni).
+    intros res2 Hfix2.
+    exists res2. split; eauto using fixpoint_some2.
+
+    intros Hfix2.
+    eapply fixpoint_none2_right in Hfix2; eauto.
+    rewrite Hfix2 in Hfix1. congruence.
+Qed.
+
+End FixpointInvariant2.
+
+End Dataflow_Solver_Var_Top.

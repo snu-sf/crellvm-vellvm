@@ -3,6 +3,7 @@ Require Import ListSet.
 Require Import Coqlib.
 Require Import Metatheory.
 Require Import Maps.
+Require Import maps_ext.
 Require Import alist.
 Require Import Dipaths.
 Require Import Program.Tactics.
@@ -48,7 +49,7 @@ Qed.
 
 (* The Cfg module defines control-flow graphs, and is parameterized by a tree 
    data type for representing CFGs. *)
-Module Cfg (T:TREE).
+Module Cfg (T:TREE0).
 
 Module XTree := More_Tree_Properties(T).
 
@@ -1039,7 +1040,7 @@ Qed.
 (* Properties of arcs *)
 Lemma arcs_fdef_inv : forall f a1 a2,
   arcs_fdef f (A_ends (index a2) (index a1)) ->
-  In a2 ((successors f)!!!a1).
+  In a2 ((successors f) !!! a1).
 Proof. auto. Qed.
 
 (* Properties of predecessors *)

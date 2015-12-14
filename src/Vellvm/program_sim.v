@@ -17,6 +17,8 @@ Inductive val_result_match: val -> val -> Prop :=
       forall wz i, val_result_match (Vint wz i) (Vint wz i)
   | val_result_match_float:
       forall f, val_result_match (Vfloat f) (Vfloat f)
+  | val_result_match_single:
+      forall f, val_result_match (Vsingle f) (Vsingle f)
   | val_result_match_ptr:
       forall b1 ofs1 b2 ofs2, 
       val_result_match (Vptr b1 ofs1) (Vptr b2 ofs2)

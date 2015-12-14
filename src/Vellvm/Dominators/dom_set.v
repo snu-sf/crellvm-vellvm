@@ -3,6 +3,7 @@ Require Import ListSet.
 Require Import Coqlib.
 Require Import Metatheory.
 Require Import Maps.
+Require Import maps_ext.
 Require Import Lattice.
 Require Import Kildall.
 Require Import Iteration.
@@ -11,6 +12,7 @@ Require Export reach.
 Require Export dom_decl.
 Require Import dom_type.
 Require Import Dipaths.
+Require Import util.
 
 Require Import syntax.
 Require Import infrastructure.

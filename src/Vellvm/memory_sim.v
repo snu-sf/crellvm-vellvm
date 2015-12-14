@@ -23,6 +23,8 @@ Inductive val_inject (mi: meminj): val -> val -> Prop :=
       forall wz i, val_inject mi (Vint wz i) (Vint wz i)
   | val_inject_float:
       forall f, val_inject mi (Vfloat f) (Vfloat f)
+  | val_inject_single:
+      forall f, val_inject mi (Vsingle f) (Vsingle f)
   | val_inject_ptr:
       forall b1 ofs1 b2 ofs2 delta,
       mi b1 = Some (b2, delta) ->
@@ -32,7 +34,7 @@ Inductive val_inject (mi: meminj): val -> val -> Prop :=
       forall i, val_inject mi (Vinttoptr i) (Vinttoptr i)
   | val_inject_undef: val_inject mi Vundef Vundef.
 
-Hint Resolve val_inject_int val_inject_float val_inject_ptr val_inject_inttoptr 
+Hint Resolve val_inject_int val_inject_float val_inject_single val_inject_ptr val_inject_inttoptr 
              val_inject_undef.
 
 Inductive val_list_inject (mi: meminj): list val -> list val-> Prop:= 
@@ -51,8 +53,8 @@ Lemma val_load_result_inject:
   val_inject f (Val.load_result chunk v1) (Val.load_result chunk v2).
 Proof.
   intros. inv H; destruct chunk; simpl; try econstructor; eauto.
-    destruct (eq_nat_dec n 31); try econstructor; eauto.
-    destruct (eq_nat_dec n 31); try econstructor; eauto.
+    destruct (eq_nat_dec _ _); try econstructor; eauto.
+    destruct (eq_nat_dec _ n); try econstructor; eauto.
 Qed.
 
 Lemma val_load_result_inject_2: forall (f : block -> option (block * Z))
@@ -107,14 +109,14 @@ Hint Resolve inject_incr_refl val_inject_incr val_list_inject_incr.
 
 Inductive memval_inject (f: meminj): memval -> memval -> Prop :=
   | memval_inject_byte:
-      forall wz n, memval_inject f (Byte wz n) (Byte wz n)
+      forall n, memval_inject f (Byte n) (Byte n)
   | memval_inject_ptr:
       forall b1 ofs1 b2 ofs2 delta n,
       f b1 = Some (b2, delta) ->
       ofs2 = Int.add 31 ofs1 (Int.repr 31 delta) ->
-      memval_inject f (Pointer b1 ofs1 n) (Pointer b2 ofs2 n)
+      memval_inject f (Fragment (Vptr b1 ofs1) Q32 n) (Fragment (Vptr b2 ofs2) Q32 n)
   | memval_inject_inttoptr:
-      forall i n, memval_inject f (IPointer i n) (IPointer i n)
+      forall i n, memval_inject f (Fragment (Vinttoptr i) Q32 n) (Fragment (Vinttoptr i) Q32 n)
   | memval_inject_undef: memval_inject f Undef Undef.
 
 (* Properties of memval_inject. *)
@@ -125,8 +127,8 @@ Proof.
 Qed.
 
 Lemma inj_bytes_inject:
-  forall f wz bl, 
-    list_forall2 (memval_inject f) (inj_bytes wz bl) (inj_bytes wz bl).
+  forall f bl, 
+    list_forall2 (memval_inject f) (inj_bytes bl) (inj_bytes bl).
 Proof.
   induction bl; constructor; auto. constructor.
 Qed.
@@ -142,55 +144,50 @@ Qed.
 Lemma proj_bytes_inject_some:
   forall f vl vl',
   list_forall2 (memval_inject f) vl vl' ->
-  forall n bl,
-  proj_bytes n vl = Some bl ->
-  proj_bytes n vl' = Some bl.
+  forall bl,
+  proj_bytes vl = Some bl ->
+  proj_bytes vl' = Some bl.
 Proof.
   induction 1; simpl. congruence.
   inv H; try congruence.
 
   intros.
-  destruct (eq_nat_dec wz n0); auto.
-  remember (proj_bytes n0 al) as R.
+(*  destruct (eq_nat_dec wz n0); auto.*)
+  remember (proj_bytes al) as R.
   destruct R.
-    inv H. rewrite (IHlist_forall2 n0 l); auto.
+    inv H. rewrite (IHlist_forall2 l); auto.
     congruence.      
 Qed.
 
 Lemma proj_bytes_inject_none:
   forall f vl vl',
   list_forall2 (memval_inject f) vl vl' ->
-  forall n,
-  proj_bytes n vl = None ->
-  proj_bytes n vl' = None.
+  proj_bytes vl = None ->
+  proj_bytes vl' = None.
 Proof.
   induction 1; simpl. congruence.
   inv H; try congruence.
 
   intros.
-  destruct (eq_nat_dec wz n0); auto.
-  remember (proj_bytes n0 al) as R.
+  remember (proj_bytes al) as R.
   destruct R.
-    inv H. rewrite (IHlist_forall2 n0); auto.
+    inv H. rewrite (IHlist_forall2); auto.
 Qed.
 
 Lemma proj_bytes_not_inject:
   forall f vl vl',
   list_forall2 (memval_inject f) vl vl' ->
-  forall n,
-  proj_bytes n vl = None -> proj_bytes n vl' <> None -> In Undef vl.
+  proj_bytes vl = None -> proj_bytes vl' <> None -> In Undef vl.
 Proof.
   induction 1; simpl; intros.
     congruence.
     inv H; try congruence; auto.
-    destruct (eq_nat_dec wz n); subst; auto.
-      remember (proj_bytes n al) as R.
-      remember (proj_bytes n bl) as R'.
+      remember (proj_bytes al) as R.
+      remember (proj_bytes bl) as R'.
       destruct R; destruct R';
         try solve [inversion H1 | inversion H2 | contradict H2; auto].
         right. eapply IHlist_forall2; eauto.
-          rewrite <- HeqR'. intro. inversion H.          
-      contradict H2; auto.
+        congruence.
 Qed.
 
 (* Properties of proj_pointer *)
@@ -206,7 +203,7 @@ Lemma meminj_no_overlap_spec : forall f b1 b d1 b2 d2,
   b1 = b2 /\ d1 = d2.
 Proof.
   intros.
-  destruct (zeq b1 b2); subst.
+  destruct (peq b1 b2); subst.
     rewrite H1 in H0.
     inv H0. split; auto.
 
@@ -214,38 +211,50 @@ Proof.
     eapply H in n; eauto.
 Qed.
 
-Lemma check_pointer_inject_true:
+Lemma ptr_iptr_diff: forall b ofs i, proj_sumbool (Val.eq (Vptr b ofs) (Vinttoptr i)) = false.
+Proof.
+  intros. destruct (Val.eq _ _); auto; inv e.
+Qed.
+
+Lemma iptr_ptr_diff: forall b ofs i, proj_sumbool (Val.eq (Vinttoptr i) (Vptr b ofs)) = false.
+Proof.
+  intros. destruct (Val.eq _ _); auto; inv e.
+Qed.
+
+Lemma check_value_ptr_inject_true:
   forall f vl vl',
   list_forall2 (memval_inject f) vl vl' ->
   forall n b ofs b' delta,
-  check_pointer n b ofs vl = true ->
+  check_value n (Vptr b ofs) Q32 vl = true ->
   f b = Some(b', delta) ->
-  check_pointer n b' (Int.add 31 ofs (Int.repr 31 delta)) vl' = true.
+  check_value n (Vptr b' (Int.add 31 ofs (Int.repr 31 delta))) Q32 vl' = true.
 Proof.
   induction 1; intros; destruct n; simpl in *; auto.
   inv H; auto.
   destruct (andb_prop _ _ H1). destruct (andb_prop _ _ H).
   destruct (andb_prop _ _ H5).
   assert (n = n0) by (apply beq_nat_true; auto).
-  assert (b = b0) by (eapply proj_sumbool_true; eauto).
-  assert (ofs = ofs1) by (eapply proj_sumbool_true; eauto).
+  assert (b = b0) by (destruct (Val.eq _ _); try (inversion e; auto); inv H7).
+  assert (ofs = ofs1) by (destruct (Val.eq _ _); try (inversion e; auto); inv H7).
   subst. rewrite H3 in H2; inv H2.
   unfold proj_sumbool. rewrite dec_eq_true. rewrite dec_eq_true.
   rewrite <- beq_nat_refl. simpl. eauto.
+
+  rewrite ptr_iptr_diff in H1; inv H1.
 Qed.
 
 Definition meminj_zero_delta (f: meminj) : Prop :=
   forall b b' delta, f b = Some(b', delta) -> delta = 0.
 
-Lemma check_pointer_inject_false:
+Lemma check_value_ptr_inject_false:
   forall f vl vl',
   list_forall2 (memval_inject f) vl vl' ->
   meminj_no_overlap f ->
   meminj_zero_delta f ->
   forall n b ofs b' delta,
-  check_pointer n b ofs vl = false ->
+  check_value n (Vptr b ofs) Q32 vl = false ->
   f b = Some(b', delta) ->
-  check_pointer n b' (Int.add 31 ofs (Int.repr 31 delta)) vl' = false.
+  check_value n (Vptr b' (Int.add 31 ofs (Int.repr 31 delta))) Q32 vl' = false.
 Proof.
   induction 1; intros; destruct n; simpl in *; auto.
   inv H; auto.
@@ -254,50 +263,76 @@ Proof.
     apply andb_false_elim in H3.
     destruct H3 as [H3 | H3].
       apply andb_false_elim in H3.
-      destruct H3 as [H3 | H3].  
+      destruct H3 as [H3 | H3].
         apply andb_false_intro1.
         apply andb_false_intro1.
         apply andb_false_intro1.
-        unfold eq_block in *.
-        destruct (zeq b b0); subst; inv H3.
-        unfold meminj_no_overlap in H1.
-        eapply H1 in n1; eauto.
-        destruct (zeq b' b2); subst; try solve [contradict n1; auto | auto].
+        destruct (Val.eq (Vptr b ofs) (Vptr b0 ofs1)). inv H3.
+  Lemma Vptr_diff: forall b ofs b0 ofs0, Vptr b ofs <> Vptr b0 ofs0 -> b <> b0 \/ ofs <> ofs0.
+  Proof.
+    intros.
+    elim (Pos.eq_dec b b0); intro Beq;
+    elim (Int.eq_dec 31 ofs ofs0); intro Oeq;
+    subst; try congruence;
+    tauto.
+  Qed.
+        exploit (Vptr_diff b ofs b0 ofs1); auto. intro Neq.
+        destruct Neq; unfold meminj_no_overlap in H1.
+        eapply H1 in H; eauto.
+        unfold proj_sumbool.
+        destruct (Val.eq (Vptr _ _) (Vptr _ _)); auto.
+        inv e. congruence.
+        unfold proj_sumbool. 
+        destruct (Val.eq (Vptr _ _) (Vptr _ _)); auto.
+        inv e.
+        rewrite !Int.Z_mod_modulus_eq in H8.
+        apply H2 in H5. apply H2 in H4. subst.
+        rewrite Zmod_0_l in H8. rewrite <- !Zplus_0_r_reverse in H8.
+        rewrite <- !Int.unsigned_repr_eq in H8.
+        rewrite !Int.repr_unsigned in H8.
+        unfold Int.unsigned in H8.
+        apply Int.mkint_eq with (wordsize_one:=31%nat) (Px:=Int.intrange 31 ofs) (Py:=Int.intrange 31 ofs1) in H8.
+        destruct ofs, ofs1.  simpl in H8. apply H in H8. inv H8.
+        
+        apply andb_false_intro1.
+        apply andb_false_intro1.
+        apply andb_false_intro2. apply H3.
 
         apply andb_false_intro1.
-        apply andb_false_intro1.
+        apply andb_false_intro2. apply H3.
+
         apply andb_false_intro2.
-        apply H2 in H4. apply H2 in H5. subst.
-        rewrite Int.add_zero. rewrite Int.add_zero. auto.
-      apply andb_false_intro1.
-      apply andb_false_intro2; auto.
-    eauto using andb_false_intro2.
+        apply IHlist_forall2 with b; auto.
+
+        rewrite ptr_iptr_diff. reflexivity.
 Qed.
 
-Lemma check_ipointer_inject_true:
+Lemma check_value_iptr_inject_true:
   forall f vl vl',
   list_forall2 (memval_inject f) vl vl' ->
   forall n i,
-  check_ipointer n i vl = true ->
-  check_ipointer n i vl' = true. 
+  check_value n (Vinttoptr i) Q32 vl = true ->
+  check_value n (Vinttoptr i) Q32 vl' = true. 
 Proof.
   induction 1; intros; destruct n; simpl in *; auto. 
   inv H; auto.
+  rewrite iptr_ptr_diff in H1; inv H1.
 
   destruct (andb_prop _ _ H1). destruct (andb_prop _ _ H).
   apply IHlist_forall2 in H2.
   congruence.
 Qed.
 
-Lemma check_ipointer_inject_false:
+Lemma check_value_iptr_inject_false:
   forall f vl vl',
   list_forall2 (memval_inject f) vl vl' ->
   forall n i,
-  check_ipointer n i vl = false ->
-  check_ipointer n i vl' = false. 
+  check_value n (Vinttoptr i) Q32 vl = false ->
+  check_value n (Vinttoptr i) Q32 vl' = false. 
 Proof.
   induction 1; intros; destruct n; simpl in *; auto. 
   inv H; auto.
+  rewrite iptr_ptr_diff; auto.
 
   apply andb_false_elim in H1.
   destruct H1; auto using andb_false_intro1.
@@ -305,55 +340,39 @@ Proof.
     auto using andb_false_intro2.
 Qed.
 
-Lemma proj_ipointer_inject:
-  forall f vl1 vl2,
+Lemma proj_value_inject:
+  forall f vl1 vl2
+  (Noover: meminj_no_overlap f)
+  (Zerodelta: meminj_zero_delta f),
   list_forall2 (memval_inject f) vl1 vl2 ->
-  val_inject f (proj_ipointer vl1) (proj_ipointer vl2).
+  val_inject f (proj_value Q32 vl1) (proj_value Q32 vl2).
 Proof.
-  intros. unfold proj_ipointer.
-  inversion H; subst. auto. inversion H0; subst; auto.
-  case_eq (check_ipointer (size_chunk_nat Mint32) i 
-             (IPointer i n :: al)); intros.
-  exploit check_ipointer_inject_true. eexact H. eauto. eauto. 
-  intro. rewrite H3. econstructor; eauto. 
+  intros. unfold proj_value.
+  inversion H; subst; auto. inversion H0; subst; auto.
+  case_eq (check_value (size_quantity_nat Q32) (Vptr b0 ofs1) Q32
+        (Fragment (Vptr b0 ofs1) Q32 n :: al)); intros.
+  exploit check_value_ptr_inject_true. eexact H. eauto. eauto. 
+  intro. rewrite H4. econstructor; eauto.
 
-  exploit check_ipointer_inject_false. eexact H. eauto. eauto. 
-  intro. rewrite H3. econstructor; eauto. 
+  exploit check_value_ptr_inject_false. eexact H. eauto. eauto. eauto. eauto. 
+  intro. rewrite H4. econstructor; eauto.
+
+  inversion H; subst; auto. inversion H0; subst; auto.
+  case_eq (check_value (size_quantity_nat Q32) (Vinttoptr i) Q32
+        (Fragment (Vinttoptr i) Q32 n :: al)); intros.
+  exploit check_value_iptr_inject_true. eexact H. eauto. eauto. 
+  intro. rewrite H3. econstructor; eauto.
+
+  exploit check_value_iptr_inject_false. eexact H. eauto. eauto. 
+  intro. rewrite H3. econstructor; eauto.  
 Qed.
 
-Lemma proj_pointer_inject:
-  forall f vl1 vl2,
-  meminj_no_overlap f ->
-  meminj_zero_delta f ->
-  list_forall2 (memval_inject f) vl1 vl2 ->
-  val_inject f (proj_pointer vl1) (proj_pointer vl2).
+Lemma proj_value_undef:
+  forall vl, In Undef vl -> proj_value Q32 vl = Vundef.
 Proof.
-  intros f v11 v12 J1 J2 H. unfold proj_pointer.
-  inversion H; subst. auto. inversion H0; subst; auto.
-  case_eq (check_pointer (size_chunk_nat Mint32) b0 ofs1 
-             (Pointer b0 ofs1 n :: al)); intros.
-
-  exploit check_pointer_inject_true; eauto.
-  intro. rewrite H4. econstructor; eauto. 
-
-  exploit check_pointer_inject_false; eauto. 
-  intro. rewrite H4. econstructor; eauto. 
-Qed.
-
-Lemma proj_pointer_undef:
-  forall vl, In Undef vl -> proj_pointer vl = Vundef.
-Proof.
-  intros; unfold proj_pointer.
+  intros; unfold proj_value.
   destruct vl; auto. destruct m; auto. 
-  rewrite check_pointer_undef. auto. auto.
-Qed.
-
-Lemma proj_ipointer_undef:
-  forall vl, In Undef vl -> proj_ipointer vl = Vundef.
-Proof.
-  intros; unfold proj_ipointer.
-  destruct vl; auto. destruct m; auto. 
-  rewrite check_ipointer_undef. auto. auto.
+  rewrite check_value_undef. auto. auto.
 Qed.
 
 (* Properties of encode/decode val *)
@@ -363,16 +382,26 @@ Theorem encode_val_inject:
   list_forall2 (memval_inject f) (encode_val chunk v1) (encode_val chunk v2).
 Proof.
   intros. inv H; simpl.
-    apply inj_bytes_inject.
-    apply inj_bytes_inject.
+    destruct chunk; solve [
+      apply inj_bytes_inject |
+      apply repeat_Undef_inject_self |
+      apply repeat_Undef_inject_self].
+    destruct chunk; solve [
+      apply inj_bytes_inject |
+      apply repeat_Undef_inject_self |
+      apply repeat_Undef_inject_self].
+    destruct chunk; solve [
+      apply inj_bytes_inject |
+      apply repeat_Undef_inject_self |
+      apply repeat_Undef_inject_self].
 
     destruct chunk; try apply repeat_Undef_inject_self.
-    destruct (eq_nat_dec n 31); subst; try apply repeat_Undef_inject_self.
+    destruct (eq_nat_dec _ _); subst; try apply repeat_Undef_inject_self.
       simpl; repeat econstructor; auto.
 
     destruct chunk; try apply repeat_Undef_inject_self.
-    destruct (eq_nat_dec n 31); subst; try apply repeat_Undef_inject_self.
-      unfold inj_ipointer; simpl; repeat econstructor; auto.
+    destruct (eq_nat_dec _ _); subst; try apply repeat_Undef_inject_self.
+      unfold inj_value; simpl; repeat econstructor; auto.
 
     destruct chunk; try apply repeat_Undef_inject_self.
 Qed.
@@ -385,21 +414,23 @@ Theorem decode_val_inject:
   val_inject f (decode_val chunk vl1) (decode_val chunk vl2).
 Proof.
   intros f vl1 vl2 chunk JJ JJ2 H. unfold decode_val.
-  case_eq (proj_bytes (wz_of_chunk chunk) vl1); intros.
+  case_eq (proj_bytes vl1); intros.
     exploit proj_bytes_inject_some; eauto. intros. rewrite H1.
-    destruct chunk; constructor.
- 
+    destruct chunk; try constructor.
+
     exploit proj_bytes_inject_none; eauto. intros. rewrite H1.
     destruct chunk; auto.
-    destruct (eq_nat_dec n 31); subst; auto.
-      assert (H2 := H).
-      apply proj_pointer_inject in H2; auto.
-      destruct (@proj_pointer_inv vl1) as [J1 | [b1 [ofs1 J1]]]; rewrite J1.
-        rewrite J1 in H2. inv H2.
-        apply proj_ipointer_inject; auto.
-
-        rewrite J1 in H2. inv H2. eauto.
+    destruct (eq_nat_dec _ _); subst; auto.
+      assert (H2 := H). simpl.
+      apply proj_value_inject in H2; auto.
+      remember (proj_value Q32 vl1) as v1.
+      remember (proj_value Q32 vl2) as v2.
+      inversion H2; auto.
+      rewrite <- H5 in H2. rewrite <- H6 in H2. auto.
 Qed.
+
+Notation "a # b" := (Maps.PMap.get b a) (at level 1).
+Notation "a ! b" := (Maps.ZMap.get b a) (at level 1).
 
 Record mem_inj (f: meminj) (m1 m2: mem) : Prop :=
   mk_mem_inj {
@@ -411,8 +442,10 @@ Record mem_inj (f: meminj) (m1 m2: mem) : Prop :=
     mi_memval:
       forall b1 ofs b2 delta,
       f b1 = Some(b2, delta) ->
-      perm m1 b1 ofs Nonempty ->
-      memval_inject f (m1.(mem_contents) b1 ofs) (m2.(mem_contents) b2 (ofs + delta))
+      perm m1 b1 ofs Cur Nonempty ->
+      memval_inject f
+        (m1.(mem_contents) # b1 ! ofs)
+        (m2.(mem_contents) # b2 ! (ofs + delta))
   }.
 
 (** Preservation of permissions *)
@@ -420,16 +453,20 @@ Record mem_inj (f: meminj) (m1 m2: mem) : Prop :=
 Lemma perm_inj:
   forall f m1 m2 b1 ofs p b2 delta,
   mem_inj f m1 m2 ->
-  perm m1 b1 ofs p ->
+  perm m1 b1 ofs Cur p ->
   f b1 = Some(b2, delta) ->
-  perm m2 b2 (ofs + delta) p.
+  perm m2 b2 (ofs + delta) Cur p.
 Proof.
   intros. 
   assert (valid_access m1 (Mint 7) b1 ofs p).
-    split. red; intros. simpl in H2. rewrite bytesize_chunk_7_eq_1 in H2. replace ofs0 with ofs by omega. auto.
+  {
+    split. red; intros. simpl in H2.
+    replace (bytesize_chunk 7) with 1 in H2 by reflexivity.
+    replace ofs0 with ofs by omega. auto.
     simpl. apply Zone_divide.
+  }
   exploit mi_access; eauto. intros [A B].
-  apply A. simpl; rewrite bytesize_chunk_7_eq_1; omega. 
+  apply A. simpl; replace (bytesize_chunk 7) with 1 by reflexivity; omega. 
 Qed.
 
 (** Preservation of loads. *)
@@ -439,10 +476,10 @@ Lemma getN_inj:
   mem_inj f m1 m2 ->
   f b1 = Some(b2, delta) ->
   forall n ofs,
-  range_perm m1 b1 ofs (ofs + Z_of_nat n) Readable ->
+  range_perm m1 b1 ofs (ofs + Z_of_nat n) Cur Readable ->
   list_forall2 (memval_inject f) 
-               (getN n ofs (m1.(mem_contents) b1))
-               (getN n (ofs + delta) (m2.(mem_contents) b2)).
+               (getN n ofs (m1.(mem_contents) # b1))
+               (getN n (ofs + delta) (m2.(mem_contents) # b2)).
 Proof.
   induction n; intros; simpl.
   constructor.
@@ -465,13 +502,13 @@ Lemma load_inj:
   exists v2, load chunk m2 b2 (ofs + delta) = Some v2 /\ val_inject f v1 v2.
 Proof.
   intros f m1 m2 chunk b1 ofs b2 delta v1 J1 J2 H H0 H1.
-  exists (decode_val chunk (getN (size_chunk_nat chunk) (ofs + delta) (m2.(mem_contents) b2))).
+  exists (decode_val chunk (getN (size_chunk_nat chunk) (ofs + delta) (m2.(mem_contents) # b2))).
   split. unfold load. apply pred_dec_true.  
   eapply mi_access; eauto with mem. 
   exploit load_result; eauto. intro. rewrite H2. 
-  apply decode_val_inject; auto. apply getN_inj; auto. 
+  apply decode_val_inject; auto. eapply getN_inj; auto. 
   rewrite <- size_chunk_conv. exploit load_valid_access; eauto. 
-  intros [A B]. auto.
+  intros [A B]. apply A.
 Qed.
 
 (** Preservation of stores. *)
@@ -480,17 +517,18 @@ Lemma setN_inj:
   forall (access: Z -> Prop) delta f vl1 vl2,
   list_forall2 (memval_inject f) vl1 vl2 ->
   forall p c1 c2,
-  (forall q, access q -> memval_inject f (c1 q) (c2 (q + delta))) ->
-  (forall q, access q -> memval_inject f ((setN vl1 p c1) q) 
-                                         ((setN vl2 (p + delta) c2) (q + delta))).
+  (forall q, access q -> memval_inject f (c1 ! q) (c2 ! (q + delta))) ->
+  (forall q, access q -> memval_inject f ((setN vl1 p c1) ! q) 
+                                         ((setN vl2 (p + delta) c2) ! (q + delta))).
 Proof.
   induction 1; intros; simpl. 
   auto.
   replace (p + delta + 1) with ((p + 1) + delta) by omega.
   apply IHlist_forall2; auto. 
-  intros. unfold update at 1. destruct (zeq q0 p). subst q0.
-  rewrite update_s. auto.
-  rewrite update_o. auto. omega.
+  intros. destruct (zeq q0 p). subst q0.
+  rewrite !Maps.ZMap.gss. auto.
+  rewrite !Maps.ZMap.gso; auto.
+  intro; apply n. rewrite Z.add_cancel_r in H4. auto.
 Qed.
 
 Lemma store_mapped_inj:
@@ -517,26 +555,27 @@ Proof.
   eapply store_valid_access_2; [apply H0 |]. auto.
 (* mem_contents *)
   intros.
-  assert (perm m1 b0 ofs0 Nonempty). eapply perm_store_2; eauto. 
+  assert (perm m1 b0 ofs0 Cur Nonempty). eapply perm_store_2; eauto. 
   rewrite (store_mem_contents _ _ _ _ _ _ H0).
   rewrite (store_mem_contents _ _ _ _ _ _ STORE).
-  unfold update. 
-  destruct (zeq b0 b1). subst b0.
+  destruct (peq b0 b1). subst b0.
   (* block = b1, block = b2 *)
   assert (b3 = b2) by congruence. subst b3.
   assert (delta0 = delta) by congruence. subst delta0.
-  rewrite zeq_true.
-  apply setN_inj with (access := fun ofs => perm m1 b1 ofs Nonempty).
-  apply encode_val_inject; auto. auto. auto. 
-  destruct (zeq b3 b2). subst b3.
+  rewrite !Maps.PMap.gss.
+  apply setN_inj with (access := fun ofs => perm m1 b1 ofs Cur Nonempty).
+  apply encode_val_inject; auto. intros; eapply mi_memval0; auto. auto.
+  destruct (peq b3 b2). subst b3.
   (* block <> b1, block = b2 *)
-  rewrite setN_other. auto.
+  rewrite Maps.PMap.gss.
+  rewrite setN_other.
+  rewrite Maps.PMap.gso; auto. eauto.
   rewrite encode_val_length. rewrite <- size_chunk_conv. intros. 
   assert (b2 <> b2).
     eapply H1; eauto. 
   congruence.
   (* block <> b1, block <> b2 *)
-  eauto.
+  repeat (rewrite Maps.PMap.gso; auto).
 Qed.
 
 Lemma store_unmapped_inj:
@@ -553,16 +592,16 @@ Proof.
 (* mem_contents *)
   intros. 
   rewrite (store_mem_contents _ _ _ _ _ _ H0).
-  rewrite update_o. eauto with mem. 
+  rewrite Maps.PMap.gso. eauto with mem. 
   congruence.
 Qed.
 
 Lemma store_outside_inj:
   forall f m1 m2 chunk b ofs v m2',
   mem_inj f m1 m2 ->
-  (forall b' delta ofs',
+  (forall b' delta ofs' pk,
     f b' = Some(b, delta) ->
-    perm m1 b' ofs' Nonempty ->
+    perm m1 b' ofs' pk Nonempty ->
     ofs' + delta < ofs \/ ofs' + delta >= ofs + size_chunk chunk) ->
   store chunk m2 b ofs v = Some m2' ->
   mem_inj f m1 m2'.
@@ -573,11 +612,12 @@ Proof.
 (* mem_contents *)
   intros. 
   rewrite (store_mem_contents _ _ _ _ _ _ H1).
-  unfold update. destruct (zeq b2 b). subst b2.
-  rewrite setN_outside. auto. 
+  destruct (peq b2 b). subst b2.
+  rewrite Maps.PMap.gss.
+  rewrite setN_outside. eauto. 
   rewrite encode_val_length. rewrite <- size_chunk_conv. 
-  eapply H0; eauto. 
-  eauto with mem.
+  eapply H0; eauto.
+  rewrite Maps.PMap.gso; auto.
 Qed.
 
 (** Preservation of allocations *)
@@ -595,12 +635,15 @@ Proof.
 (* mem_contents *)
   intros.
   assert (valid_access m2 (Mint 7) b0 (ofs + delta) Nonempty).
+  {
     eapply mi_access0; eauto.
-    split. simpl. red; intros. rewrite bytesize_chunk_7_eq_1 in H3. assert (ofs0 = ofs) by omega. congruence.
-    simpl. apply Zone_divide. 
+    split. simpl. red; intros. replace (bytesize_chunk 7) with 1 in H3 by auto. assert (ofs0 = ofs) by omega.
+    congruence.
+    simpl. apply Zone_divide.
+  }
   assert (valid_block m2 b0) by eauto with mem.
-  rewrite <- MEM; simpl. rewrite update_o. eauto with mem.
-  rewrite NEXT. apply sym_not_equal. eauto with mem. 
+  rewrite <- MEM; simpl. rewrite Maps.PMap.gso. eauto with mem.
+  rewrite NEXT. eauto with mem. 
 Qed.
 
 (** Preservation of frees *)
@@ -610,7 +653,7 @@ Lemma free_right_inj:
   mem_inj f m1 m2 ->
   free m2 b lo hi = Some m2' ->
   (forall b1 delta ofs p,
-    f b1 = Some(b, delta) -> perm m1 b1 ofs p ->
+    f b1 = Some(b, delta) -> perm m1 b1 ofs Cur p ->
     lo <= ofs + delta < hi -> False) ->
   mem_inj f m1 m2'.
 Proof.
@@ -618,17 +661,21 @@ Proof.
 (* access *)
   intros. exploit mi_access0; eauto. intros [RG AL]. split; auto.
   red; intros. eapply perm_free_1; eauto. 
-  destruct (zeq b2 b); auto. subst b. right.
+  destruct (peq b2 b); auto. subst b. right.
   destruct (zlt ofs0 lo); auto. destruct (zle hi ofs0); auto.
   elimtype False. eapply H1 with (ofs := ofs0 - delta). eauto. 
   apply H3. omega. omega.
 (* mem_contents *)
   intros. rewrite FREE; simpl.
   specialize (mi_memval0 _ _ _ _ H2 H3).
-  assert (b=b2 /\ lo <= ofs+delta < hi \/ (b<>b2 \/ ofs+delta<lo \/ hi <= ofs+delta)) by (unfold block; omega).
+  assert (b=b2 /\ lo <= ofs+delta < hi \/ (b<>b2 \/ ofs+delta<lo \/ hi <= ofs+delta)).
+  {
+    assert (lo <= ofs+delta < hi \/ ofs + delta < lo \/ hi <= ofs + delta) by omega.
+    destruct (peq b b2); tauto.
+  }
   destruct H4. destruct H4. subst b2.
   specialize (H1 _ _ _ _ H2 H3). elimtype False; auto.
-  rewrite (clearN_out _ _ _ _ _ _ H4); auto.
+  auto.
 Qed.
 
 Lemma free_inj:
@@ -651,7 +698,7 @@ Proof.
 
   split; auto.
   red; intros. eapply perm_free_1; eauto.
-  destruct (zeq b3 b2); auto.
+  destruct (peq b3 b2); auto.
     subst b2. right.
     destruct (zlt ofs0 (lo + delta)); auto.
     destruct (zle (hi + delta) ofs0); auto.
@@ -664,23 +711,24 @@ Proof.
     destruct H4 as [H41 H42].
     apply H41 in J2.
     eapply perm_free_2 with (p:=p) in J1; eauto.
-    congruence.
+    apply J1 in J2; inv J2.
 
 (* mem_contents *) 
   intros. rewrite FREE; simpl.
   assert (FREE':=H0). apply free_result in FREE'.
-  rewrite FREE'; simpl.   
+  rewrite FREE'; simpl.
+  assert (lo <= ofs < hi \/ (ofs < lo \/ hi <= ofs)) as J1base by omega.
   assert (b0=b1 /\ lo <= ofs < hi \/ (b1<>b0 \/ ofs<lo \/ hi <= ofs)) as J1
-    by (unfold block; omega).
+    by (destruct (peq b0 b1); subst; try tauto ; right; left; auto).
+  assert (lo+delta <= ofs+delta < hi+delta \/ (ofs+delta<lo+delta \/ hi+delta <= ofs+delta)) as J2base by omega.
   assert (b2=b3 /\ lo+delta <= ofs+delta < hi+delta \/ 
-    (b2<>b3 \/ ofs+delta<lo+delta \/ hi+delta <= ofs+delta)) 
-    as J2 by (unfold block; omega).
+    (b2<>b3 \/ ofs+delta<lo+delta \/ hi+delta <= ofs+delta)) as J2
+    by (destruct (peq b2 b3); tauto).
   destruct J1 as [J1 | J1].
     destruct J1 as [J11 J12]; subst.
     eapply perm_free_2 with (p:=Nonempty) in H0; eauto.
-    congruence.
+    apply H0 in H4; tauto.
 
-    rewrite (clearN_out _ _ _ _ _ _ J1).
     destruct J2 as [J2 | J2].
       destruct J2 as [J21 J22]; subst.
       destruct (@meminj_no_overlap_spec f b0 b3 delta0 b1 delta J H3 H2)
@@ -693,7 +741,6 @@ Proof.
 
       assert (W1:=H2). apply J' in W1. subst.
       assert (W2:=H3). apply J' in W2. subst.
-      rewrite (clearN_out _ _ _ _ _ _ J2).
       eapply perm_free_3 in H4; eauto.
 Qed.
 
@@ -711,11 +758,9 @@ Proof.
 (* mem_contents *)
   intros. rewrite FREE; simpl.
   assert (b=b1 /\ lo <= ofs < hi \/ (b<>b1 \/ ofs<lo \/ hi <= ofs))
-    by (unfold Values.block; omega).
+    by (assert (lo <= ofs < hi \/ ofs<lo \/ hi <= ofs) by omega; tauto).
   destruct H3.
     destruct H3. subst b1. uniq_result.
-
-    rewrite (Mem.clearN_out _ _ _ _ _ _ H3).
     apply mi_memval; auto.
     eapply Mem.perm_free_3; eauto.
 Qed.

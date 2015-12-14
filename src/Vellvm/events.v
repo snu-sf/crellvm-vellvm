@@ -53,6 +53,7 @@ Unset Implicit Arguments.
 Inductive eventval: Type :=
   | EVint: forall (wz:nat), Int.int wz -> eventval
   | EVfloat: float -> eventval
+  | EVsingle: float32 -> eventval
   | EVptr_global: atom -> int32 -> eventval.
 
 Definition eventgv := list eventval.
@@ -104,6 +105,8 @@ Inductive eventval_match: eventval -> typ -> val -> Prop :=
       eventval_match (EVint wz i) Tint (Vint wz i)
   | ev_match_float: forall f,
       eventval_match (EVfloat f) Tfloat (Vfloat f)
+  | ev_match_single: forall f,
+      eventval_match (EVsingle f) Tsingle (Vsingle f)
   | ev_match_ptr: forall id b ofs,
       Genv.find_symbol ge id = Some b ->
       eventval_match (EVptr_global id ofs) Tint (Vptr b ofs).
@@ -174,7 +177,7 @@ Lemma eventval_match_inject_2:
   forall ev ty v,
   eventval_match ev ty v -> MoreMem.val_inject f v v.
 Proof.
-  induction 1. constructor. constructor.
+  induction 1. constructor. constructor. constructor.
   destruct glob_pres as [A [B C]].
   exploit A; eauto. intro EQ.
   econstructor; eauto. rewrite Int.add_zero; auto.
@@ -242,6 +245,7 @@ Definition eventval_valid (ev: eventval) : Prop :=
   match ev with
   | EVint _ _ => True
   | EVfloat _ => True
+  | EVsingle _ => True
   | EVptr_global id ofs => exists b, Genv.find_symbol ge id = Some b
   end.
 
@@ -249,6 +253,7 @@ Definition eventval_type (ev: eventval) : typ :=
   match ev with
   | EVint _ _ => Tint
   | EVfloat _ => Tfloat
+  | EVsingle _ => Tsingle
   | EVptr_global id ofs => Tint
   end.
 
@@ -259,6 +264,7 @@ Proof.
   intros. subst ty. destruct ev; simpl in *.
   exists (Vint wz i); constructor.
   exists (Vfloat f0); constructor.
+  exists (Vsingle f0); constructor.
   destruct H as [b A]. 
   match goal with 
   | |- context [EVptr_global _ ?i] => exists (Vptr b i); constructor; auto
@@ -471,8 +477,13 @@ match ev with
                  end
 | EVfloat f => match chk with
                | Mint _ => False
-               | Mfloat32 => f = Float.singleoffloat f
+               | Mfloat32 => False
                | Mfloat64 => True
+               end
+| EVsingle f => match chk with
+               | Mint _ => False
+               | Mfloat32 => True
+               | Mfloat64 => False
                end
 | _ => match chk with
        | Mint wz => wz = 31%nat
@@ -497,9 +508,11 @@ Proof.
 
     exists (Vfloat f).
     destruct m; tinv H0; simpl.
-      rewrite <- H0. 
       split; auto.
         constructor.
+
+    exists (Vsingle f).
+    destruct m; tinv H0; simpl.
       split; auto.
         constructor.
 
