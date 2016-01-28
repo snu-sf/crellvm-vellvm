@@ -15,21 +15,20 @@ way to parse LLVM bitcode into a Vellvm AST.
 
 ## Dependencies
 
-- camlp4, [ott 0.25](http://www.cl.cam.ac.uk/~pes20/ott/)
-    + `opam install camlp4 ott`
-- Coq 8.4pl5, configured with `-usecamlp4` option
-    + Download [this](https://coq.inria.fr/distrib/V8.4pl5/files/coq-8.4pl5.tar.gz).
-    + `./configure -prefix ~/.local -usecamlp4 && make && make install`
+- [OPAM](https://opam.ocaml.org/)
 
-## Building
+## Build
 
-1. In the top-level directory of the repo, run `scripts/fetch-libs.sh` to
-download all third-party sources into lib/src, extract, and apply patches.
-2. Run `make libs` to compile the Equations plugin and the metatheory
-library. If you get an error about grammar.cma, make sure your version of coq
-was compiled with the same version of OCaml in your path.
-3. Run `make` to compile the Vellvm theories.
+- `git clone git@github.com:snu-sf/opam-repository.git`
+- `opam repo add snu-sf opam-repository`
+- `opam switch 4.02.3`
+- `opam install ott coq.8.5.0~camlp4`
+- `make`
 
 ## Interactive Theorem Proving
 
-Copy 'coqrc_example' to '~/.coqrc' and edit accordingly.
+It is recommended to use the following tools:
+
+- [Emacs](https://www.gnu.org/software/emacs/),
+- [ProofGeneral](http://proofgeneral.inf.ed.ac.uk/) and [Company-Coq](https://github.com/cpitclaudel/company-coq).  Here is a [installation manual](https://github.com/cpitclaudel/company-coq).
+- See `.dir-locals.el` for `coq-load-path` variable.
