@@ -430,6 +430,8 @@ linkage :: 'linkage_'					::=  			{{ com linkage }}
   | External_weak					::   :: external_weak
   | Ghost						::   :: ghost
   | Common						::   :: common
+  | Link_once_odr_auto_hide :: :: link_once_odr_auto_hide
+  | Linker_private_weak  :: :: linker_private_weak
 
 fnattrs ::  'fnattrs_'                                  ::=                     {{ com function attributtes }}
   | linkage visibility callconv attributes1 attributes2 ::   :: intro
