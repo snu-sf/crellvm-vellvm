@@ -1,0 +1,6 @@
+[submodule "lib/cpdtlib"]
+	path = lib/cpdtlib
+	url = git@github.com:snu-sf/cpdtlib.git
+[submodule "lib/metalib"]
+	path = lib/metalib
+	url = git@github.com:snu-sf/metalib.git

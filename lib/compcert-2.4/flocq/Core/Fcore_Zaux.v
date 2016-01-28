@@ -18,7 +18,6 @@ COPYING file for more details.
 *)
 
 Require Import ZArith.
-Require Import ZOdiv.
 
 Section Zmissing.
 

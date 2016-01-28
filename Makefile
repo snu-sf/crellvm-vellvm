@@ -1,41 +1,31 @@
-OTT ?= ott
+COQMODULE    := Vellvm
+COQTHEORIES  := $(shell ls \
+  lib/GraphBasics/*.v \
+  src/Vellvm/*.v \
+  src/Vellvm/Dominators/*.v \
+  src/Vellvm/ott/*.v)
 
-COQLIBS=-I src/Vellvm -I src/Vellvm/ott -I src/Vellvm/Dominators \
-  -I src/Interpreter -I src/Parser -I src/Extraction \
-	-I lib/GraphBasics -I lib/cpdtlib -I lib/metalib-20090714 \
-	-I lib/compcert-2.4/backend -I lib/compcert-2.4/common -I lib/compcert-2.4/flocq/Appli/ \
-	-I lib/compcert-2.4/flocq/Calc -I lib/compcert-2.4/flocq/Core -I lib/compcert-2.4/flocq/Prop \
-	-I lib/compcert-2.4/ia32 -I lib/compcert-2.4/lib -I lib/compcert-2.4/old
-MAKECOQ=make -f Makefile.coq COQLIBS="$(COQLIBS)"
+.PHONY: all metalib cpdtlib theories clean
 
-all: theories extraction
+all: metalib cpdtlib compcert theories
 
-libs: lib/metalib-20090714
-	make -C lib/metalib-20090714
+Makefile.coq: Makefile $(COQTHEORIES)
+	(echo "-R . $(COQMODULE)"; \
+   echo "-R lib/metalib metalib"; \
+   echo "-R lib/cpdtlib cpdtlib"; \
+   echo "-R lib/compcert-2.4 compcert"; \
+   echo "-R lib/GraphBasics GraphBasics"; \
+   echo $(COQTHEORIES)) > _CoqProject
+	coq_makefile -f _CoqProject -o Makefile.coq
 
-compcert: libs lib/compcert-2.4
-	make -C lib/compcert-2.4
+metalib: lib/metalib
+	$(MAKE) -C lib/metalib
 
-depend: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
-	+$(MAKECOQ) depend
+cpdtlib: lib/cpdtlib
+	$(MAKE) -C lib/cpdtlib
 
-extraction: theories
-	+make -C src/Extraction
-	+cd src/Extraction; ./fixextract.py; cd ../..
-
-theories: libs compcert Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
-	+$(MAKECOQ)
-
-Makefile.coq: Make
-	coq_makefile -f Make -o Makefile.coq
-
-%.vo: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
-	+$(MAKECOQ) "$@"
-
-clean:
-	rm -f src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v 
-	make -f Makefile.coq clean
-	rm -f Makefile.coq
+compcert: lib/compcert-2.4
+	$(MAKE) -C lib/compcert-2.4
 
 src/Vellvm/syntax_base.v: src/Vellvm/syntax_base.ott
 	cd src/Vellvm && \
@@ -48,4 +38,13 @@ src/Vellvm/typing_rules.v: src/Vellvm/syntax_base.ott src/Vellvm/typing_rules.ot
 	    -i typing_rules.ott -o typing_rules.v && \
 	rm _tmp_syntax_base.v
 
-.PHONY: all clean theories libs
+theories: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
+	$(MAKE) -f Makefile.coq
+
+%.vo: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
+	$(MAKE) -f Makefile.coq "$@"
+
+clean:
+	rm -f src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v 
+	$(MAKE) -f Makefile.coq clean
+	rm -f Makefile.coq

@@ -1,6 +1,0 @@
-Add LoadPath "~/Works/vellvm-legacy/lib/metalib-20090714".
-Add LoadPath "~/Works/vellvm-legacy/lib/compcert-1.9".
-Add LoadPath "~/Works/vellvm-legacy/lib/GraphBasics".
-Add LoadPath "~/Works/vellvm-legacy/src/Vellvm/".
-Add LoadPath "~/Works/vellvm-legacy/src/Vellvm/ott".
-Add LoadPath "~/Works/vellvm-legacy/src/Vellvm/Dominators".

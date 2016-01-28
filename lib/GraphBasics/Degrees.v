@@ -102,16 +102,16 @@ Fixpoint Out_neighborhood (x : Vertex) (v : V_set)
 Fixpoint neighborhood (x : Vertex) (v : V_set) (a : A_set)
  (g : Graph v a) {struct g} : V_list :=
   match g with
-  | G_empty => V_nil
-  | G_vertex v' a' g' x' _ => neighborhood x v' a' g'
-  | G_edge v' a' g' x' y' _ _ _ _ _ =>
+  | G_empty _ => V_nil
+  | G_vertex _ v' a' g' x' _ => neighborhood x v' a' g'
+  | G_edge _ v' a' g' x' y' _ _ _ _ _ =>
       if V_eq_dec eq_a_dec x x'
       then y' :: neighborhood x v' a' g'
       else
        if V_eq_dec eq_a_dec x y'
        then x' :: neighborhood x v' a' g'
        else neighborhood x v' a' g'
-  | G_eq v' _ a' _ _ _ g' => neighborhood x v' a' g'
+  | G_eq _ v' _ a' _ _ _ g' => neighborhood x v' a' g'
   end.
 
 Fixpoint In_degree (x : Vertex) (v : V_set) (a : A_set)
@@ -169,16 +169,16 @@ Qed.
 Fixpoint degree (x : Vertex) (v : V_set) (a : A_set)
  (g : Graph v a) {struct g} : nat :=
   match g with
-  | G_empty => 0
-  | G_vertex v' a' g' x' _ => degree x v' a' g'
-  | G_edge v' a' g' x' y' _ _ _ _ _ =>
+  | G_empty _ => 0
+  | G_vertex _ v' a' g' x' _ => degree x v' a' g'
+  | G_edge _ v' a' g' x' y' _ _ _ _ _ =>
       if V_eq_dec eq_a_dec x x'
       then S (degree x v' a' g')
       else
 	if V_eq_dec eq_a_dec x y'
 	then S (degree x v' a' g')
 	else degree x v' a' g'
-  | G_eq v' _ a' _ _ _ g' => degree x v' a' g'
+  | G_eq _ v' _ a' _ _ _ g' => degree x v' a' g'
   end.
 
 Lemma Degree_neighborhood :

@@ -1,15 +1,22 @@
-all:
-	make -C flocq
-	make -C ia32
-	make -C lib
-	make -C old
-	make -C common
-	make -C backend
+COQTHEORIES  := $(shell find . -name "*.v")
+COQMODULE    := compcert
+
+.PHONY: all theories clean
+
+all: theories
+
+Makefile.coq: Makefile $(COQTHEORIES)
+	(echo "-R . $(COQMODULE)"; \
+   echo "-R ../metalib metalib"; \
+   echo $(COQTHEORIES)) > _CoqProject
+	coq_makefile -f _CoqProject -o Makefile.coq
+
+theories: Makefile.coq
+	$(MAKE) -f Makefile.coq
+
+%.vo: Makefile.coq
+	$(MAKE) -f Makefile.coq "$@"
 
 clean:
-	make -C flocq clean
-	make -C ia32 clean
-	make -C lib clean
-	make -C old clean
-	make -C common clean
-	make -C backend clean
+	$(MAKE) -f Makefile.coq clean
+	rm -f Makefile.coq
