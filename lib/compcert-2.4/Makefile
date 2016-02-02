@@ -1,4 +1,5 @@
-COQTHEORIES  := $(shell find . -name "*.v")
+# COQTHEORIES  := $(shell find . -name "*.v")
+COQTHEORIES  := backend/*.v common/*.v flocq/Appli/*.v flocq/Calc/*.v flocq/Core/*.v flocq/Prop/*.v old/*.v lib/*.v ia32/Archi.v
 COQMODULE    := compcert
 
 .PHONY: all theories clean

@@ -63,10 +63,10 @@ Qed.
 
 Definition is_finite_pos0 (f: binary_float) : bool :=
   match f with
-  | B754_zero s => negb s
-  | B754_infinity _ => false
-  | B754_nan _ _ => false
-  | B754_finite _ _ _ _ => true
+  | B754_zero _ _ s => negb s
+  | B754_infinity _ _ _ => false
+  | B754_nan _ _ _ _ => false
+  | B754_finite _ _ _ _ _ _ => true
   end.
 
 Lemma Bsign_pos0:
@@ -122,19 +122,19 @@ Defined.
 
 Definition Bcompare (f1 f2: binary_float): option comparison :=
   match f1, f2 with
-    | B754_nan _ _,_ | _,B754_nan _ _ => None
-    | B754_infinity true, B754_infinity true
-    | B754_infinity false, B754_infinity false => Some Eq
-    | B754_infinity true, _ => Some Lt
-    | B754_infinity false, _ => Some Gt
-    | _, B754_infinity true => Some Gt
-    | _, B754_infinity false => Some Lt
-    | B754_finite true _ _ _, B754_zero _ => Some Lt
-    | B754_finite false _ _ _, B754_zero _ => Some Gt
-    | B754_zero _, B754_finite true _ _ _ => Some Gt
-    | B754_zero _, B754_finite false _ _ _ => Some Lt
-    | B754_zero _, B754_zero _ => Some Eq
-    | B754_finite s1 m1 e1 _, B754_finite s2 m2 e2 _ =>
+    | B754_nan _ _ _ _,_ | _,B754_nan _ _ _ _ => None
+    | B754_infinity _ _ true, B754_infinity _ _ true
+    | B754_infinity _ _ false, B754_infinity _ _ false => Some Eq
+    | B754_infinity _ _ true, _ => Some Lt
+    | B754_infinity _ _ false, _ => Some Gt
+    | _, B754_infinity _ _ true => Some Gt
+    | _, B754_infinity _ _ false => Some Lt
+    | B754_finite _ _ true _ _ _, B754_zero _ _ _ => Some Lt
+    | B754_finite _ _ false _ _ _, B754_zero _ _ _ => Some Gt
+    | B754_zero _ _ _, B754_finite _ _ true _ _ _ => Some Gt
+    | B754_zero _ _ _, B754_finite _ _ false _ _ _ => Some Lt
+    | B754_zero _ _ _, B754_zero _ _ _ => Some Eq
+    | B754_finite _ _ s1 m1 e1 _, B754_finite _ _ s2 m2 e2 _ =>
       match s1, s2 with
         | true, false => Some Lt
         | false, true => Some Gt
@@ -216,11 +216,11 @@ Qed.
 
 Definition Babs abs_nan (x: binary_float) : binary_float :=
   match x with
-  | B754_nan sx plx =>
+  | B754_nan _ _ sx plx =>
       let '(sres, plres) := abs_nan sx plx in B754_nan _ _ sres plres
-  | B754_infinity sx => B754_infinity _ _ false
-  | B754_finite sx mx ex Hx => B754_finite _ _ false mx ex Hx
-  | B754_zero sx => B754_zero _ _ false
+  | B754_infinity _ _ sx => B754_infinity _ _ false
+  | B754_finite _ _ sx mx ex Hx => B754_finite _ _ false mx ex Hx
+  | B754_zero _ _ sx => B754_zero _ _ false
   end.
 
 Theorem B2R_Babs :
@@ -843,10 +843,10 @@ Qed.
 
 Definition ZofB (f: binary_float): option Z :=
   match f with
-    | B754_finite s m (Zpos e) _ => Some (cond_Zopp s (Zpos m) * Zpower_pos radix2 e)%Z
-    | B754_finite s m 0 _ => Some (cond_Zopp s (Zpos m))
-    | B754_finite s m (Zneg e) _ => Some (cond_Zopp s (Zpos m / Zpower_pos radix2 e))%Z
-    | B754_zero _ => Some 0%Z
+    | B754_finite _ _ s m (Zpos e) _ => Some (cond_Zopp s (Zpos m) * Zpower_pos radix2 e)%Z
+    | B754_finite _ _ s m 0 _ => Some (cond_Zopp s (Zpos m))
+    | B754_finite _ _ s m (Zneg e) _ => Some (cond_Zopp s (Zpos m / Zpower_pos radix2 e))%Z
+    | B754_zero _ _ _ => Some 0%Z
     | _ => None
   end.
 
@@ -1099,7 +1099,8 @@ Proof.
 - revert H H0. fold emin. fold fexp. 
   set (x := B754_finite prec emax b0 m0 e1 e2). set (rx := B2R _ _ x). 
   set (y := B754_finite prec emax b m e e0). set (ry := B2R _ _ y).
-  rewrite (Rmult_comm ry rx). destruct Rlt_bool.
+  rewrite (Rmult_comm ry rx).
+  destruct (Rlt_bool (Rabs (round radix2 fexp (round_mode mode) (rx * ry))) (bpow radix2 emax)).
   + intros (A1 & A2 & A3) (B1 & B2 & B3).
     apply B2R_Bsign_inj; auto. rewrite <- B1 in A1. auto. 
     rewrite ! Bsign_FF2B. f_equal. f_equal. apply xorb_comm. apply Pos.mul_comm. apply Z.add_comm.
@@ -1152,9 +1153,9 @@ Definition Bexact_inverse_mantissa := Z.iter (prec - 1) xO xH.
 Remark Bexact_inverse_mantissa_value:
   Zpos Bexact_inverse_mantissa = 2 ^ (prec - 1).
 Proof.
-  assert (REC: forall n, Z.pos (nat_iter n xO xH) = 2 ^ (Z.of_nat n)).
+  assert (REC: forall n, Z.pos (iter_nat n _ xO xH) = 2 ^ (Z.of_nat n)).
   { induction n. reflexivity. 
-    simpl nat_iter. transitivity (2 * Z.pos (nat_iter n xO xH)). reflexivity. 
+    simpl iter_nat. transitivity (2 * Z.pos (iter_nat n _ xO xH)). reflexivity. 
     rewrite inj_S. rewrite IHn. unfold Z.succ. rewrite Zpower_plus by omega. 
     change (2 ^ 1) with 2. ring. }
   red in prec_gt_0_.
@@ -1165,7 +1166,7 @@ Qed.
 Remark Bexact_inverse_mantissa_digits2_Pnat:
   digits2_Pnat Bexact_inverse_mantissa = Z.to_nat (prec - 1).
 Proof.
-  assert (DIGITS: forall n, digits2_Pnat (nat_iter n xO xH) = n).
+  assert (DIGITS: forall n, digits2_Pnat (iter_nat n _ xO xH) = n).
   { induction n; simpl. auto. congruence. }
   red in prec_gt_0_.
   unfold Bexact_inverse_mantissa. rewrite iter_nat_of_Z by omega. rewrite DIGITS.
@@ -1187,7 +1188,7 @@ Qed.
 
 Program Definition Bexact_inverse (f: binary_float) : option binary_float :=
   match f with
-  | B754_finite s m e B =>
+  | B754_finite _ _ s m e B =>
       if positive_eq_dec m Bexact_inverse_mantissa then
       let e' := -e - (prec - 1) * 2 in
       if Z_le_dec emin e' then
@@ -1277,10 +1278,10 @@ Let binary_float2 := binary_float prec2 emax2.
 
 Definition Bconv (conv_nan: bool -> nan_pl prec1 -> bool * nan_pl prec2) (md: mode) (f: binary_float1) : binary_float2 :=
   match f with
-    | B754_nan s pl => let '(s, pl) := conv_nan s pl in B754_nan _ _ s pl
-    | B754_infinity s => B754_infinity _ _ s
-    | B754_zero s => B754_zero _ _ s
-    | B754_finite s m e _ => binary_normalize _ _ _ Hmax2 md (cond_Zopp s (Zpos m)) e s
+    | B754_nan _ _ s pl => let '(s, pl) := conv_nan s pl in B754_nan _ _ s pl
+    | B754_infinity _ _ s => B754_infinity _ _ s
+    | B754_zero _ _ s => B754_zero _ _ s
+    | B754_finite _ _ s m e _ => binary_normalize _ _ _ Hmax2 md (cond_Zopp s (Zpos m)) e s
   end.
 
 Theorem Bconv_correct:

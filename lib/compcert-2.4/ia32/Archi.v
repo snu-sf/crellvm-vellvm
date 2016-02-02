@@ -25,14 +25,18 @@ Definition big_endian := false.
 Notation align_int64 := 4%Z (only parsing).
 Notation align_float64 := 4%Z (only parsing).
 
+Require Import Arith.Wf_nat.
+
+
+
 Program Definition default_pl_64 : bool * nan_pl 53 := 
-  (true, nat_iter 51 xO xH).
+  (true, iter_nat 51 _ xO xH).
 
 Definition choose_binop_pl_64 (s1: bool) (pl1: nan_pl 53) (s2: bool) (pl2: nan_pl 53) :=
   false.                        (**r always choose first NaN *)
 
 Program Definition default_pl_32 : bool * nan_pl 24 := 
-  (true, nat_iter 22 xO xH).
+  (true, iter_nat 22 _ xO xH).
 
 Definition choose_binop_pl_32 (s1: bool) (pl1: nan_pl 24) (s2: bool) (pl2: nan_pl 24) :=
   false.                        (**r always choose first NaN *)

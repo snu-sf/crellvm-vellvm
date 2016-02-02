@@ -1,3 +1,5 @@
+OTT ?= ott
+
 COQMODULE    := Vellvm
 COQTHEORIES  := $(shell ls \
   lib/GraphBasics/*.v \

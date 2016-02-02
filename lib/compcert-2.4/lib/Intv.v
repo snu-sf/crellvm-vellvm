@@ -248,7 +248,7 @@ Next Obligation.
   destruct H2. congruence. auto. 
 Qed.
 Next Obligation.
-  exists wildcard'0; split; auto. omega.
+  exists wildcard'; split; auto. omega.
 Qed.
 Next Obligation.
   exists (hi - 1); split; auto. omega.
