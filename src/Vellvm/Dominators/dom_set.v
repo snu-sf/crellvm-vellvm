@@ -1275,7 +1275,7 @@ Proof.
     destruct R.
       symmetry in HeqR.
       remember (t !! l5) as R.
-      destruct R; simpl; auto with datatypes v62.
+      destruct R; try rewrite <- HeqR0; simpl; auto with datatypes v62.
         eapply dom_in_bound_blocks; eauto.
 
       rewrite AMap.gi. simpl. intros x Hin. inv Hin.
@@ -1309,7 +1309,8 @@ Proof.
       unfold transfer, DomDS.L.ge, DomDS.L.sub, Dominators.add in HeqR1.
       remember (t !! l') as R2.
       remember (t !! l3) as R3.
-      destruct R2 as [els2|]; destruct R3 as [els3|]; 
+      destruct R2 as [els2|]; destruct R3 as [els3|];
+      try rewrite <- HeqR2; try rewrite <- HeqR3;
         simpl; try solve [auto with datatypes v62 | tauto].
         symmetry in HeqR2.
         apply Hinbd in HeqR2. auto with datatypes v62.

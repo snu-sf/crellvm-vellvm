@@ -5,7 +5,9 @@ COQTHEORIES  := $(shell ls \
   lib/GraphBasics/*.v \
   src/Vellvm/*.v \
   src/Vellvm/Dominators/*.v \
-  src/Vellvm/ott/*.v)
+  src/Vellvm/ott/*.v) \
+	src/Vellvm/syntax_base.v \
+	src/Vellvm/typing_rules.v
 
 .PHONY: all metalib cpdtlib theories clean
 
@@ -14,7 +16,7 @@ all: metalib cpdtlib compcert theories
 Makefile.coq: Makefile $(COQTHEORIES)
 	(echo "-R . $(COQMODULE)"; \
    echo "-R lib/metalib metalib"; \
-   echo "-R lib/cpdtlib cpdtlib"; \
+   echo "-R lib/cpdtlib Cpdt"; \
    echo "-R lib/compcert-2.4 compcert"; \
    echo "-R lib/GraphBasics GraphBasics"; \
    echo $(COQTHEORIES)) > _CoqProject

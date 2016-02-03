@@ -814,12 +814,13 @@ Lemma a2p_reachable: forall pe p3 l3
   (Hget3: (PO_a2p PO) ! l3 = Some p3),
   PCfg.reachable (asuccs_psuccs (PO_a2p PO) asuccs) pe p3.
 Proof.
+  pose proof areachable__preachable as aux_ap.
   unfold cfg.reachable.
   intros.
   apply getEntryLabel__getEntryBlock in Hentry.
   destruct Hentry as [[le' []] [Hentry' Heq]]; simpl in Heq; subst le'.
-  rewrite Hentry' in Hreach. 
-  eapply areachable__preachable; eauto.
+  rewrite Hentry' in Hreach.
+  eapply aux_ap; eauto.
 Qed.
 
 Lemma reachable_isnt_bot: forall (l3 : l) (res : PMap.t LDoms.t) 
@@ -883,13 +884,14 @@ Lemma p2a_reachable: forall pe p3 l3
   (Hget3: (PO_a2p PO) ! l3 = Some p3),
   cfg.reachable f l3.
 Proof.
+  pose proof preachable__areachable as aux_ap.
   intros.
   unfold cfg.reachable.
   apply getEntryLabel__getEntryBlock in Hentry.
   destruct Hentry as [be [Hentry' Heq]].
   rewrite Hentry'.
   destruct be as [le' ? ? ?]; simpl in Heq; subst le'.
-  eapply preachable__areachable; eauto.
+  eapply aux_ap; eauto.
 Qed.
 
 Lemma reachable_isnt_bot': forall (l3: l) (pe : positive)

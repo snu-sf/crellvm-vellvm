@@ -479,7 +479,7 @@ Lemma wf_const_ind2 : forall s td c t,
   wf_const s td c t -> P s td c t.
 Proof.
   apply wf_const_ind; auto; unfold Size.to_nat in *;
-    guess_hyp convert_context.
+    guess_hyp2 convert_context.
 Qed.
 
 Lemma wf_const_list_ind2 : forall l,
@@ -621,7 +621,7 @@ Ltac convert_context :=
 Lemma wf_styp_ind2 :
   forall s td t, wf_styp s td t -> P s td t.
 Proof.
-  apply wf_styp_ind; auto; guess_hyp convert_context.
+  apply wf_styp_ind; auto; guess_hyp2 convert_context.
 Qed.
 
 Lemma wf_styp_list_ind2 :

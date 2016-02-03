@@ -358,7 +358,7 @@ Module MergeLt <: MERGE.
   
       uniq_result.
       revert Hmerge. unfold_merge_aux.
-      remember (Pos.compare_cont Xd Yd Eq) as Cmp.
+      remember (Pos.compare_cont Eq Xd Yd) as Cmp.
       intro.
       destruct Cmp; subst.
         apply Hrec with (y:=(length Xsdms + length Ysdms)%nat) in Hmerge; 
@@ -447,7 +447,7 @@ Module MergeLt <: MERGE.
   
       revert Hmerge. unfold_merge_aux. intro.
       revert Hmerge'. unfold_merge_aux. intro.
-      remember (Pos.compare_cont Xd Yd Eq) as Cmp.
+      remember (Pos.compare_cont Eq Xd Yd) as Cmp.
       destruct Cmp; subst.
         uniq_result'.
         symmetry in HeqCmp. apply Pcompare_Eq_eq in HeqCmp. subst Yd.
@@ -520,7 +520,7 @@ Module MergeLt <: MERGE.
       compute. auto.
 
       unfold merge. unfold_merge_aux.
-      replace (Pos.compare_cont x p Eq) with Gt.
+      replace (Pos.compare_cont Eq x p) with Gt.
       erewrite merge_aux_refl_aux; eauto.
       simpl_env.
       rewrite rev_involutive. auto.
@@ -553,7 +553,7 @@ Module MergeLt <: MERGE.
 
       inv Hsortx. inv Hsorty.
       revert Hmerge. unfold_merge_aux. intro.
-      remember (Pos.compare_cont Xd Yd Eq) as Cmp.
+      remember (Pos.compare_cont Eq Xd Yd) as Cmp.
       destruct Cmp; subst; symmetry in HeqCmp.
       Case "1".
         uniq_result'.

@@ -188,7 +188,8 @@ Lemma sdom_is_sound : forall
   (HBinF : blockInFdefB (l3, s3) f = true)
   (Hin : l' `in` (adom.sdom f l3)),
   f |= l' >> l3.
-Proof. 
+Proof.
+  pose proof dom_is_sound as aux_dom_is_sound.
   intros.
   eapply dom_is_sound with (l':=l') in HBinF; simpl; eauto.
   unfold strict_domination, domination in *.
@@ -219,9 +220,7 @@ Proof.
           destruct f. eapply adom.dom_successors; eauto.
         simpl in Hin.
         apply Hinc; auto.
-      eapply dom_is_sound in J; try solve [eauto 1 | congruence].
-      unfold domination in J.
-      rewrite <- HeqR in J.
+      eapply aux_dom_is_sound in J; try solve [eauto 1 | congruence].
       assert (Hw:=H).
       apply D_path_isa_walk in Hw.
       apply J in Hw.

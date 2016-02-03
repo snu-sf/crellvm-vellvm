@@ -145,22 +145,25 @@ Lemma dom_acyclic: forall (l1 l2:l)
   (H: f ~>* l2) (H0: f |= l1 >> l2),
   ~ f |= l2 >>= l1.
 Proof.
+  pose proof entry_has_no_preds as aux_ehnp.
   unfold_cfg f.
-  eapply ACfg.dom_acyclic; eauto using entry_has_no_preds.
+  eapply ACfg.dom_acyclic; eauto.
 Qed.
 
 Lemma sdom_tran1: forall (l1 l2 l3:l),
   f |= l1 >> l2 -> f |= l2 >>= l3 -> f |= l1 >> l3.
 Proof.
+  pose proof entry_has_no_preds as aux_ehnp.
   unfold_cfg f.
-  eapply ACfg.sdom_tran1; eauto using entry_has_no_preds.
+  eapply ACfg.sdom_tran1; eauto.
 Qed.
 
 Lemma sdom_tran2: forall (l1 l2 l3:l),
   f |= l1 >>= l2 -> f |= l2 >> l3 -> f |= l1 >> l3.
 Proof.
+  pose proof entry_has_no_preds as aux_ehnp.
   unfold_cfg f.
-  eapply ACfg.sdom_tran2; eauto using entry_has_no_preds.
+  eapply ACfg.sdom_tran2; eauto.
 Qed.
 
 Lemma sdom_tran: forall (l1 l2 l3:l),
@@ -190,8 +193,9 @@ Lemma idom_injective: forall p l1 l2
   (Hdec : f |= l1 >> l2 \/ f |= l2 >> l1),
   False.
 Proof.
+  pose proof entry_has_no_preds as aux_ehnp.
   unfold_cfg f.
-  eapply ACfg.idom_injective in Hdec; eauto using entry_has_no_preds.
+  eapply ACfg.idom_injective in Hdec; eauto.
 Qed.
 
 End dom_acyclic_tran.
