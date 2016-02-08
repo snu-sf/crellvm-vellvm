@@ -17,6 +17,7 @@ Require Import typings.
 Require Import events.
 Require Import external_intrinsics.
 Require Import genericvalues_inject.
+Require Import static.
 
 (*************************************************************)
 (* The operational semantics of Vellvm                       *)
@@ -30,27 +31,38 @@ Import LLVMtypings.
 (* GenericValues represent dynamic values at runtime. We provide
    different styles of semantics that have different definitions of
    dynamic values. The following defines their signatures. *)
-Structure GenericValues := mkGVs {
-(* The type of GenericValues *)
-GVsT : Type;
+Module GenericValue_helper.
 (* instantiate_gvs gv gvs ensures that gvs includes gv. *) 
-instantiate_gvs : GenericValue -> GVsT -> Prop;
+Definition instantiate_gvs : GenericValue -> GenericValue -> Prop := fun gv1 gv2 => gv1 = gv2.
 (* inhabited gvs ensures that gvs is not empty. *)
-inhabited : GVsT -> Prop;
+Definition inhabited : GenericValue -> Prop := fun _ => True.
+
+Hint Unfold inhabited instantiate_gvs.
+
 (* cgv2gvs cgv t converts the constant cgv to GenericValues w.r.t type t. *)
-cgv2gvs : GenericValue -> typ -> GVsT;
+Definition cgv2gvs : GenericValue -> typ -> GenericValue := LLVMgv.cgv2gv.
 (* gv2gvs gv t converts gv to GenericValues in terms of type t. *)
-gv2gvs : GenericValue -> typ -> GVsT;
+Definition gv2gvs : GenericValue -> typ -> GenericValue := fun gv _ => gv.
 (* f is a unary operation of gv, lift_op1 f returns a unary operation of 
    GenericValues. *)
-lift_op1 : (GenericValue -> option GenericValue) -> GVsT -> typ -> option GVsT;
+
+Notation "gv @ gvs" :=
+  (instantiate_gvs gv gvs) (at level 43, right associativity).
+Notation "$ gv # t $" := (gv2gvs gv t) (at level 41).
+
+
+Definition lift_op1 : (GenericValue -> option GenericValue) -> GenericValue -> typ -> option GenericValue :=
+fun (f: GenericValue -> option GenericValue) (gvs1:GenericValue) (ty:typ) => f gvs1.
 (* f is a binary operation of gv, lift_op2 f returns a binary operation of 
    GenericValues. *)
-lift_op2 : (GenericValue -> GenericValue -> option GenericValue) ->
-  GVsT -> GVsT -> typ -> option GVsT;
+Definition lift_op2 : (GenericValue -> GenericValue -> option GenericValue) ->
+  GenericValue -> GenericValue -> typ -> option GenericValue :=
+fun (f: GenericValue -> GenericValue -> option GenericValue)
+  (gvs1 gvs2:GenericValue) (ty: typ) => f gvs1 gvs2.
 (* All values in (cgv2gvs cgv t) are of type size t, match type t, and non-empty.
  *)
-cgv2gvs__getTypeSizeInBits : forall S los nts gv t sz al gv',
+
+Lemma cgv2gvs__getTypeSizeInBits : forall S los nts gv t sz al gv',
   wf_typ S (los,nts) t ->
   _getTypeSizeInBits_and_Alignment los
     (getTypeSizeInBits_and_Alignment_for_namedts (los,nts) true) true t =
@@ -58,56 +70,99 @@ cgv2gvs__getTypeSizeInBits : forall S los nts gv t sz al gv',
   Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz) 8) = sizeGenericValue gv ->
   instantiate_gvs gv' (cgv2gvs gv t) ->
   Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz) 8) =
-    sizeGenericValue gv';
+    sizeGenericValue gv'.
+Proof.
+  unfold instantiate_gvs.
+  intros. inv H2.
+  eapply cgv2gv__getTypeSizeInBits; eauto.
+Qed.
 
-cgv2gvs__matches_chunks : forall S los nts gv t gv',
+Definition cundef_gvs := LLVMgv.cundef_gv.
+
+Lemma cundef_gvs__matches_chunks : forall S los nts gv ty gv',
+  wf_typ S (los,nts) ty ->
+  gv_chunks_match_typ (los, nts) gv ty ->
+  instantiate_gvs gv' (cundef_gvs gv ty) ->
+  gv_chunks_match_typ (los, nts) gv' ty.
+Proof.
+  unfold instantiate_gvs.
+  intros. subst.
+  eapply cundef_gv__matches_chunks; eauto.
+Qed.
+
+Lemma cgv2gvs__matches_chunks : forall S los nts gv t gv',
   wf_typ S (los,nts) t ->
   gv_chunks_match_typ (los, nts) gv t ->
   instantiate_gvs gv' (cgv2gvs gv t) ->
-  gv_chunks_match_typ (los, nts) gv' t;
+  gv_chunks_match_typ (los, nts) gv' t.
+Proof.
+  unfold instantiate_gvs.
+  intros. subst. unfold cgv2gvs.
+  destruct gv; auto.
+  destruct p as [[]]; auto. 
+  destruct gv; auto.
+  eapply cundef_gvs__matches_chunks; eauto.
+Qed.
 
-cgv2gvs__inhabited : forall gv t, inhabited (cgv2gvs gv t);
+Lemma cgv2gvs__inhabited : forall gv t, inhabited (cgv2gvs gv t).
+Proof. auto. Qed.
+
 (* All values in (gv2gvs gv t) are of type size t, match type t, and non-empty.
  *)
-gv2gvs__getTypeSizeInBits : forall S los nts gv t sz al,
+Lemma gv2gvs__getTypeSizeInBits : forall S los nts gv t sz al,
   wf_typ S (los,nts) t ->
   _getTypeSizeInBits_and_Alignment los
     (getTypeSizeInBits_and_Alignment_for_namedts (los,nts) true) true t =
       Some (sz, al) ->
   Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz) 8) = sizeGenericValue gv ->
   forall gv', instantiate_gvs gv' (gv2gvs gv t) ->
-  sizeGenericValue gv' = Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz) 8);
+  sizeGenericValue gv' = Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz) 8).
+Proof.
+  unfold instantiate_gvs.
+  intros. inv H2. auto.
+Qed.
 
-gv2gvs__matches_chunks : forall S los nts gv t,
+
+Lemma gv2gvs__matches_chunks : forall S los nts gv t,
   wf_typ S (los,nts) t ->
   gv_chunks_match_typ (los, nts) gv t ->
   forall gv', instantiate_gvs gv' (gv2gvs gv t) ->
-  gv_chunks_match_typ (los, nts) gv' t;
+  gv_chunks_match_typ (los, nts) gv' t.
+Proof.
+  unfold instantiate_gvs.
+  intros. subst. auto.
+Qed.
 
-gv2gvs__inhabited : forall gv t, inhabited (gv2gvs gv t);
+Lemma gv2gvs__inhabited : forall gv t, inhabited (gv2gvs gv t).
+Proof. auto. Qed.
+
 (* lift_op1 and lift_op2 preserve inhabitedness, totalness, type size, and 
    chunks. *)
-lift_op1__inhabited : forall f gvs1 t gvs2
+Lemma lift_op1__inhabited : forall f gvs1 t gvs2
   (H:forall x, exists z, f x = Some z),
   inhabited gvs1 ->
   lift_op1 f gvs1 t = Some gvs2 ->
-  inhabited gvs2;
+  inhabited gvs2.
+Proof. auto. Qed.
 
-lift_op2__inhabited : forall f gvs1 gvs2 t gvs3
+Lemma lift_op2__inhabited : forall f gvs1 gvs2 t gvs3
   (H:forall x y, exists z, f x y = Some z),
   inhabited gvs1 -> inhabited gvs2 ->
   lift_op2 f gvs1 gvs2 t = Some gvs3 ->
-  inhabited gvs3;
+  inhabited gvs3.
+Proof. auto. Qed.
 
-lift_op1__isnt_stuck : forall f gvs1 t
+Lemma lift_op1__isnt_stuck : forall f gvs1 t
   (H:forall x, exists z, f x = Some z),
-  exists gvs2, lift_op1 f gvs1 t = Some gvs2;
+  exists gvs2, lift_op1 f gvs1 t = Some gvs2.
+Proof. unfold lift_op1. auto. Qed.
 
-lift_op2__isnt_stuck : forall f gvs1 gvs2 t
+Lemma lift_op2__isnt_stuck : forall f gvs1 gvs2 t
   (H:forall x y, exists z, f x y = Some z),
-  exists gvs3, lift_op2 f gvs1 gvs2 t = Some gvs3;
+  exists gvs3, lift_op2 f gvs1 gvs2 t = Some gvs3.
+Proof. unfold lift_op2. auto. Qed.
 
-lift_op1__getTypeSizeInBits : forall S los nts f g t sz al gvs,
+Lemma lift_op1__getTypeSizeInBits : forall S los nts f g t sz al gvs,
   wf_typ S (los,nts) t ->
   _getTypeSizeInBits_and_Alignment los
     (getTypeSizeInBits_and_Alignment_for_namedts (los,nts) true) true t =
@@ -117,9 +172,10 @@ lift_op1__getTypeSizeInBits : forall S los nts f g t sz al gvs,
   lift_op1 f g t = Some gvs ->
   forall gv : GenericValue,
   instantiate_gvs gv gvs ->
-  sizeGenericValue gv = nat_of_Z (ZRdiv (Z_of_nat sz) 8);
+  sizeGenericValue gv = nat_of_Z (ZRdiv (Z_of_nat sz) 8).
+Proof. intros. unfold lift_op1 in H2. inv H3. eauto. Qed.
 
-lift_op2__getTypeSizeInBits : forall S los nts f g1 g2 t sz al gvs,
+Lemma lift_op2__getTypeSizeInBits : forall S los nts f g1 g2 t sz al gvs,
   wf_typ S (los,nts) t ->
   _getTypeSizeInBits_and_Alignment los
     (getTypeSizeInBits_and_Alignment_for_namedts (los,nts) true) true t =
@@ -130,18 +186,20 @@ lift_op2__getTypeSizeInBits : forall S los nts f g1 g2 t sz al gvs,
   lift_op2 f g1 g2 t = Some gvs ->
   forall gv : GenericValue,
   instantiate_gvs gv gvs ->
-  sizeGenericValue gv = nat_of_Z (ZRdiv (Z_of_nat sz) 8);
+  sizeGenericValue gv = nat_of_Z (ZRdiv (Z_of_nat sz) 8).
+Proof. intros. unfold lift_op2 in H2. inv H3. eauto. Qed.
 
-lift_op1__matches_chunks : forall S los nts f g t gvs,
+Lemma lift_op1__matches_chunks : forall S los nts f g t gvs,
   wf_typ S (los,nts) t ->
   (forall x y, instantiate_gvs x g -> f x = Some y ->
    gv_chunks_match_typ (los, nts) y t) ->
   lift_op1 f g t = Some gvs ->
   forall gv : GenericValue,
   instantiate_gvs gv gvs ->
-  gv_chunks_match_typ (los, nts) gv t;
+  gv_chunks_match_typ (los, nts) gv t.
+Proof. intros. unfold lift_op1 in H1. inv H2. eauto. Qed.
 
-lift_op2__matches_chunks : forall S los nts f g1 g2 t gvs,
+Lemma lift_op2__matches_chunks : forall S los nts f g1 g2 t gvs,
   wf_typ S (los,nts) t ->
   (forall x y z,
    instantiate_gvs x g1 -> instantiate_gvs y g2 -> f x y = Some z ->
@@ -149,18 +207,30 @@ lift_op2__matches_chunks : forall S los nts f g1 g2 t gvs,
   lift_op2 f g1 g2 t = Some gvs ->
   forall gv : GenericValue,
   instantiate_gvs gv gvs ->
-  gv_chunks_match_typ (los, nts) gv t;
-(* Inhabited values are not empty. *)
-inhabited_inv : forall gvs, inhabited gvs -> exists gv, instantiate_gvs gv gvs;
-(* gv is in (gv2gvs gv t). *)
-instantiate_gv__gv2gvs : forall gv t, instantiate_gvs gv (gv2gvs gv t);
-(* If gv's is not undefined, (gv2gvs gv' t) only includes gv'. *)
-none_undef2gvs_inv : forall gv gv' t,
-  instantiate_gvs gv (gv2gvs gv' t) -> (forall mc, (Vundef, mc)::nil <> gv') ->
-  gv = gv'
-}.
+  gv_chunks_match_typ (los, nts) gv t.
+Proof. intros. unfold lift_op2 in H1. inv H2. eauto. Qed.
 
-Global Opaque GVsT gv2gvs instantiate_gvs inhabited cgv2gvs lift_op1 lift_op2.
+
+(* Inhabited values are not empty. *)
+Lemma inhabited_inv : forall gvs, inhabited gvs -> exists gv, instantiate_gvs gv gvs.
+Proof. eauto. Qed.
+
+(* gv is in (gv2gvs gv t). *)
+Lemma instantiate_gv__gv2gvs : forall gv t, instantiate_gvs gv (gv2gvs gv t).
+Proof. auto. Qed.
+
+(* If gv's is not undefined, (gv2gvs gv' t) only includes gv'. *)
+Lemma none_undef2gvs_inv : forall gv gv' t,
+  instantiate_gvs gv (gv2gvs gv' t) -> (forall mc, (Vundef, mc)::nil <> gv') ->
+  gv = gv'.
+Proof.
+  intros.
+  destruct gv'; try solve [inv H; auto].
+Qed.
+
+End GenericValue_helper.
+
+(* Global Opaque GVsT gv2gvs instantiate_gvs inhabited cgv2gvs lift_op1 lift_op2. *)
 
 Module OpsemAux.
 
@@ -383,30 +453,27 @@ Export OpsemAux.
 
 Section Opsem.
 
-Context `{GVsSig : GenericValues}.
-
-Notation GVs := GVsSig.(GVsT).
-Definition GVsMap := list (id * GVs).
+Definition GVsMap := list (id * GenericValue).
 Notation "gv @ gvs" :=
-  (GVsSig.(instantiate_gvs) gv gvs) (at level 43, right associativity).
-Notation "$ gv # t $" := (GVsSig.(gv2gvs) gv t) (at level 41).
+  (GenericValue_helper.instantiate_gvs gv gvs) (at level 43, right associativity).
+Notation "$ gv # t $" := (GenericValue_helper.gv2gvs gv t) (at level 41).
 
-Definition in_list_gvs (l1 : list GenericValue) (l2 : list GVs) : Prop :=
-List.Forall2 GVsSig.(instantiate_gvs) l1 l2.
+Definition in_list_gvs (l1 : list GenericValue) (l2 : list GenericValue) : Prop :=
+List.Forall2 GenericValue_helper.instantiate_gvs l1 l2.
 
 Notation "vidxs @@ vidxss" := (in_list_gvs vidxs vidxss)
   (at level 43, right associativity).
 
 (* Compute the semantic value of a constant. *)
-Definition const2GV (TD:TargetData) (gl:GVMap) (c:const) : option GVs :=
+Definition const2GV (TD:TargetData) (gl:GVMap) (c:const) : option GenericValue :=
 match (_const2GV TD gl c) with
 | None => None
-| Some (gv, ty) => Some (GVsSig.(cgv2gvs) gv ty)
+| Some (gv, ty) => Some (GenericValue_helper.cgv2gvs gv ty)
 end.
 
 (* Compute the semantic value of a program value. *)
 Definition getOperandValue (TD:TargetData) (v:value) (locals:GVsMap)
-  (globals:GVMap) : option GVs :=
+  (globals:GVMap) : option GenericValue :=
 match v with
 | value_id id => lookupAL _ locals id
 | value_const c => const2GV TD globals c
@@ -437,7 +504,7 @@ Mem                : mem
   function computes the definitions of PNs. *)
 Fixpoint getIncomingValuesForBlockFromPHINodes (TD:TargetData)
   (PNs:list phinode) (b:block) (globals:GVMap) (locals:GVsMap) :
-  option (list (id*GVs)) :=
+  option (list (id*GenericValue)) :=
 match PNs with
 | nil => Some nil
 | (insn_phi id0 t vls)::PNs =>
@@ -454,7 +521,7 @@ match PNs with
 end.
 
 (* Update locals in terms of the mapping ResultValues. *)
-Fixpoint updateValuesForNewBlock (ResultValues:list (id*GVs)) (locals:GVsMap)
+Fixpoint updateValuesForNewBlock (ResultValues:list (id*GenericValue)) (locals:GVsMap)
   : GVsMap :=
 match ResultValues with
 | nil => locals
@@ -475,7 +542,7 @@ Definition switchToNewBasicBlock(TD:TargetData) (Dest:block)
 (* When a program calls a function with parameters lp, the following computes the
    runtime values of lp. *)
 Fixpoint params2GVs (TD:TargetData) (lp:params) (locals:GVsMap) (globals:GVMap) :
- option (list GVs) :=
+ option (list GenericValue) :=
 match lp with
 | nil => Some nil
 | (_, v)::lp' =>
@@ -513,7 +580,7 @@ Definition returnUpdateLocals (TD:TargetData) (c':cmd) (Result:value)
   | Some gr =>
       match c' with
       | insn_call id0 false _ ct _ _ _ =>
-           match (GVsSig.(lift_op1) (fit_gv TD ct) gr ct) with
+           match (GenericValue_helper.lift_op1 (fit_gv TD ct) gr ct) with
            | Some gr' => Some (updateAddAL _ lc' id0 gr')
            | _ => None
            end
@@ -525,7 +592,7 @@ Definition returnUpdateLocals (TD:TargetData) (c':cmd) (Result:value)
 
 (* Convert the list of values of GEP into runtime values. *)
 Fixpoint values2GVs (TD:TargetData) (lv:list (sz * value)) (locals:GVsMap)
-  (globals:GVMap) : option (list GVs):=
+  (globals:GVMap) : option (list GenericValue):=
 match lv with
 | nil => Some nil
 | (_, v) :: lv' =>
@@ -544,12 +611,12 @@ end.
    When la and lg do not match, for example, calling a function with the wrong
    signature, it returns none.
 *)
-Fixpoint _initializeFrameValues TD (la:args) (lg:list GVs) (locals:GVsMap)
+Fixpoint _initializeFrameValues TD (la:args) (lg:list GenericValue) (locals:GVsMap)
   : option GVsMap :=
 match (la, lg) with
 | (((t, _), id)::la', g::lg') =>
   match _initializeFrameValues TD la' lg' locals,
-        GVsSig.(lift_op1) (fit_gv TD t) g t with
+        GenericValue_helper.lift_op1 (fit_gv TD t) g t with
   | Some lc', Some gv => Some (updateAddAL _ lc' id gv)
   | _, _ => None
   end
@@ -562,92 +629,92 @@ match (la, lg) with
 | _ => Some locals
 end.
 
-Definition initLocals TD (la:args) (lg:list GVs): option GVsMap :=
+Definition initLocals TD (la:args) (lg:list GenericValue): option GVsMap :=
 _initializeFrameValues TD la lg nil.
 
 (* Operations *)
 Definition BOP (TD:TargetData) (lc:GVsMap) (gl:GVMap) (op:bop) (bsz:sz)
-  (v1 v2:value) : option GVs :=
+  (v1 v2:value) : option GenericValue :=
 match (getOperandValue TD v1 lc gl, getOperandValue TD v2 lc gl) with
 | (Some gvs1, Some gvs2) =>
-    GVsSig.(lift_op2) (mbop TD op bsz) gvs1 gvs2 (typ_int bsz)
+    GenericValue_helper.lift_op2 (mbop TD op bsz) gvs1 gvs2 (typ_int bsz)
 | _ => None
 end
 .
 
 Definition FBOP (TD:TargetData) (lc:GVsMap) (gl:GVMap) (op:fbop) fp
-  (v1 v2:value) : option GVs :=
+  (v1 v2:value) : option GenericValue :=
 match (getOperandValue TD v1 lc gl, getOperandValue TD v2 lc gl) with
 | (Some gvs1, Some gvs2) =>
-    GVsSig.(lift_op2) (mfbop TD op fp) gvs1 gvs2 (typ_floatpoint fp)
+    GenericValue_helper.lift_op2 (mfbop TD op fp) gvs1 gvs2 (typ_floatpoint fp)
 | _ => None
 end
 .
 
 Definition ICMP (TD:TargetData) (lc:GVsMap) (gl:GVMap) c t (v1 v2:value)
-  : option GVs :=
+  : option GenericValue :=
 match (getOperandValue TD v1 lc gl, getOperandValue TD v2 lc gl) with
 | (Some gvs1, Some gvs2) =>
-    GVsSig.(lift_op2) (micmp TD c t) gvs1 gvs2 (typ_int Size.One)
+    GenericValue_helper.lift_op2 (micmp TD c t) gvs1 gvs2 (typ_int Size.One)
 | _ => None
 end
 .
 
 Definition FCMP (TD:TargetData) (lc:GVsMap) (gl:GVMap) c fp (v1 v2:value)
-  : option GVs :=
+  : option GenericValue :=
 match (getOperandValue TD v1 lc gl, getOperandValue TD v2 lc gl) with
 | (Some gvs1, Some gvs2) =>
-    GVsSig.(lift_op2) (mfcmp TD c fp) gvs1 gvs2 (typ_int Size.One)
+    GenericValue_helper.lift_op2 (mfcmp TD c fp) gvs1 gvs2 (typ_int Size.One)
 | _ => None
 end
 .
 
 Definition CAST (TD:TargetData) (lc:GVsMap) (gl:GVMap) (op:castop)
-  (t1:typ) (v1:value) (t2:typ) : option GVs:=
+  (t1:typ) (v1:value) (t2:typ) : option GenericValue:=
 match (getOperandValue TD v1 lc gl) with
-| (Some gvs1) => GVsSig.(lift_op1) (mcast TD op t1 t2) gvs1 t2
+| (Some gvs1) => GenericValue_helper.lift_op1 (mcast TD op t1 t2) gvs1 t2
 | _ => None
 end
 .
 
 Definition TRUNC (TD:TargetData) (lc:GVsMap) (gl:GVMap) (op:truncop)
-  (t1:typ) (v1:value) (t2:typ) : option GVs:=
+  (t1:typ) (v1:value) (t2:typ) : option GenericValue:=
 match (getOperandValue TD v1 lc gl) with
-| (Some gvs1) => GVsSig.(lift_op1) (mtrunc TD op t1 t2) gvs1 t2
+| (Some gvs1) => GenericValue_helper.lift_op1 (mtrunc TD op t1 t2) gvs1 t2
 | _ => None
 end
 .
 
 Definition EXT (TD:TargetData) (lc:GVsMap) (gl:GVMap) (op:extop)
-  (t1:typ) (v1:value) (t2:typ) : option GVs:=
+  (t1:typ) (v1:value) (t2:typ) : option GenericValue:=
 match (getOperandValue TD v1 lc gl) with
-| (Some gvs1) => GVsSig.(lift_op1) (mext TD op t1 t2) gvs1 t2
+| (Some gvs1) => GenericValue_helper.lift_op1 (mext TD op t1 t2) gvs1 t2
 | _ => None
 end
 .
 
-Definition GEP (TD:TargetData) (ty:typ) (mas:GVs) (vidxs:list GenericValue)
-  (inbounds:bool) ty' : option GVs :=
-GVsSig.(lift_op1) (gep TD ty vidxs inbounds ty') mas (typ_pointer ty').
+Definition GEP (TD:TargetData) (ty:typ) (mas:GenericValue) (vidxs:list GenericValue)
+  (inbounds:bool) ty' : option GenericValue :=
+GenericValue_helper.lift_op1 (gep TD ty vidxs inbounds ty') mas (typ_pointer ty').
 
-Definition extractGenericValue (TD:TargetData) (t:typ) (gvs : GVs)
-  (cidxs : list const) : option GVs :=
+Definition extractGenericValue (TD:TargetData) (t:typ) (gvs : GenericValue)
+  (cidxs : list const) : option GenericValue :=
 match (intConsts2Nats TD cidxs) with
 | None => None
 | Some idxs =>
   match (mgetoffset TD t idxs) with
-  | Some (o, t') => GVsSig.(lift_op1) (mget' TD o t') gvs t'
+  | Some (o, t') => GenericValue_helper.lift_op1 (mget' TD o t') gvs t'
   | None => None
   end
 end.
 
-Definition insertGenericValue (TD:TargetData) (t:typ) (gvs:GVs)
-  (cidxs:list const) (t0:typ) (gvs0:GVs) : option GVs :=
+Definition insertGenericValue (TD:TargetData) (t:typ) (gvs:GenericValue)
+  (cidxs:list const) (t0:typ) (gvs0:GenericValue) : option GenericValue :=
 match (intConsts2Nats TD cidxs) with
 | None => None
 | Some idxs =>
   match (mgetoffset TD t idxs) with
-  | Some (o, _) => GVsSig.(lift_op2) (mset' TD o t t0) gvs gvs0 t
+  | Some (o, _) => GenericValue_helper.lift_op2 (mset' TD o t t0) gvs gvs0 t
   | None => None
   end
 end.
@@ -907,7 +974,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
 
 (* Given the entry of main with input Args, the following initializes the 
    program S. *)
-Definition s_genInitState (S:system) (main:id) (Args:list GVs) (initmem:mem)
+Definition s_genInitState (S:system) (main:id) (Args:list GenericValue) (initmem:mem)
   : option (Config * State) :=
 match (lookupFdefViaIDFromSystem S main) with
 | None => None
@@ -956,7 +1023,7 @@ match (lookupFdefViaIDFromSystem S main) with
 end.
 
 (* Return the final result if state is a final state. *)
-Definition s_isFinialState (cfg:Config) (state:State) : option GVs :=
+Definition s_isFinialState (cfg:Config) (state:State) : option GenericValue :=
 match state with
 | (mkState (mkEC _ _ nil (insn_return_void _) _ _) nil Mem ) => 
     (* This case cannot be None at any context. *)
@@ -1024,8 +1091,8 @@ CoInductive sop_wf_diverges (cfg:Config): Measure -> State -> traceinf -> Prop:=
 End SOP_WF_DIVERGES.
 
 (* A program terminates if its initial state reaches a final state. *)
-Inductive s_converges : system -> id -> list GVs -> trace -> GVs -> Prop :=
-| s_converges_intro : forall (s:system) (main:id) (VarArgs:list GVs)    
+Inductive s_converges : system -> id -> list GenericValue -> trace -> GenericValue -> Prop :=
+| s_converges_intro : forall (s:system) (main:id) (VarArgs:list GenericValue)    
                               cfg (IS FS:Opsem.State) r tr,
   s_genInitState s main VarArgs Mem.empty = Some (cfg, IS) ->
   sop_star cfg IS FS tr ->
@@ -1034,8 +1101,8 @@ Inductive s_converges : system -> id -> list GVs -> trace -> GVs -> Prop :=
 .
 
 (* A program non-terminates if its initial state diverges. *)
-Inductive s_diverges : system -> id -> list GVs -> traceinf -> Prop :=
-| s_diverges_intro : forall (s:system) (main:id) (VarArgs:list GVs)
+Inductive s_diverges : system -> id -> list GenericValue -> traceinf -> Prop :=
+| s_diverges_intro : forall (s:system) (main:id) (VarArgs:list GenericValue)
                              cfg (IS:State) tr,
   s_genInitState s main VarArgs Mem.empty = Some (cfg, IS) ->
   sop_diverges cfg IS tr ->
@@ -1047,8 +1114,8 @@ Definition stuck_state (cfg:OpsemAux.Config) (st:State) : Prop :=
 ~ exists st', exists tr, sInsn cfg st st' tr.
 
 (* A program terminates if its initial state reaches a non-final stuck state. *)
-Inductive s_goeswrong : system -> id -> list GVs -> trace -> State -> Prop :=
-| s_goeswrong_intro : forall (s:system) (main:id) (VarArgs:list GVs)
+Inductive s_goeswrong : system -> id -> list GenericValue -> trace -> State -> Prop :=
+| s_goeswrong_intro : forall (s:system) (main:id) (VarArgs:list GenericValue)
                               cfg (IS FS:State) tr,
   s_genInitState s main VarArgs Mem.empty = Some (cfg, IS) ->
   sop_star cfg IS FS tr ->
@@ -1069,7 +1136,7 @@ Definition callUpdateLocals (TD:TargetData) rt (noret:bool) (rid:id)
         | Some Result =>
           match getOperandValue TD Result lc' gl with
           | Some gr =>
-              match (GVsSig.(lift_op1) (fit_gv TD rt) gr rt) with
+              match (GenericValue_helper.lift_op1 (fit_gv TD rt) gr rt) with
               | Some gr' => Some (updateAddAL _ lc rid gr')
               | None => None
               end
@@ -1384,7 +1451,7 @@ with bFdefInf : value -> typ -> params -> system -> TargetData -> products ->
 .
 
 (* Initial states *)
-Definition b_genInitState (S:system) (main:id) (Args:list GVs) (initmem:mem)
+Definition b_genInitState (S:system) (main:id) (Args:list GenericValue) (initmem:mem)
   : option (bConfig * bExecutionContext) :=
 match s_genInitState S main Args initmem with
 | Some (mkCfg S0 TD Ps gl fs, mkState (mkEC F B cs tmn lc als) nil M) =>
@@ -1393,7 +1460,7 @@ match s_genInitState S main Args initmem with
 end.
 
 (* Final states *)
-Definition b_isFinialState (cfg:bConfig) (ec:bExecutionContext) : option GVs :=
+Definition b_isFinialState (cfg:bConfig) (ec:bExecutionContext) : option GenericValue :=
 match ec with
 | (mkbEC _ nil (insn_return_void _) _ _ _ ) =>
     const2GV (OpsemAux.bCurTargetData cfg) (OpsemAux.bGlobals cfg) 
@@ -1405,8 +1472,8 @@ match ec with
 end.
 
 (* Termination *)
-Inductive b_converges : system -> id -> list GVs -> trace -> GVs -> Prop :=
-| b_converges_intro : forall (s:system) (main:id) (VarArgs:list GVs)
+Inductive b_converges : system -> id -> list GenericValue -> trace -> GenericValue -> Prop :=
+| b_converges_intro : forall (s:system) (main:id) (VarArgs:list GenericValue)
                        cfg (IS FS:bExecutionContext) tr r,
   b_genInitState s main VarArgs Mem.empty = Some (cfg, IS) ->
   bops cfg IS FS tr ->
@@ -1415,8 +1482,8 @@ Inductive b_converges : system -> id -> list GVs -> trace -> GVs -> Prop :=
 .
 
 (* None-termination *)
-Inductive b_diverges : system -> id -> list GVs -> traceinf -> Prop :=
-| b_diverges_intro : forall (s:system) (main:id) (VarArgs:list GVs)
+Inductive b_diverges : system -> id -> list GenericValue -> traceinf -> Prop :=
+| b_diverges_intro : forall (s:system) (main:id) (VarArgs:list GenericValue)
                              cfg (IS S:bExecutionContext) tr,
   b_genInitState s main VarArgs Mem.empty = Some (cfg, IS) ->
   bopInf cfg IS tr ->
@@ -1428,8 +1495,8 @@ Definition stuck_bstate (cfg:OpsemAux.bConfig) (st:bExecutionContext) : Prop :=
 ~ exists st', exists tr, bInsn cfg st st' tr.
 
 Inductive b_goeswrong : 
-    system -> id -> list GVs -> trace -> bExecutionContext -> Prop :=
-| b_goeswrong_intro : forall (s:system) (main:id) (VarArgs:list GVs)
+    system -> id -> list GenericValue -> trace -> bExecutionContext -> Prop :=
+| b_goeswrong_intro : forall (s:system) (main:id) (VarArgs:list GenericValue)
                               cfg (IS FS:bExecutionContext) tr,
   b_genInitState s main VarArgs Mem.empty = Some (cfg, IS) ->
   bops cfg IS FS tr ->

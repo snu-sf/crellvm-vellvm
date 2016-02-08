@@ -4,11 +4,11 @@ Require Import memory_sim.
 Require Import memory_props.
 
 (* A program that goes wrong is undefined. *)
-Definition undefined_program (P:system) (main:id) (VarArgs:list (GVsT DGVs)) :=
+Definition undefined_program (P:system) (main:id) (VarArgs:list GenericValue) :=
   exists tr, exists St, Opsem.s_goeswrong P main VarArgs tr St.
 
 (* Otherwise a program is undefined. *)
-Definition defined_program (P:system) (main:id) (VarArgs:list (GVsT DGVs)) :=
+Definition defined_program (P:system) (main:id) (VarArgs:list GenericValue) :=
   ~ (undefined_program P main VarArgs).
 
 (* Equivalence of values. *)
@@ -41,7 +41,7 @@ List.Forall2 (fun vm1 vm2 =>
    returned value if a program terminates): a transformed program refines its 
    original program if the behaviors of the well-defined original program include 
    all the behaviors of the transformed program. *)
-Inductive program_sim (P1 P2:system) (main:id) (VarArgs:list (GVsT DGVs)) :
+Inductive program_sim (P1 P2:system) (main:id) (VarArgs:list GenericValue) :
    Prop :=
 | program_sim_intro: 
     (forall tr r1, 
@@ -155,7 +155,7 @@ Proof.
 Qed.
 
 Lemma s_isFinialState__stuck: forall St1 St2 cfg tr
-  (Hfinal : @Opsem.s_isFinialState DGVs cfg St1 <> None),
+  (Hfinal : Opsem.s_isFinialState cfg St1 <> None),
   ~ Opsem.sInsn cfg St1 St2 tr.
 Proof.
   intros.
@@ -168,7 +168,7 @@ Proof.
 Qed.
 
 Lemma undefined_state__stuck: forall St1 St2 cfg tr
-  (Hundef : @OpsemPP.undefined_state DGVs cfg St1),
+  (Hundef : OpsemPP.undefined_state cfg St1),
   ~ Opsem.sInsn cfg St1 St2 tr.
 Proof.
   intros.
@@ -293,7 +293,7 @@ Proof.
 Qed.
 
 Lemma undefined_state__stuck': forall St cfg
-  (Hundef : @OpsemPP.undefined_state DGVs cfg St),
+  (Hundef : OpsemPP.undefined_state cfg St),
   Opsem.stuck_state cfg St.
 Proof.
   intros.
@@ -305,9 +305,9 @@ Qed.
 
 Lemma stuck__undefined_state: forall St cfg
   (HwfCfg: OpsemPP.wf_Config cfg) (Hst: OpsemPP.wf_State cfg St) 
-  (Hstck: @Opsem.stuck_state DGVs cfg St)
-  (Hnfinal: @Opsem.s_isFinialState DGVs cfg St = None),
-  @OpsemPP.undefined_state DGVs cfg St.
+  (Hstck: Opsem.stuck_state cfg St)
+  (Hnfinal: Opsem.s_isFinialState cfg St = None),
+  OpsemPP.undefined_state cfg St.
 Proof.
   intros.
   apply OpsemPP.progress in Hst; auto.
@@ -317,7 +317,7 @@ Qed.
 
 Definition sop_goeswrong cfg IS : Prop :=
 exists FS, exists tr, 
-  @Opsem.sop_star DGVs cfg IS FS tr /\ Opsem.stuck_state cfg FS /\ 
+  Opsem.sop_star cfg IS FS tr /\ Opsem.stuck_state cfg FS /\ 
   Opsem.s_isFinialState cfg FS = None.
 
 Lemma sop_goeswrong__step: forall cfg St St' tr
@@ -363,7 +363,7 @@ Proof.
 Qed.
 
 Lemma nonfinal_stuck_state_goes_wrong: forall Cfg St,
-  @Opsem.stuck_state DGVs Cfg St ->
+  Opsem.stuck_state Cfg St ->
   Opsem.s_isFinialState Cfg St = None -> sop_goeswrong Cfg St.
 Proof.
   intros.
@@ -407,7 +407,7 @@ Proof.
 Qed.
 
 Lemma program_sim_wfS_trans: forall (P1 P2 P3 : system) (main : id)
-  (VarArgs : list (GVsT DGVs)) (HwfS: wf_system P3) 
+  (VarArgs : list GenericValue) (HwfS: wf_system P3) 
   (Hok: defined_program P3 main VarArgs),
   (wf_system P2 -> 
    defined_program P2 main VarArgs ->
@@ -449,13 +449,13 @@ Axiom main_wf_params: forall f t i0 a v b S CurLayouts CurNamedts CurProducts
   VarArgs,
   getParentOfFdefFromSystem (fdef_intro (fheader_intro f t i0 a v) b) S =
     ret module_intro CurLayouts CurNamedts CurProducts ->
-  @OpsemPP.wf_params DGVs
+  OpsemPP.wf_params
     (OpsemAux.initTargetData CurLayouts CurNamedts Mem.empty)
     VarArgs (args_to_params a).
 
 Lemma s_genInitState__opsem_wf: forall S main VarArgs cfg IS
   (HwfS : wf_system S)
-  (Hinit : @Opsem.s_genInitState DGVs S main VarArgs Mem.empty = ret (cfg, IS)),
+  (Hinit : Opsem.s_genInitState S main VarArgs Mem.empty = ret (cfg, IS)),
   OpsemPP.wf_Config cfg /\ OpsemPP.wf_State cfg IS.
 Proof.
   intros.
@@ -483,7 +483,7 @@ Proof.
 Qed.
 
 Lemma s_genInitState__targedata: forall los nts Ps main VarArgs cfg1 IS1,
-  @Opsem.s_genInitState DGVs
+  Opsem.s_genInitState
             [module_intro los nts Ps] main VarArgs Mem.empty = ret (cfg1, IS1) ->
   (los,nts) = OpsemAux.CurTargetData cfg1.
 Proof.
@@ -496,7 +496,7 @@ Axiom genGlobalAndInitMem__wf_globals_Mem: forall
   (initGlobal initFunTable : GVMap) (initMem : mem)
   (CurLayouts : layouts) (CurNamedts : namedts)
   (CurProducts : list product) (la : args) (lc : Opsem.GVsMap)
-  (VarArgs : list (GVsT DGVs)),
+  (VarArgs : list GenericValue),
   OpsemAux.genGlobalAndInitMem
          (OpsemAux.initTargetData CurLayouts CurNamedts Mem.empty)
          CurProducts nil nil Mem.empty =
@@ -515,7 +515,7 @@ Axiom genGlobalAndInitMem__wf_globals_Mem: forall
   OpsemAux.ftable_simulation (MemProps.inject_init (Mem.nextblock initMem - 1))
     initFunTable initFunTable /\
   (forall i0 gv, 
-     lookupAL (GVsT DGVs) lc i0 = ret gv ->
+     lookupAL GenericValue lc i0 = ret gv ->
      genericvalues_inject.gv_inject 
        (MemProps.inject_init (Mem.nextblock initMem - 1)) gv gv) /\
   MoreMem.mem_inj inject_id initMem initMem /\
@@ -524,7 +524,7 @@ Axiom genGlobalAndInitMem__wf_globals_Mem: forall
 (***********************************************************************)
 (* A measure function used by refinement proofs, which is the number of 
    commands to execute. *)
-Definition measure (st:@Opsem.State DGVs) : nat :=
+Definition measure (st:Opsem.State) : nat :=
 match st with 
 | {| Opsem.ECS := {| Opsem.CurCmds := cs |} :: _ |} => List.length cs
 | _ => 0%nat
