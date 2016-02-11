@@ -32,8 +32,8 @@ Module OpsemProps. Section OpsemProps.
 Export Opsem.
 
 Notation "gv @ gvs" :=
-  (GenericValue_helper.instantiate_gvs gv gvs) (at level 43, right associativity).
-Notation "$ gv # t $" := (GenericValue_helper.gv2gvs gv t) (at level 41).
+  (GenericValueHelper.instantiate_gvs gv gvs) (at level 43, right associativity).
+Notation "$ gv # t $" := (GenericValueHelper.gv2gvs gv t) (at level 41).
 
 (***********************************************************)
 (* Properties of updating locals after calls. *)
@@ -775,7 +775,7 @@ Lemma BOP_inversion : forall TD lc gl b s v1 v2 gv2,
   exists gvs1, exists gvs2,
     getOperandValue TD v1 lc gl = Some gvs1 /\
     getOperandValue TD v2 lc gl = Some gvs2 /\
-    GenericValue_helper.lift_op2 (mbop TD b s) gvs1 gvs2 (typ_int s) = Some gv2.
+    GenericValueHelper.lift_op2 (mbop TD b s) gvs1 gvs2 (typ_int s) = Some gv2.
 Proof.
   intros TD lc gl b s v1 v2 gv2 HBOP.
   unfold BOP in HBOP.
@@ -791,7 +791,7 @@ Lemma FBOP_inversion : forall TD lc gl b fp v1 v2 gv,
   exists gv1, exists gv2,
     getOperandValue TD v1 lc gl = Some gv1 /\
     getOperandValue TD v2 lc gl = Some gv2 /\
-    GenericValue_helper.lift_op2 (mfbop TD b fp) gv1 gv2 (typ_floatpoint fp) = Some gv.
+    GenericValueHelper.lift_op2 (mfbop TD b fp) gv1 gv2 (typ_floatpoint fp) = Some gv.
 Proof.
   intros TD lc gl b fp v1 v2 gv HFBOP.
   unfold FBOP in HFBOP.
@@ -806,7 +806,7 @@ Lemma CAST_inversion : forall TD lc gl op t1 v1 t2 gv,
   CAST TD lc gl op t1 v1 t2 = Some gv ->
   exists gv1,
     getOperandValue TD v1 lc gl = Some gv1 /\
-    GenericValue_helper.lift_op1 (mcast TD op t1 t2) gv1 t2 = Some gv.
+    GenericValueHelper.lift_op1 (mcast TD op t1 t2) gv1 t2 = Some gv.
 Proof.
   intros TD lc gl op t1 v1 t2 gv HCAST.
   unfold CAST in HCAST.
@@ -819,7 +819,7 @@ Lemma TRUNC_inversion : forall TD lc gl op t1 v1 t2 gv,
   TRUNC TD lc gl op t1 v1 t2 = Some gv ->
   exists gv1,
     getOperandValue TD v1 lc gl = Some gv1 /\
-    GenericValue_helper.lift_op1 (mtrunc TD op t1 t2) gv1 t2 = Some gv.
+    GenericValueHelper.lift_op1 (mtrunc TD op t1 t2) gv1 t2 = Some gv.
 Proof.
   intros TD lc gl op t1 v1 t2 gv HTRUNC.
   unfold TRUNC in HTRUNC.
@@ -832,7 +832,7 @@ Lemma EXT_inversion : forall TD lc gl op t1 v1 t2 gv,
   EXT TD lc gl op t1 v1 t2 = Some gv ->
   exists gv1,
     getOperandValue TD v1 lc gl = Some gv1 /\
-    GenericValue_helper.lift_op1 (mext TD op t1 t2) gv1 t2 = Some gv.
+    GenericValueHelper.lift_op1 (mext TD op t1 t2) gv1 t2 = Some gv.
 Proof.
   intros TD lc gl op t1 v1 t2 gv HEXT.
   unfold EXT in HEXT.
@@ -846,7 +846,7 @@ Lemma ICMP_inversion : forall TD lc gl cond t v1 v2 gv,
   exists gv1, exists gv2,
     getOperandValue TD v1 lc gl = Some gv1 /\
     getOperandValue TD v2 lc gl = Some gv2 /\
-    GenericValue_helper.lift_op2 (micmp TD cond t) gv1 gv2 (typ_int 1%nat) = Some gv.
+    GenericValueHelper.lift_op2 (micmp TD cond t) gv1 gv2 (typ_int 1%nat) = Some gv.
 Proof.
   intros TD lc gl cond0 t v1 v2 gv HICMP.
   unfold ICMP in HICMP.
@@ -862,7 +862,7 @@ Lemma FCMP_inversion : forall TD lc gl cond fp v1 v2 gv,
   exists gv1, exists gv2,
     getOperandValue TD v1 lc gl = Some gv1 /\
     getOperandValue TD v2 lc gl = Some gv2 /\
-    GenericValue_helper.lift_op2 (mfcmp TD cond fp) gv1 gv2 (typ_int 1%nat) = Some gv.
+    GenericValueHelper.lift_op2 (mfcmp TD cond fp) gv1 gv2 (typ_int 1%nat) = Some gv.
 Proof.
   intros TD lc gl cond0 fp v1 v2 gv HFCMP.
   unfold FCMP in HFCMP.
@@ -993,11 +993,11 @@ Proof.
         destruct v as [i0|c]; simpl.
           rewrite H2.
           destruct (lookupAL _ lc2' i0); auto.
-          destruct (GenericValue_helper.lift_op1 (fit_gv TD rt) g rt);
+          destruct (GenericValueHelper.lift_op1 (fit_gv TD rt) g rt);
             auto using eqAL_updateAddAL.
 
           destruct (const2GV TD gl c); auto using eqAL_updateAddAL.
-          destruct (GenericValue_helper.lift_op1 (fit_gv TD rt) g rt);
+          destruct (GenericValueHelper.lift_op1 (fit_gv TD rt) g rt);
             auto using eqAL_updateAddAL.
 Qed.
 
@@ -1161,7 +1161,7 @@ Proof.
 
     destruct oresult; try solve [inversion H0; subst; auto].
     destruct (getOperandValue TD v lc' gl); tinv H0.
-    destruct (GenericValue_helper.lift_op1 (fit_gv TD rt) g rt); inv H0.
+    destruct (GenericValueHelper.lift_op1 (fit_gv TD rt) g rt); inv H0.
       apply updateAddAL_uniq; auto.
 Qed.
 
@@ -1200,7 +1200,7 @@ Proof.
 
       remember (_initializeFrameValues TD la l0 nil) as R.
       destruct R; tinv H.
-      destruct (GenericValue_helper.lift_op1 (fit_gv TD t) g t); inv H;
+      destruct (GenericValueHelper.lift_op1 (fit_gv TD t) g t); inv H;
         eauto using updateAddAL_uniq.
 Qed.
 
@@ -1248,7 +1248,7 @@ Proof.
 
         remember (_initializeFrameValues TD la gvs nil) as R1.
         destruct R1; tinv H0.
-        destruct (GenericValue_helper.lift_op1 (fit_gv TD t) g t); inv H0.
+        destruct (GenericValueHelper.lift_op1 (fit_gv TD t) g t); inv H0.
         eauto using lookupAL_updateAddAL_eq.
 
       destruct (eq_atom_dec id0 id1); subst.
@@ -1261,7 +1261,7 @@ Proof.
 
           remember (_initializeFrameValues TD la gvs nil) as R1.
           destruct R1; tinv H0.
-          destruct (GenericValue_helper.lift_op1 (fit_gv TD t) g t); inv H0.
+          destruct (GenericValueHelper.lift_op1 (fit_gv TD t) g t); inv H0.
           eauto using lookupAL_updateAddAL_eq.
 
         destruct gvs.
@@ -1276,7 +1276,7 @@ Proof.
 
           remember (_initializeFrameValues TD la gvs nil) as R1.
           destruct R1; tinv H0.
-          destruct (GenericValue_helper.lift_op1 (fit_gv TD t) g t); inv H0.
+          destruct (GenericValueHelper.lift_op1 (fit_gv TD t) g t); inv H0.
           symmetry in HeqR1.
           eapply IHla in HeqR1; eauto.
           destruct HeqR1 as [gv HeqR1].

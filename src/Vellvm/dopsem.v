@@ -278,8 +278,8 @@ Import LLVMinfra.
 (* MDGVs.none_undef2gvs_inv. *)
 
 Notation "gv @ gvs" :=
-  (GenericValue_helper.instantiate_gvs gv gvs) (at level 43, right associativity).
-Notation "$ gv # t $" := (GenericValue_helper.gv2gvs gv t) (at level 41).
+  (GenericValueHelper.instantiate_gvs gv gvs) (at level 43, right associativity).
+Notation "$ gv # t $" := (GenericValueHelper.gv2gvs gv t) (at level 41).
 Notation "vidxs @@ vidxss" := (Opsem.in_list_gvs vidxs vidxss)
   (at level 43, right associativity).
 
@@ -297,13 +297,15 @@ Qed.
 
 Ltac dgvs_instantiate_inv :=
   match goal with
-  | [ H : GenericValue_helper.instantiate_gvs _ _ |- _ ] => inv H
+  | [ H : GenericValueHelper.instantiate_gvs _ _ |- _ ] => inv H
   | [ H : _ @@ _ |- _ ] => apply dos_in_list_gvs_inv in H; subst
   end.
 
 Lemma dos_instantiate_gvs_intro : forall gv, gv @ gv.
 Proof.
-  unfold GenericValue_helper.instantiate_gvs. simpl. auto.
+Local Transparent GenericValueHelper.instantiate_gvs.
+  unfold GenericValueHelper.instantiate_gvs. simpl. auto.
+Global Opaque GenericValueHelper.instantiate_gvs.
 Qed.
 
 Hint Resolve dos_instantiate_gvs_intro.
@@ -445,9 +447,10 @@ Lemma GEP_inv: forall TD t (mp1 : GenericValue) inbounds0 vidxs mp2 t'
   exists blk, exists ofs1, exists ofs2 : int32, exists m1, exists m2,
     mp1 = (Vptr blk ofs1, m1) :: nil /\ mp2 = (Vptr blk ofs2, m2) :: nil.
 Proof.
+Local Transparent GenericValueHelper.lift_op1.
   intros.
-  unfold Opsem.GEP in H1. unfold GenericValue_helper.lift_op1 in H1. simpl in H1.
-  unfold GenericValue_helper.lift_op1 in H1.
+  unfold Opsem.GEP in H1. unfold GenericValueHelper.lift_op1 in H1. simpl in H1.
+  unfold GenericValueHelper.lift_op1 in H1.
   unfold gep in H1. unfold GEP in H1.
   remember (GV2ptr TD (getPointerSize TD) mp1) as R1.
   destruct R1; auto.
@@ -468,6 +471,7 @@ Proof.
   exists (Int.add 31 i1 (Int.repr 31 z0)). exists m.
   exists (AST.Mint (Size.mul Size.Eight (getPointerSize TD) - 1)).
   eauto.
+Opaque GenericValueHelper.lift_op1.
 Qed.
 
 Lemma wf__getTypeStoreSize_eq_sizeGenericValue: forall (gl2 : GVMap)

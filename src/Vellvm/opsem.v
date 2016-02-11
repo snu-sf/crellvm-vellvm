@@ -31,7 +31,7 @@ Import LLVMtypings.
 (* GenericValues represent dynamic values at runtime. We provide
    different styles of semantics that have different definitions of
    dynamic values. The following defines their signatures. *)
-Module GenericValue_helper.
+Module GenericValueHelper.
 (* instantiate_gvs gv gvs ensures that gvs includes gv. *) 
 Definition instantiate_gvs : GenericValue -> GenericValue -> Prop := fun gv1 gv2 => gv1 = gv2.
 (* inhabited gvs ensures that gvs is not empty. *)
@@ -228,9 +228,9 @@ Proof.
   destruct gv'; try solve [inv H; auto].
 Qed.
 
-End GenericValue_helper.
+Global Opaque gv2gvs instantiate_gvs inhabited cgv2gvs lift_op1 lift_op2.
 
-(* Global Opaque GVsT gv2gvs instantiate_gvs inhabited cgv2gvs lift_op1 lift_op2. *)
+End GenericValueHelper.
 
 Module OpsemAux.
 
@@ -455,11 +455,11 @@ Section Opsem.
 
 Definition GVsMap := list (id * GenericValue).
 Notation "gv @ gvs" :=
-  (GenericValue_helper.instantiate_gvs gv gvs) (at level 43, right associativity).
-Notation "$ gv # t $" := (GenericValue_helper.gv2gvs gv t) (at level 41).
+  (GenericValueHelper.instantiate_gvs gv gvs) (at level 43, right associativity).
+Notation "$ gv # t $" := (GenericValueHelper.gv2gvs gv t) (at level 41).
 
 Definition in_list_gvs (l1 : list GenericValue) (l2 : list GenericValue) : Prop :=
-List.Forall2 GenericValue_helper.instantiate_gvs l1 l2.
+List.Forall2 GenericValueHelper.instantiate_gvs l1 l2.
 
 Notation "vidxs @@ vidxss" := (in_list_gvs vidxs vidxss)
   (at level 43, right associativity).
@@ -468,7 +468,7 @@ Notation "vidxs @@ vidxss" := (in_list_gvs vidxs vidxss)
 Definition const2GV (TD:TargetData) (gl:GVMap) (c:const) : option GenericValue :=
 match (_const2GV TD gl c) with
 | None => None
-| Some (gv, ty) => Some (GenericValue_helper.cgv2gvs gv ty)
+| Some (gv, ty) => Some (GenericValueHelper.cgv2gvs gv ty)
 end.
 
 (* Compute the semantic value of a program value. *)
@@ -580,7 +580,7 @@ Definition returnUpdateLocals (TD:TargetData) (c':cmd) (Result:value)
   | Some gr =>
       match c' with
       | insn_call id0 false _ ct _ _ _ =>
-           match (GenericValue_helper.lift_op1 (fit_gv TD ct) gr ct) with
+           match (GenericValueHelper.lift_op1 (fit_gv TD ct) gr ct) with
            | Some gr' => Some (updateAddAL _ lc' id0 gr')
            | _ => None
            end
@@ -616,7 +616,7 @@ Fixpoint _initializeFrameValues TD (la:args) (lg:list GenericValue) (locals:GVsM
 match (la, lg) with
 | (((t, _), id)::la', g::lg') =>
   match _initializeFrameValues TD la' lg' locals,
-        GenericValue_helper.lift_op1 (fit_gv TD t) g t with
+        GenericValueHelper.lift_op1 (fit_gv TD t) g t with
   | Some lc', Some gv => Some (updateAddAL _ lc' id gv)
   | _, _ => None
   end
@@ -637,7 +637,7 @@ Definition BOP (TD:TargetData) (lc:GVsMap) (gl:GVMap) (op:bop) (bsz:sz)
   (v1 v2:value) : option GenericValue :=
 match (getOperandValue TD v1 lc gl, getOperandValue TD v2 lc gl) with
 | (Some gvs1, Some gvs2) =>
-    GenericValue_helper.lift_op2 (mbop TD op bsz) gvs1 gvs2 (typ_int bsz)
+    GenericValueHelper.lift_op2 (mbop TD op bsz) gvs1 gvs2 (typ_int bsz)
 | _ => None
 end
 .
@@ -646,7 +646,7 @@ Definition FBOP (TD:TargetData) (lc:GVsMap) (gl:GVMap) (op:fbop) fp
   (v1 v2:value) : option GenericValue :=
 match (getOperandValue TD v1 lc gl, getOperandValue TD v2 lc gl) with
 | (Some gvs1, Some gvs2) =>
-    GenericValue_helper.lift_op2 (mfbop TD op fp) gvs1 gvs2 (typ_floatpoint fp)
+    GenericValueHelper.lift_op2 (mfbop TD op fp) gvs1 gvs2 (typ_floatpoint fp)
 | _ => None
 end
 .
@@ -655,7 +655,7 @@ Definition ICMP (TD:TargetData) (lc:GVsMap) (gl:GVMap) c t (v1 v2:value)
   : option GenericValue :=
 match (getOperandValue TD v1 lc gl, getOperandValue TD v2 lc gl) with
 | (Some gvs1, Some gvs2) =>
-    GenericValue_helper.lift_op2 (micmp TD c t) gvs1 gvs2 (typ_int Size.One)
+    GenericValueHelper.lift_op2 (micmp TD c t) gvs1 gvs2 (typ_int Size.One)
 | _ => None
 end
 .
@@ -664,7 +664,7 @@ Definition FCMP (TD:TargetData) (lc:GVsMap) (gl:GVMap) c fp (v1 v2:value)
   : option GenericValue :=
 match (getOperandValue TD v1 lc gl, getOperandValue TD v2 lc gl) with
 | (Some gvs1, Some gvs2) =>
-    GenericValue_helper.lift_op2 (mfcmp TD c fp) gvs1 gvs2 (typ_int Size.One)
+    GenericValueHelper.lift_op2 (mfcmp TD c fp) gvs1 gvs2 (typ_int Size.One)
 | _ => None
 end
 .
@@ -672,7 +672,7 @@ end
 Definition CAST (TD:TargetData) (lc:GVsMap) (gl:GVMap) (op:castop)
   (t1:typ) (v1:value) (t2:typ) : option GenericValue:=
 match (getOperandValue TD v1 lc gl) with
-| (Some gvs1) => GenericValue_helper.lift_op1 (mcast TD op t1 t2) gvs1 t2
+| (Some gvs1) => GenericValueHelper.lift_op1 (mcast TD op t1 t2) gvs1 t2
 | _ => None
 end
 .
@@ -680,7 +680,7 @@ end
 Definition TRUNC (TD:TargetData) (lc:GVsMap) (gl:GVMap) (op:truncop)
   (t1:typ) (v1:value) (t2:typ) : option GenericValue:=
 match (getOperandValue TD v1 lc gl) with
-| (Some gvs1) => GenericValue_helper.lift_op1 (mtrunc TD op t1 t2) gvs1 t2
+| (Some gvs1) => GenericValueHelper.lift_op1 (mtrunc TD op t1 t2) gvs1 t2
 | _ => None
 end
 .
@@ -688,14 +688,14 @@ end
 Definition EXT (TD:TargetData) (lc:GVsMap) (gl:GVMap) (op:extop)
   (t1:typ) (v1:value) (t2:typ) : option GenericValue:=
 match (getOperandValue TD v1 lc gl) with
-| (Some gvs1) => GenericValue_helper.lift_op1 (mext TD op t1 t2) gvs1 t2
+| (Some gvs1) => GenericValueHelper.lift_op1 (mext TD op t1 t2) gvs1 t2
 | _ => None
 end
 .
 
 Definition GEP (TD:TargetData) (ty:typ) (mas:GenericValue) (vidxs:list GenericValue)
   (inbounds:bool) ty' : option GenericValue :=
-GenericValue_helper.lift_op1 (gep TD ty vidxs inbounds ty') mas (typ_pointer ty').
+GenericValueHelper.lift_op1 (gep TD ty vidxs inbounds ty') mas (typ_pointer ty').
 
 Definition extractGenericValue (TD:TargetData) (t:typ) (gvs : GenericValue)
   (cidxs : list const) : option GenericValue :=
@@ -703,7 +703,7 @@ match (intConsts2Nats TD cidxs) with
 | None => None
 | Some idxs =>
   match (mgetoffset TD t idxs) with
-  | Some (o, t') => GenericValue_helper.lift_op1 (mget' TD o t') gvs t'
+  | Some (o, t') => GenericValueHelper.lift_op1 (mget' TD o t') gvs t'
   | None => None
   end
 end.
@@ -714,7 +714,7 @@ match (intConsts2Nats TD cidxs) with
 | None => None
 | Some idxs =>
   match (mgetoffset TD t idxs) with
-  | Some (o, _) => GenericValue_helper.lift_op2 (mset' TD o t t0) gvs gvs0 t
+  | Some (o, _) => GenericValueHelper.lift_op2 (mset' TD o t t0) gvs gvs0 t
   | None => None
   end
 end.
@@ -1136,7 +1136,7 @@ Definition callUpdateLocals (TD:TargetData) rt (noret:bool) (rid:id)
         | Some Result =>
           match getOperandValue TD Result lc' gl with
           | Some gr =>
-              match (GenericValue_helper.lift_op1 (fit_gv TD rt) gr rt) with
+              match (GenericValueHelper.lift_op1 (fit_gv TD rt) gr rt) with
               | Some gr' => Some (updateAddAL _ lc rid gr')
               | None => None
               end

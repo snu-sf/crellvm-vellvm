@@ -8,8 +8,10 @@ Lemma simpl_blk2GV: forall td mb t,
   ((Vptr mb (Int.repr 31 0),
     AST.Mint (Size.mul Size.Eight (getPointerSize td) - 1)) :: nil).
 Proof.
+Local Transparent GenericValueHelper.gv2gvs.
   intros. unfold_blk2GV.
-  unfold GenericValue_helper.gv2gvs. simpl. auto.
+  unfold GenericValueHelper.gv2gvs. simpl. auto.
+Opaque GenericValueHelper.gv2gvs.
 Qed.
 
 Module MemProps.
@@ -721,10 +723,11 @@ Qed.
 Lemma cgv2gvs_preserves_no_alias: forall g0 mb ofs m t0 maxb,
   no_alias g0 [(Vptr mb ofs, m)] ->
   (xH <= maxb < mb)%positive ->
-  no_alias (GenericValue_helper.cgv2gvs g0 t0) [(Vptr mb ofs, m)].
+  no_alias (GenericValueHelper.cgv2gvs g0 t0) [(Vptr mb ofs, m)].
 Proof.
+Local Transparent GenericValueHelper.cgv2gvs.
   intros.
-  unfold GenericValue_helper.cgv2gvs. simpl.
+  unfold GenericValueHelper.cgv2gvs. simpl.
   destruct g0 as [|[]]; auto.
   destruct v; auto.
   destruct g0 as [|]; auto.
@@ -735,6 +738,7 @@ Proof.
 
     simpl. split; auto. split; auto. unfold Mem.nullptr. intro J. subst.
     inv H0; destruct maxb; inv H2.
+Global Opaque GenericValueHelper.cgv2gvs.
 Qed.
 
 Lemma no_alias_GV2ptr__neq_blk: forall TD sz0 ptr1 ptr2 b1 i1 b2 i2
@@ -753,7 +757,8 @@ Lemma GEP_preserves_no_alias: forall TD t mp vidxs inbounds0 mp' gvsa t',
   Opsem.GEP TD t mp vidxs inbounds0 t' = ret mp' ->
   no_alias mp gvsa -> no_alias mp' gvsa.
 Proof.
-  unfold Opsem.GEP. unfold GenericValue_helper.lift_op1. simpl. unfold gep.
+Local Transparent GenericValueHelper.lift_op1.
+  unfold Opsem.GEP. unfold GenericValueHelper.lift_op1. simpl. unfold gep.
   unfold GEP. intros.
   remember (GV2ptr TD (getPointerSize TD) mp) as R1.
   destruct R1; eauto using undef_disjoint_with_ptr.
@@ -763,6 +768,7 @@ Proof.
   inv H.
   eapply GV2ptr_preserves_no_alias in HeqR1; eauto.
   eapply mgep_preserves_no_alias; eauto.
+Opaque GenericValueHelper.lift_op1.
 Qed.
 
 Lemma initializeFrameValues_preserves_no_alias: forall TD mb t la
@@ -773,7 +779,7 @@ Lemma initializeFrameValues_preserves_no_alias: forall TD mb t la
   (Hlkup : lookupAL GenericValue lc id1 = ret gvs1),
   no_alias gvs1 ($ blk2GV TD mb # typ_pointer t $).
 Proof.
-Opaque GenericValue_helper.gv2gvs.
+Local Transparent GenericValueHelper.lift_op1.
   unfold Opsem.initLocals.
   induction la; simpl; intros.
     inv Hinit. inv Hlkup.
@@ -791,7 +797,7 @@ Opaque GenericValue_helper.gv2gvs.
       inv_mbind. symmetry in HeqR.
       destruct (id_dec i0 id1); subst.
         rewrite lookupAL_updateAddAL_eq in Hlkup. inv Hlkup.
-        unfold GenericValue_helper.lift_op1, fit_gv in HeqR0.
+        unfold GenericValueHelper.lift_op1, fit_gv in HeqR0.
         symmetry in HeqR0.
         inv_mbind.
         destruct_if.
@@ -802,7 +808,7 @@ Opaque GenericValue_helper.gv2gvs.
         rewrite <- lookupAL_updateAddAL_neq in Hlkup; auto.
         eapply IHla in HeqR; eauto.
         intros. apply Hwf. simpl. auto.
-Transparent GenericValue_helper.gv2gvs.
+Opaque GenericValueHelper.lift_op1.
 Qed.
 
 (*****************************************************************)
@@ -1041,7 +1047,9 @@ Lemma undef__valid_lift_ptrs: forall g td t1 blk
 Proof.
   unfold gundef. intros.
   inv_mbind'.
-  unfold GenericValue_helper.gv2gvs. simpl. apply mc2undefs_valid_ptrs.
+Local Transparent GenericValueHelper.gv2gvs.
+  unfold GenericValueHelper.gv2gvs. simpl. apply mc2undefs_valid_ptrs.
+Opaque GenericValueHelper.gv2gvs.
 Qed.
 
 Lemma in_valid_ptrs: forall bd m b ofs gvs,
@@ -1082,7 +1090,6 @@ Lemma valid_ptrs__no_alias__fresh_ptr: forall bound TD mb t (Hbd: (bound <= mb)%
   gvs, valid_ptrs bound gvs ->
   no_alias gvs ($ blk2GV TD mb # typ_pointer t $).
 Proof.
-  Opaque GenericValue_helper.gv2gvs.
   induction gvs as [|[]]; simpl; intros.
     apply no_alias_nil.
 
@@ -1092,7 +1099,6 @@ Proof.
     destruct H0.
     repeat split; auto.
       intro J. subst. contradict H; apply Pos.le_nlt; auto.
-  Transparent GenericValue_helper.gv2gvs.
 Qed.
 
 Lemma undefs_valid_ptrs: forall bd gvs1
@@ -1128,10 +1134,11 @@ Proof.
 Qed.
 
 Lemma cgv2gvs_preserves_valid_ptrs: forall g0 t0 bd,
-  (bd > xH)%positive -> valid_ptrs bd g0 -> valid_ptrs bd (GenericValue_helper.cgv2gvs g0 t0).
+  (bd > xH)%positive -> valid_ptrs bd g0 -> valid_ptrs bd (GenericValueHelper.cgv2gvs g0 t0).
 Proof.
   intros.
-  unfold GenericValue_helper.cgv2gvs. simpl. unfold cgv2gv.
+Local Transparent GenericValueHelper.cgv2gvs.
+  unfold GenericValueHelper.cgv2gvs. simpl. unfold cgv2gv.
   destruct g0 as [|[]]; auto.
   destruct v; auto.
   destruct g0 as [|]; auto.
@@ -1140,6 +1147,7 @@ Proof.
     destruct f; auto.
 
     apply null_valid_ptrs; auto.
+Global Opaque GenericValueHelper.cgv2gvs.
 Qed.
 
 (*****************************************************************)
@@ -3044,7 +3052,6 @@ Lemma params2GVs_preserves_no_alias: forall maxb gl
   forall gv,
     In gv gvs -> no_alias gv ($ blk2GV (los,nts) mb # typ_pointer t $).
 Proof.
-  Opaque GenericValue_helper.gv2gvs.
   induction tavl; simpl; intros; subst.
     inv Hps2GVs. inv H.
 
@@ -3060,7 +3067,6 @@ Proof.
       symmetry in HeqR0.
       eapply IHtavl in HeqR0; eauto.
         intros. eapply Hwf; simpl; eauto.
-  Transparent GenericValue_helper.gv2gvs.
 Qed.
 
 Lemma operand__lt_nextblock: forall maxb los nts M (lc:DGVMap) mptr gl
