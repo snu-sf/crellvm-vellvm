@@ -16,7 +16,7 @@ Export Opsem.
 
 (* The small-step interpreter, given a configuration and a program state, 
    computes the next program state and a trace. *)
-Definition interInsn (cfg:Config) (state:@State DGVs) : option (State*trace) :=
+Definition interInsn (cfg:Config) (state:State) : option (State*trace) :=
 let '(mkCfg Sys TD Ps gl fs) := cfg in
 (* Check if the stack is empty. *)
 match state with
@@ -506,7 +506,7 @@ Proof.
             remember (params2GVs CurTargetData0 p lc Globals0) as R5.
             destruct R5 as [l0|]; try solve [inversion HinterInsn]; subst.
             simpl in HinterInsn.
-            change GenericValue with (GVsT DGVs) in HinterInsn.
+            change GenericValue with GenericValue in HinterInsn.
             match goal with
             | HinterInsn: match ?ef with
                           | Some _ => _
