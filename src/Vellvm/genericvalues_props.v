@@ -2227,12 +2227,12 @@ Case "wfconst_cons".
   intros S TD los nts gl EQ Hwfl; subst.
   split.
     intros gv t Hft Hin Hc2g.
-    remember (_list_const_arr2GV (los, nts) gl t lc) as R.
+    remember (_list_const_arr2GV (@pair (list layout) (list namedt) los nts) gl t lc) as R.
     destruct R; try solve [inv Hc2g].
-    remember (_const2GV (los, nts) gl const_) as R'.
+    remember (_const2GV (@pair (list layout) (list namedt) los nts) gl const_) as R'.
     destruct R' as [[gv0 t0]|]; try solve [inv Hc2g].
     destruct (typ_dec t t0); subst; try solve [inv Hc2g].
-    remember (getTypeAllocSize (los, nts) t0) as R1.
+    remember (getTypeAllocSize (@pair (list layout) (list namedt) los nts) t0) as R1.
     destruct R1; inv Hc2g.
     assert (typ5 = t0) as EQ. eapply Hin; eauto.
     subst.
@@ -2257,11 +2257,11 @@ Case "wfconst_cons".
     ring.
 
     intros gv lt' Hc2g.
-    remember (_list_const_struct2GV (los, nts) gl lc) as R.
+    remember (_list_const_struct2GV (@pair (list layout) (list namedt) los nts) gl lc) as R.
     destruct R as [[gv1 ts1]|]; try solve [inv Hc2g].
-    remember (_const2GV (los, nts) gl const_) as R'.
+    remember (_const2GV (@pair (list layout) (list namedt) los nts) gl const_) as R'.
     destruct R' as [[gv0 t0]|]; try solve [inv Hc2g].
-    remember (getTypeAllocSize (los, nts) t0) as R1.
+    remember (getTypeAllocSize (@pair (list layout) (list namedt) los nts) t0) as R1.
     destruct R1; inv Hc2g.
     apply wf_list_targetdata_typ_cons_inv in Hwfl.
     destruct Hwfl as [J1' [J2' [J3 J4]]]; subst.
@@ -2278,7 +2278,7 @@ Case "wfconst_cons".
     rewrite sizeGenericValue__uninits.
     rewrite <- J8. rewrite <- J6. simpl. rewrite J7. rewrite J5.
     rewrite plus_assoc.
-    assert (feasible_typ (los, nts) t0) as Hft.
+    assert (feasible_typ (@pair (list layout) (list namedt) los nts) t0) as Hft.
       apply wf_const__wf_typ in H.
       apply wf_typ__feasible_typ in H; auto.
     erewrite getTypeAllocSize_roundup; eauto.
