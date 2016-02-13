@@ -10,3 +10,4 @@ Makefile.coq: Make
 
 clean:
 	make -f Makefile.coq clean
+	rm -f Makefile.coq

@@ -11,7 +11,7 @@ Require Import dom_list_tree.
 Require Import dom_set_tree.
 Require Import dom_list_df.
 
-Extract Constant OrderedInt.wordsize_one => "O".
+Extract Constant Ordered.OrderedInt.wordsize_one => "O".
 
 Extraction Library dom_libs.
 Extraction Library dfs.

@@ -3,15 +3,18 @@ OTT ?= ott
 COQMODULE    := Vellvm
 COQTHEORIES  := $(shell ls \
   lib/GraphBasics/*.v \
-  src/Vellvm/*.v \
   src/Vellvm/Dominators/*.v \
   src/Vellvm/ott/*.v) \
-	src/Vellvm/syntax_base.v \
-	src/Vellvm/typing_rules.v
+  src/Vellvm/analysis.v src/Vellvm/datatype_base.v src/Vellvm/dopsem.v src/Vellvm/events.v src/Vellvm/external_intrinsics.v src/Vellvm/genericvalues_inject.v src/Vellvm/genericvalues_props.v src/Vellvm/genericvalues.v src/Vellvm/infrastructure.v src/Vellvm/infrastructure_props.v \
+	src/Vellvm/interpreter.v src/Vellvm/memory_sim.v src/Vellvm/opsem_props.v src/Vellvm/opsem.v src/Vellvm/opsem_wf.v src/Vellvm/ott_list_core.v src/Vellvm/ott_list_eq_dec.v \
+	src/Vellvm/static.v src/Vellvm/syntax.v src/Vellvm/monad.v src/Vellvm/syntax_base.v src/Vellvm/tactics.v src/Vellvm/targetdata.v src/Vellvm/targetdata_props.v src/Vellvm/trace.v \
+	src/Vellvm/typing_rules.v src/Vellvm/typings_props.v src/Vellvm/typings.v src/Vellvm/vellvm.v src/Vellvm/vellvm_tactics.v src/Vellvm/memory_props.v src/Vellvm/program_sim.v src/Vellvm/util.v src/Vellvm/maps_ext.v
+
+COQEXTRACT	:= src/Extraction/extraction_dom.v src/Extraction/extraction_core.v 
 
 .PHONY: all metalib cpdtlib theories clean
 
-all: metalib cpdtlib compcert theories
+all: metalib cpdtlib compcert theories extract
 
 Makefile.coq: Makefile $(COQTHEORIES)
 	(echo "-R . $(COQMODULE)"; \
@@ -45,6 +48,10 @@ src/Vellvm/typing_rules.v: src/Vellvm/syntax_base.ott src/Vellvm/typing_rules.ot
 theories: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
 	$(MAKE) -f Makefile.coq
 
+extract: theories $(COQEXTRACT)
+	$(MAKE) -C src/Extraction
+	cd src/Extraction; ./fixextract.py
+
 %.vo: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
 	$(MAKE) -f Makefile.coq "$@"
 
@@ -52,3 +59,4 @@ clean:
 	rm -f src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v 
 	$(MAKE) -f Makefile.coq clean
 	rm -f Makefile.coq
+	$(MAKE) -C src/Extraction clean
