@@ -2,7 +2,7 @@ OTT ?= ott
 
 COQMODULE    := Vellvm
 COQTHEORIES  := $(shell ls \
-  lib/GraphBasics/*.v \
+  src/GraphBasics/*.v \
   src/Vellvm/Dominators/*.v \
   src/Vellvm/ott/*.v) \
   src/Vellvm/analysis.v src/Vellvm/datatype_base.v src/Vellvm/dopsem.v src/Vellvm/events.v src/Vellvm/external_intrinsics.v src/Vellvm/genericvalues_inject.v src/Vellvm/genericvalues_props.v src/Vellvm/genericvalues.v src/Vellvm/infrastructure.v src/Vellvm/infrastructure_props.v \
@@ -14,14 +14,17 @@ COQEXTRACT	:= src/Extraction/extraction_dom.v src/Extraction/extraction_core.v
 
 .PHONY: all metalib cpdtlib theories clean
 
-all: metalib cpdtlib compcert theories extract
+all: metalib cpdtlib compcert theories
+
+init:
+	git submodule init
+	git submodule update
 
 Makefile.coq: Makefile $(COQTHEORIES)
-	(echo "-R . $(COQMODULE)"; \
+	(echo "-R src $(COQMODULE)"; \
    echo "-R lib/metalib metalib"; \
    echo "-R lib/cpdtlib Cpdt"; \
    echo "-R lib/compcert-2.4 compcert"; \
-   echo "-R lib/GraphBasics GraphBasics"; \
    echo $(COQTHEORIES)) > _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq
 
@@ -49,13 +52,14 @@ theories: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
 	$(MAKE) -f Makefile.coq
 
 extract: theories $(COQEXTRACT)
+	$(MAKE) -C src/Extraction clean
 	$(MAKE) -C src/Extraction
 	cd src/Extraction; ./fixextract.py
 
 %.vo: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
 	$(MAKE) -f Makefile.coq "$@"
 
-clean:
+clean: Makefile.coq
 	rm -f src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v 
 	$(MAKE) -f Makefile.coq clean
 	rm -f Makefile.coq

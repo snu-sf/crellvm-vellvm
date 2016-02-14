@@ -3,12 +3,12 @@
 *.glob
 *.aux
 
-/*.ml
-/*.mli
+_CoqProject
+Makefile.coq
 
 /src/Vellvm/syntax_base.v
 /src/Vellvm/syntax_rules.v
 /src/Vellvm/typing_rules.v
 
-_CoqProject
-Makefile.coq
+/src/Extraction/*.ml
+/src/Extraction/*.mli

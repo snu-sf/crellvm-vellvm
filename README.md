@@ -19,11 +19,13 @@ way to parse LLVM bitcode into a Vellvm AST.
 
 ## Build
 
-- `git clone git@github.com:snu-sf/opam-repository.git`
-- `opam repo add snu-sf opam-repository`
-- `opam switch 4.02.3`
-- `opam install ott coq.8.5.0~camlp4`
-- `make`
+```
+opam switch 4.02.3
+opam install ott coq.8.5.0~camlp4
+
+make init
+make
+```
 
 ## Interactive Theorem Proving
 
