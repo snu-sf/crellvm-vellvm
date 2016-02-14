@@ -52,7 +52,6 @@ theories: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
 	$(MAKE) -f Makefile.coq
 
 extract: theories $(COQEXTRACT)
-	$(MAKE) -C src/Extraction clean
 	$(MAKE) -C src/Extraction
 	cd src/Extraction; ./fixextract.py
 
