@@ -14,7 +14,7 @@ COQEXTRACT	:= src/Extraction/extraction_dom.v src/Extraction/extraction_core.v
 
 .PHONY: all metalib cpdtlib theories clean
 
-all: metalib cpdtlib compcert theories
+all: theories
 
 init:
 	git submodule init
@@ -34,7 +34,7 @@ metalib: lib/metalib
 cpdtlib: lib/cpdtlib
 	$(MAKE) -C lib/cpdtlib
 
-compcert: lib/compcert-2.4
+compcert: lib/compcert-2.4 metalib
 	$(MAKE) -C lib/compcert-2.4
 
 src/Vellvm/syntax_base.v: src/Vellvm/syntax_base.ott
@@ -48,7 +48,7 @@ src/Vellvm/typing_rules.v: src/Vellvm/syntax_base.ott src/Vellvm/typing_rules.ot
 	    -i typing_rules.ott -o typing_rules.v && \
 	rm _tmp_syntax_base.v
 
-theories: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
+theories: metalib cpdtlib compcert Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
 	$(MAKE) -f Makefile.coq
 
 extract: theories $(COQEXTRACT)
