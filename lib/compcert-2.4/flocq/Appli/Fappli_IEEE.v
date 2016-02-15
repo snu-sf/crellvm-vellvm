@@ -96,7 +96,7 @@ Definition B2FF x :=
   | B754_finite s m e _ => F754_finite s m e
   | B754_infinity s => F754_infinity s
   | B754_zero s => F754_zero s
-  | B754_nan b (exist pl _) => F754_nan b pl
+  | B754_nan b (exist _ pl _) => F754_nan b pl
   end.
 
 Definition radix2 := Build_radix 2 (refl_equal true).
@@ -157,7 +157,7 @@ Theorem match_FF2B :
   match FF2B x Hx return T with
   | B754_zero sx => fz sx
   | B754_infinity sx => fi sx
-  | B754_nan b (exist p _) => fn b p
+  | B754_nan b (exist _ p _) => fn b p
   | B754_finite sx mx ex _ => ff sx mx ex
   end =
   match x with
@@ -543,7 +543,7 @@ Qed.
 
 Definition shr mrs e n :=
   match n with
-  | Zpos p => (iter_pos p _ shr_1 mrs, (e + n)%Z)
+  | Zpos p => (iter_pos _ shr_1 mrs p, (e + n)%Z)
   | _ => (mrs, e)
   end.
 
@@ -787,7 +787,7 @@ destruct (truncate radix2 fexp (Z0, e1, loc_Exact)) as ((m2, e2), l2).
 rewrite shr_m_shr_record_of_loc.
 intros Hm2.
 rewrite Hm2.
-intros z.
+(* intros z. *)
 repeat split.
 rewrite Rlt_bool_true.
 repeat split.
@@ -1027,7 +1027,7 @@ Definition Bmult_FF mult_nan m x y :=
 Theorem B2FF_Bmult :
   forall mult_nan mult_nan_ff,
   forall m x y,
-  mult_nan_ff (B2FF x) (B2FF y) = (let '(sr, exist plr _) := mult_nan x y in (sr, plr)) ->
+  mult_nan_ff (B2FF x) (B2FF y) = (let '(sr, exist _ plr _) := mult_nan x y in (sr, plr)) ->
   B2FF (Bmult mult_nan m x y) = Bmult_FF mult_nan_ff m (B2FF x) (B2FF y).
 Proof.
 intros mult_nan mult_nan_ff m x y Hmult_nan.
@@ -1336,7 +1336,7 @@ elim Rle_not_lt with (1 := Bz).
 generalize (bounded_lt_emax _ _ Hx) (bounded_lt_emax _ _ Hy) (andb_prop _ _ Hx) (andb_prop _ _ Hy).
 intros Bx By (Hx',_) (Hy',_).
 generalize (canonic_canonic_mantissa sx _ _ Hx') (canonic_canonic_mantissa sy _ _ Hy').
-clear -Bx By Hs.
+clear -Bx By Hs prec_gt_0_.
 intros Cx Cy.
 destruct sx.
 (* ... *)

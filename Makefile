@@ -1,41 +1,41 @@
 OTT ?= ott
 
-COQLIBS=-I src/Vellvm -I src/Vellvm/ott -I src/Vellvm/Dominators \
-  -I src/Interpreter -I src/Parser -I src/Extraction \
-	-I lib/GraphBasics -I lib/cpdtlib -I lib/metalib-20090714 \
-	-I lib/compcert-2.4/backend -I lib/compcert-2.4/common -I lib/compcert-2.4/flocq/Appli/ \
-	-I lib/compcert-2.4/flocq/Calc -I lib/compcert-2.4/flocq/Core -I lib/compcert-2.4/flocq/Prop \
-	-I lib/compcert-2.4/ia32 -I lib/compcert-2.4/lib -I lib/compcert-2.4/old
-MAKECOQ=make -f Makefile.coq COQLIBS="$(COQLIBS)"
+COQMODULE    := Vellvm
+COQTHEORIES  := $(shell ls \
+  src/GraphBasics/*.v \
+  src/Vellvm/Dominators/*.v \
+  src/Vellvm/ott/*.v) \
+  src/Vellvm/analysis.v src/Vellvm/datatype_base.v src/Vellvm/dopsem.v src/Vellvm/events.v src/Vellvm/external_intrinsics.v src/Vellvm/genericvalues_inject.v src/Vellvm/genericvalues_props.v src/Vellvm/genericvalues.v src/Vellvm/infrastructure.v src/Vellvm/infrastructure_props.v \
+	src/Vellvm/interpreter.v src/Vellvm/memory_sim.v src/Vellvm/opsem_props.v src/Vellvm/opsem.v src/Vellvm/opsem_wf.v src/Vellvm/ott_list_core.v src/Vellvm/ott_list_eq_dec.v \
+	src/Vellvm/static.v src/Vellvm/syntax.v src/Vellvm/monad.v src/Vellvm/syntax_base.v src/Vellvm/tactics.v src/Vellvm/targetdata.v src/Vellvm/targetdata_props.v src/Vellvm/trace.v \
+	src/Vellvm/typing_rules.v src/Vellvm/typings_props.v src/Vellvm/typings.v src/Vellvm/vellvm.v src/Vellvm/vellvm_tactics.v src/Vellvm/memory_props.v src/Vellvm/program_sim.v src/Vellvm/util.v src/Vellvm/maps_ext.v
 
-all: theories extraction
+COQEXTRACT	:= src/Extraction/extraction_dom.v src/Extraction/extraction_core.v 
 
-libs: lib/metalib-20090714
-	make -C lib/metalib-20090714
+.PHONY: all metalib cpdtlib theories clean
 
-compcert: libs lib/compcert-2.4
-	make -C lib/compcert-2.4
+all: theories
 
-depend: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
-	+$(MAKECOQ) depend
+init:
+	git submodule init
+	git submodule update
 
-extraction: theories
-	+make -C src/Extraction
-	+cd src/Extraction; ./fixextract.py; cd ../..
+Makefile.coq: Makefile $(COQTHEORIES)
+	(echo "-R src $(COQMODULE)"; \
+   echo "-R lib/metalib metalib"; \
+   echo "-R lib/cpdtlib Cpdt"; \
+   echo "-R lib/compcert-2.4 compcert"; \
+   echo $(COQTHEORIES)) > _CoqProject
+	coq_makefile -f _CoqProject -o Makefile.coq
 
-theories: libs compcert Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
-	+$(MAKECOQ)
+metalib: lib/metalib
+	$(MAKE) -C lib/metalib
 
-Makefile.coq: Make
-	coq_makefile -f Make -o Makefile.coq
+cpdtlib: lib/cpdtlib
+	$(MAKE) -C lib/cpdtlib
 
-%.vo: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
-	+$(MAKECOQ) "$@"
-
-clean:
-	rm -f src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v 
-	make -f Makefile.coq clean
-	rm -f Makefile.coq
+compcert: lib/compcert-2.4 metalib
+	$(MAKE) -C lib/compcert-2.4
 
 src/Vellvm/syntax_base.v: src/Vellvm/syntax_base.ott
 	cd src/Vellvm && \
@@ -48,4 +48,18 @@ src/Vellvm/typing_rules.v: src/Vellvm/syntax_base.ott src/Vellvm/typing_rules.ot
 	    -i typing_rules.ott -o typing_rules.v && \
 	rm _tmp_syntax_base.v
 
-.PHONY: all clean theories libs
+theories: metalib cpdtlib compcert Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
+	$(MAKE) -f Makefile.coq
+
+extract: theories $(COQEXTRACT)
+	$(MAKE) -C src/Extraction
+	cd src/Extraction; ./fixextract.py
+
+%.vo: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
+	$(MAKE) -f Makefile.coq "$@"
+
+clean: Makefile.coq
+	rm -f src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v 
+	$(MAKE) -f Makefile.coq clean
+	rm -f Makefile.coq
+	$(MAKE) -C src/Extraction clean

@@ -166,7 +166,7 @@ Variable uf: t.
 
 Definition F_repr (a: elt) (rec: forall b, order uf.(m) b a -> elt) : elt :=
   match getlink uf.(m) a with
-  | inleft (exist a' P) => rec a' P
+  | inleft (exist _ a' P) => rec a' P
   | inright _ => a
   end.
 
@@ -488,7 +488,7 @@ Variable uf: t.
 
 Definition F_pathlen (a: elt) (rec: forall b, order uf.(m) b a -> nat) : nat :=
   match getlink uf.(m) a with
-  | inleft (exist a' P) => S (rec a' P)
+  | inleft (exist _ a' P) => S (rec a' P)
   | inright _ => O
   end.
 
@@ -653,20 +653,22 @@ Next Obligation.
   (* a <> b*)
   destruct (find_x a')
   as [[b' uf''] [A B]]. simpl in *. inv Heq_anonymous0.
+  inv Heq_anonymous.
   apply repr_some_diff. auto.
 Qed.
 Next Obligation.
   destruct (find_x a') as [[b' uf''] [A B]]. simpl in *. inv Heq_anonymous0.
+  inv Heq_anonymous.
   rewrite B. apply repr_some. auto.
 Qed.
 Next Obligation.
   split.
   destruct (find_x a')
   as [[b' uf''] [A B]]. simpl in *. inv Heq_anonymous0.
-  symmetry. apply repr_some. auto.
+  symmetry. inv Heq_anonymous. apply repr_some. auto.
   intros. rewrite repr_compress. 
   destruct (find_x a')
-  as [[b' uf''] [A B]]. simpl in *. inv Heq_anonymous0. auto.
+  as [[b' uf''] [A B]]. simpl in *. inv Heq_anonymous0. inv Heq_anonymous. auto.
 Qed.
 Next Obligation.
   split; auto. symmetry. apply repr_none. auto.

@@ -1080,14 +1080,14 @@ Proof.
   intros.
   inv_mbind. 
   symmetry in HeqR0.
-  set (P:=fun (pc:atom)(r:ReachDS.L.t) => 
+  set (P:=fun (pc:atom)(r:analysis.ReachDS.L.t) => 
           if r then reachable f pc else True).
-  assert (forall res : AMap.t ReachDS.L.t,
-       ReachDS.fixpoint (successors f) 
-         (fun (_ : atom) (r : ReachDS.L.t) => r) 
+  assert (forall res : AMap.t analysis.ReachDS.L.t,
+       analysis.ReachDS.fixpoint (successors f) 
+         (fun (_ : atom) (r : analysis.ReachDS.L.t) => r) 
          ((l0, true) :: nil) = ret res ->
        forall pc : atom, P pc res !! pc) as J.
-    apply ReachDS.fixpoint_inv; simpl; auto.
+    apply analysis.ReachDS.fixpoint_inv; simpl; auto.
       destruct x; auto.
 
       unfold P. intros pc sc x y Hin' H1 H2.
@@ -1111,7 +1111,7 @@ Proof.
   apply J with (pc:=a) in HeqR0.
   unfold P in HeqR0.
   apply get_reachable_labels__spec'' in Hin.
-  unfold ReachDS.L.t in *.
+  unfold analysis.ReachDS.L.t in *.
   rewrite Hin in HeqR0. auto.
 Qed.
 
@@ -2810,7 +2810,7 @@ Proof.
           solve_in_list.
       inv EQ.
       apply lookupBlockViaLabelFromFdef_inv in J2; auto.
-      destruct J2; subst.
+      inv J2; subst.
       destruct Hdom2 as [Hdom2 | [sts2 [a2 [J4 [J5 J6]]]]].
       SCase "local".
         unfold init_scope in Hdom2.

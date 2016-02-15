@@ -170,10 +170,10 @@ Qed.
 
 Definition bits_of_binary_float (x : binary_float) :=
   match x with
-  | B754_zero sx => join_bits sx 0 0
-  | B754_infinity sx => join_bits sx 0 (Zpower 2 ew - 1)
-  | B754_nan sx (exist plx _) => join_bits sx (Zpos plx) (Zpower 2 ew - 1)
-  | B754_finite sx mx ex _ =>
+  | B754_zero _ _ sx => join_bits sx 0 0
+  | B754_infinity _ _ sx => join_bits sx 0 (Zpower 2 ew - 1)
+  | B754_nan _ _ sx (exist _ plx _) => join_bits sx (Zpos plx) (Zpower 2 ew - 1)
+  | B754_finite _ _ sx mx ex _ =>
     if Zle_bool (Zpower 2 mw) (Zpos mx) then
       join_bits sx (Zpos mx - Zpower 2 mw) (ex - emin + 1)
     else
@@ -182,10 +182,10 @@ Definition bits_of_binary_float (x : binary_float) :=
 
 Definition split_bits_of_binary_float (x : binary_float) :=
   match x with
-  | B754_zero sx => (sx, 0, 0)%Z
-  | B754_infinity sx => (sx, 0, Zpower 2 ew - 1)%Z
-  | B754_nan sx (exist plx _) => (sx, Zpos plx, Zpower 2 ew - 1)%Z
-  | B754_finite sx mx ex _ =>
+  | B754_zero _ _ sx => (sx, 0, 0)%Z
+  | B754_infinity _ _ sx => (sx, 0, Zpower 2 ew - 1)%Z
+  | B754_nan _ _ sx (exist _ plx _) => (sx, Zpos plx, Zpower 2 ew - 1)%Z
+  | B754_finite _ _ sx mx ex _ =>
     if Zle_bool (Zpower 2 mw) (Zpos mx) then
       (sx, Zpos mx - Zpower 2 mw, ex - emin + 1)%Z
     else
@@ -273,7 +273,9 @@ Local Open Scope Z_scope.
              0 <= Z.pos p < 2^n).
   {
     intros.  
-    generalize (digits2_Pnat_correct p). simpl. rewrite ! Zpower_nat_Z. intros [A B].
+    generalize (digits2_Pnat_correct p).
+    replace (let d := digits2_Pnat p in Zpower_nat 2 d <= Z.pos p < Zpower_nat 2 (S d)) with (Zpower_nat 2 (digits2_Pnat p) <= Z.pos p < Zpower_nat 2 (S (digits2_Pnat p))); auto.
+    rewrite ! Zpower_nat_Z. intros [A B].
     split. zify; omega. eapply Zlt_le_trans. eassumption. 
     apply (Zpower_le radix2); auto.
   } 

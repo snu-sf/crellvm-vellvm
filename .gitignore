@@ -1,18 +1,14 @@
-**.vo
-**.v.d
-**.glob
+*.v.d
+*.vo
+*.glob
+*.aux
 
-/*.ml
-/*.mli
+_CoqProject
+Makefile.coq
 
 /src/Vellvm/syntax_base.v
 /src/Vellvm/syntax_rules.v
 /src/Vellvm/typing_rules.v
 
-/lib/*
-!/lib/compcert-2.4/*
-!/lib/GraphBasics
-!/lib/GraphBasics/*
-
-Makefile.coq
-.coqrc
+/src/Extraction/*.ml
+/src/Extraction/*.mli

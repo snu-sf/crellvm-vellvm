@@ -4,6 +4,7 @@ Require Import Arith.
 Require Import Bool.
 Require Import List.
 Require Import Ring.
+Require Import Omega.
 Require Import ott_list_core.
 Require Import ott_list_base.
 Require Import ott_list_nth.

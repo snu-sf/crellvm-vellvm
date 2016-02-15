@@ -325,7 +325,7 @@ destruct (round_DN_or_UP beta fexp rnd x) as [H|H] ; rewrite H ; clear H.
 (* . *)
 rewrite Rabs_left1.
 rewrite Ropp_minus_distr.
-apply Rplus_lt_reg_r with (round beta fexp Zfloor x).
+apply Rplus_lt_reg_l with (round beta fexp Zfloor x).
 rewrite <- ulp_DN_UP with (1 := Hx).
 ring_simplify.
 assert (Hu: (x <= round beta fexp Zceil x)%R).
@@ -340,7 +340,7 @@ apply round_DN_pt...
 (* . *)
 rewrite Rabs_pos_eq.
 rewrite ulp_DN_UP with (1 := Hx).
-apply Rplus_lt_reg_r with (x - ulp x)%R.
+apply Rplus_lt_reg_l with (x - ulp x)%R.
 ring_simplify.
 assert (Hd: (round beta fexp Zfloor x <= x)%R).
 apply round_DN_pt...
@@ -1136,7 +1136,6 @@ destruct (Rle_or_lt x 0) as [Hx|Hx].
 apply Rle_trans with (1 := Hx).
 now apply pred_ge_0.
 apply le_pred_lt_aux ; try easy.
-now split.
 Qed.
 
 
@@ -1150,7 +1149,7 @@ assumption.
 now apply generic_format_succ.
 replace 0%R with (0+0)%R by ring; apply Rplus_lt_compat; try apply Hx.
 apply bpow_gt_0.
-apply Rplus_lt_reg_r with (-x)%R; ring_simplify.
+apply Rplus_lt_reg_l with (-x)%R; ring_simplify.
 apply bpow_gt_0.
 apply Rle_antisym; trivial.
 apply Rplus_le_reg_r with (ulp (pred (x + ulp x))).

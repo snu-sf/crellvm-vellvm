@@ -394,7 +394,7 @@ block {{ tex b }} :: 'block_' 				::=  	                {{ com blocks }}
   | l stmts				                ::   :: intro           {{ coq ([[l]], [[stmts]]) }}
   | ( block )						:: S :: paren           {{ coq [[ block ]] }}
 
-opt_stmts :: 'opt_stmts_' 				::=			{{ com option stmt }}
+opt_stmts {{ tex \mathit{opt_{stmts} } }} :: 'opt_stmts_' 				::=			{{ com option stmts }} {{ coq option stmts }}
   |  none 						:: M :: none		{{ com none }} {{ coq None }}
   |  stmts						:: M :: some  		{{ com some }} {{ coq (Some [[stmts]]) }}
 

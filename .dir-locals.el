@@ -1,27 +1,10 @@
 ;; Specify coq-load path relative to project root
-((coq-mode . ((eval . (flet ((pre (s) (concat 
-                                       (locate-dominating-file buffer-file-name
-                                                               ".dir-locals.el") 
-                                       s)))
-                        (setq coq-load-path 
-                              `(,(pre "src/Vellvm")
-                                ,(pre "src/Vellvm/ott")
-                                ,(pre "src/Vellvm/Dominators")
-                                ,(pre "lib/compcert-2.4")
-                                ,(pre "lib/compcert-2.4/flocq/Core")
-                                ,(pre "lib/compcert-2.4/flocq/Calc")
-                                ,(pre "lib/compcert-2.4/flocq/Appli")
-                                ,(pre "lib/compcert-2.4/flocq/Prop")
-                                ,(pre "lib/compcert-2.4/old")
-                                ,(pre "lib/compcert-2.4/lib")
-                                ,(pre "lib/compcert-2.4/common")
-                                ,(pre "lib/compcert-2.4/backend")
-                                ,(pre "lib/compcert-2.4/ia32")
-                                ,(pre "lib/cpdtlib")
-                                ,(pre "lib/GraphBasics")
-                                ,(pre "lib/metalib-20090714")
-                                ,(pre "lib/Coq-Equations-8.4/src")
-                                (rec ,(pre "lib/Coq-Equations-8.4/theories") "Equations")))))
-              (coq-prog-args . ("-emacs-U"
-                                "-impredicative-set")))))
-                                      
+((coq-mode . ((eval . (flet
+                          ((pre (s) (concat (locate-dominating-file buffer-file-name ".dir-locals.el") s)))
+                        (setq coq-load-path
+                              `((rec ,(pre "src") "Vellvm")
+                                (rec ,(pre "lib/metalib") "metalib")
+                                (rec ,(pre "lib/cpdtlib") "Cpdt")
+                                (rec ,(pre "lib/compcert-2.4") "compcert")
+                                ))))
+              (coq-prog-args . ("-emacs-U")))))

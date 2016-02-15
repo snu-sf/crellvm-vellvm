@@ -3116,9 +3116,10 @@ Proof.
              assert (J:=HlkB).
              symmetry in J.
              apply lookupBlockViaLabelFromFdef_inv in J; auto.
-             destruct J as [Heq J]; subst.
+             inv J.
+             (* destruct J as [Heq J]; subst. *)
              eapply wf_system__lookup__wf_block in HlkB; eauto.
-             inv HlkB. clear H9 H8.
+             inv HlkB. clear H9 H10.
              eapply wf_phinodes__getIncomingValuesForBlockFromPHINodes
                with (ps':=ps')(cs':=cs')(tmn':=tmn')(l0:=l3); eauto.
                simpl. auto.
@@ -3127,9 +3128,10 @@ Proof.
              assert (J:=HlkB).
              symmetry in J.
              apply lookupBlockViaLabelFromFdef_inv in J; auto.
-             destruct J as [Heq J]; subst.
+             (* destruct J as [Heq J]; subst. *)
+             inv J.
              eapply wf_system__lookup__wf_block in HlkB; eauto.
-             inv HlkB. clear H9 H8.
+             inv HlkB. clear H9 H10.
              eapply wf_phinodes__getIncomingValuesForBlockFromPHINodes
                with (ps':=ps')(cs':=cs')(tmn':=tmn')(l0:=l2); eauto.
                simpl. auto.
