@@ -151,7 +151,7 @@ wf_global (los,nts) s gl /\
 wf_system s /\
 moduleInSystemB (module_intro los nts ps) s = true.
 
-Transparent GenericValueHelper.gv2gvs GenericValueHelper.cgv2gvs GenericValueHelper.lift_op1 GenericValueHelper.lift_op2.
+Transparent GenericValueHelper.gv2gvs GenericValueHelper.lift_op1 GenericValueHelper.lift_op2.
 
 (* Properties of inhabited *)
 (* Lemma const2GV__inhabited : forall TD gl c gvs, *)

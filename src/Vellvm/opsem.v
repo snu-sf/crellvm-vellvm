@@ -40,7 +40,7 @@ Module GenericValueHelper.
 (* Hint Unfold inhabited. *)
 
 (* cgv2gvs cgv t converts the constant cgv to GenericValues w.r.t type t. *)
-Definition cgv2gvs : GenericValue -> typ -> GenericValue := LLVMgv.cgv2gv.
+(* Definition cgv2gvs : GenericValue -> typ -> GenericValue := LLVMgv.cgv2gv. *)
 (* gv2gvs gv t converts gv to GenericValues in terms of type t. *)
 Definition gv2gvs : GenericValue -> typ -> GenericValue := fun gv _ => gv.
 (* f is a unary operation of gv, lift_op1 f returns a unary operation of 
@@ -69,7 +69,7 @@ Lemma cgv2gvs__getTypeSizeInBits : forall S los nts gv t sz al,
       Some (sz, al) ->
   Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz) 8) = sizeGenericValue gv ->
   Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz) 8) =
-    sizeGenericValue (cgv2gvs gv t).
+    sizeGenericValue (LLVMgv.cgv2gv gv t).
 Proof.
   intros.
   eapply cgv2gv__getTypeSizeInBits; eauto.
@@ -89,9 +89,9 @@ Qed.
 Lemma cgv2gvs__matches_chunks : forall S los nts gv t,
   wf_typ S (los,nts) t ->
   gv_chunks_match_typ (los, nts) gv t ->
-  gv_chunks_match_typ (los, nts) (cgv2gvs gv t) t.
+  gv_chunks_match_typ (los, nts) (LLVMgv.cgv2gv gv t) t.
 Proof.
-  intros. subst. unfold cgv2gvs.
+  intros. subst. unfold LLVMgv.cgv2gv.
   destruct gv; auto.
   destruct p as [[]]; auto. 
   destruct gv; auto.
@@ -209,7 +209,7 @@ Proof.
   intros. eauto.
 Qed.
 
-Global Opaque gv2gvs cgv2gvs lift_op1 lift_op2.
+Global Opaque gv2gvs lift_op1 lift_op2.
 
 End GenericValueHelper.
 
@@ -449,7 +449,7 @@ Definition in_list_gvs (l1 : list GenericValue) (l2 : list GenericValue) : Prop 
 Definition const2GV (TD:TargetData) (gl:GVMap) (c:const) : option GenericValue :=
 match (_const2GV TD gl c) with
 | None => None
-| Some (gv, ty) => Some (GenericValueHelper.cgv2gvs gv ty)
+| Some (gv, ty) => Some (LLVMgv.cgv2gv gv ty)
 end.
 
 (* Compute the semantic value of a program value. *)

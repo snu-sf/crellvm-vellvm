@@ -723,11 +723,10 @@ Qed.
 Lemma cgv2gvs_preserves_no_alias: forall g0 mb ofs m t0 maxb,
   no_alias g0 [(Vptr mb ofs, m)] ->
   (xH <= maxb < mb)%positive ->
-  no_alias (GenericValueHelper.cgv2gvs g0 t0) [(Vptr mb ofs, m)].
+  no_alias (genericvalues.LLVMgv.cgv2gv g0 t0) [(Vptr mb ofs, m)].
 Proof.
-Local Transparent GenericValueHelper.cgv2gvs.
   intros.
-  unfold GenericValueHelper.cgv2gvs. simpl.
+  unfold cgv2gv. simpl.
   destruct g0 as [|[]]; auto.
   destruct v; auto.
   destruct g0 as [|]; auto.
@@ -738,7 +737,6 @@ Local Transparent GenericValueHelper.cgv2gvs.
 
     simpl. split; auto. split; auto. unfold Mem.nullptr. intro J. subst.
     inv H0; destruct maxb; inv H2.
-Global Opaque GenericValueHelper.cgv2gvs.
 Qed.
 
 Lemma no_alias_GV2ptr__neq_blk: forall TD sz0 ptr1 ptr2 b1 i1 b2 i2
@@ -1134,11 +1132,10 @@ Proof.
 Qed.
 
 Lemma cgv2gvs_preserves_valid_ptrs: forall g0 t0 bd,
-  (bd > xH)%positive -> valid_ptrs bd g0 -> valid_ptrs bd (GenericValueHelper.cgv2gvs g0 t0).
+  (bd > xH)%positive -> valid_ptrs bd g0 -> valid_ptrs bd (genericvalues.LLVMgv.cgv2gv g0 t0).
 Proof.
   intros.
-Local Transparent GenericValueHelper.cgv2gvs.
-  unfold GenericValueHelper.cgv2gvs. simpl. unfold cgv2gv.
+  unfold cgv2gv.
   destruct g0 as [|[]]; auto.
   destruct v; auto.
   destruct g0 as [|]; auto.
@@ -1147,7 +1144,6 @@ Local Transparent GenericValueHelper.cgv2gvs.
     destruct f; auto.
 
     apply null_valid_ptrs; auto.
-Global Opaque GenericValueHelper.cgv2gvs.
 Qed.
 
 (*****************************************************************)
