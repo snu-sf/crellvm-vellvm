@@ -446,7 +446,7 @@ Proof.
         destruct R3; simpl in HinterInsn; try solve [inversion HinterInsn].
         remember (GEP CurTargetData0 t g l1 i1 typ') as R2.
         destruct R2; simpl in HinterInsn; inv HinterInsn;
-          eauto using dos_in_list_gvs_intro.
+          eauto.
 
       Case "insn_trunc".
         remember (TRUNC CurTargetData0 lc Globals0 t t0 v t1) as R.
@@ -517,7 +517,7 @@ Proof.
             end.
             remember (exCallUpdateLocals CurTargetData0 rt1 n i0 oresult lc) as R4.
             destruct R4; inv HinterInsn.
-            eapply sExCall; eauto using dos_in_list_gvs_intro.
+            eapply sExCall with (gvs:=l0); eauto.
               unfold lookupExFdecViaPtr.
               rewrite <- HeqR4. simpl. rewrite <- HeqR1. eauto.
 Qed.

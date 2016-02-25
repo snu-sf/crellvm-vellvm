@@ -2801,7 +2801,7 @@ Case "wfconst_struct". Focus.
   destruct (@H0 system5 (layouts5, namedts5) maxb gl mb ofs m) as [J1 J2];
     eauto using const2GV_typsize_mutind_struct'.
   destruct_if.
-  destruct g0; inv H5.
+  destruct g0; inv H6.
     split; simpl; auto.
     split; auto.
       symmetry in HeqR.
@@ -2864,13 +2864,13 @@ Case "wfconst_gep". Focus.
   eapply H0 with (ofs:=ofs)(m:=m) in HeqR; eauto.
   destruct HeqR as [J1 [J2 J3]]; subst.
   remember (getConstGEPTyp const_list (typ_pointer typ5)) as R2.
-  destruct R2; tinv H8. uniq_result.
+  destruct R2; tinv H7. uniq_result.
   remember (GV2ptr targetdata5 (getPointerSize targetdata5) g0) as R3.
-  destruct R3; tinv H8.
+  destruct R3; tinv H7.
     remember (intConsts2Nats targetdata5 const_list) as R4.
-    destruct R4; tinv H8.
+    destruct R4; tinv H7.
       remember (mgep targetdata5 typ5 v l0) as R5.
-      destruct R5; inv H8.
+      destruct R5; inv H7.
         symmetry_ctx. uniq_result. 
         split; auto.
         split.
@@ -2893,7 +2893,7 @@ Case "wfconst_icmp".
     eapply micmp_preserves_no_alias; eauto.
     eapply micmp_preserves_valid_ptrs; eauto.
 Case "wfconst_fcmp".
-  destruct t; tinv H8. inv_mbind'.
+  destruct t; tinv H7. inv_mbind'.
   split; auto.
   split.
     eapply mfcmp_preserves_no_alias; eauto.
@@ -3072,7 +3072,7 @@ Qed.
 Lemma operand__lt_nextblock: forall maxb los nts M (lc:DGVMap) mptr gl
   (Hwfgl : wf_globals maxb gl) v mptrs (Hlt: (maxb < Mem.nextblock M)%positive)
   (Hwflc: wf_lc M lc)
-  (Hin: mptr @ mptrs) S Ps t F
+  (Hin: mptr = mptrs) S Ps t F
   (Hwft: wf_value S (module_intro los nts Ps) F v t)
   (Hgetop : Opsem.getOperandValue (los,nts) v lc gl = ret mptrs),
   valid_ptrs (Mem.nextblock M) mptr.

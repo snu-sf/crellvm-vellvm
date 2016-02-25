@@ -38,8 +38,8 @@ Import AtomSet.
 
 (* Notations *)
 
-Notation "gv @ gvs" :=
-  (GenericValueHelper.instantiate_gvs gv gvs) (at level 43, right associativity).
+(* Notation "gv @ gvs" := *)
+(*   (GenericValueHelper.instantiate_gvs gv gvs) (at level 43, right associativity). *)
 Notation "$ gv # t $" := (GenericValueHelper.gv2gvs gv t) (at level 41).
 Notation "vidxs @@ vidxss" := (in_list_gvs vidxs vidxss)
   (at level 43, right associativity).
@@ -51,10 +51,9 @@ Notation "vidxs @@ vidxss" := (in_list_gvs vidxs vidxss)
 Inductive wf_GVs : TargetData -> GenericValue -> typ -> Prop :=
 | wf_GVs_intro : forall TD gvs t sz,
     getTypeSizeInBits TD t = Some sz ->
-    (forall gv, gv @ gvs ->
-      sizeGenericValue gv = Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz) 8)) ->
+    sizeGenericValue gvs = Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz) 8) ->
     GenericValueHelper.inhabited gvs ->
-    (forall gv, gv @ gvs -> gv_chunks_match_typ TD gv t) ->
+    gv_chunks_match_typ TD gvs t ->
     wf_GVs TD gvs t.
 
 Hint Constructors wf_GVs.
@@ -153,7 +152,7 @@ wf_global (los,nts) s gl /\
 wf_system s /\
 moduleInSystemB (module_intro los nts ps) s = true.
 
-Transparent GenericValueHelper.gv2gvs GenericValueHelper.instantiate_gvs GenericValueHelper.inhabited GenericValueHelper.cgv2gvs GenericValueHelper.lift_op1 GenericValueHelper.lift_op2.
+Transparent GenericValueHelper.gv2gvs GenericValueHelper.inhabited GenericValueHelper.cgv2gvs GenericValueHelper.lift_op1 GenericValueHelper.lift_op2.
 
 (* Properties of inhabited *)
 Lemma const2GV__inhabited : forall TD gl c gvs,
@@ -203,7 +202,7 @@ Qed.
 Lemma const2GV__getTypeSizeInBits : forall S TD c t gl gvs gv
   (hwfc: wf_const S TD c t)
   (Hc2g: const2GV TD gl c = Some gvs),
-  gv @ gvs ->
+  gv = gvs ->
   wf_global TD S gl ->
   exists sz,
     getTypeSizeInBits TD t = Some sz /\
@@ -228,7 +227,7 @@ Qed.
 Lemma const2GV__matches_chunks : forall S TD c t gl gvs gv
   (hwfc: wf_const S TD c t)
   (Hc2g: const2GV TD gl c = Some gvs),
-  gv @ gvs ->
+  gv = gvs ->
   wf_global TD S gl ->
   gv_chunks_match_typ TD gv t.
 Proof.
@@ -845,7 +844,6 @@ Proof.
     unfold getTypeSizeInBits, getTypeSizeInBits_and_Alignment,
            getTypeSizeInBits_and_Alignment_for_namedts.
     rewrite J1. auto.
-    eapply GenericValueHelper.gv2gvs__getTypeSizeInBits; eauto.
     eapply GenericValueHelper.gv2gvs__matches_chunks; eauto.
       eapply gundef__matches_chunks in J; eauto.
 Qed.
@@ -866,7 +864,6 @@ Proof.
            (_getTypeSizeInBits_and_Alignment_for_namedts los nts true)
            true t) as R.
     destruct R as [[]|]; inv J1.
-    eapply GenericValueHelper.gv2gvs__getTypeSizeInBits; eauto.
 
     eapply GenericValueHelper.gv2gvs__matches_chunks; eauto.
       eapply fit_gv__matches_chunks in J; eauto.
@@ -887,9 +884,9 @@ Proof.
     rewrite J1. auto.
 
     eapply GenericValueHelper.lift_op1__getTypeSizeInBits; eauto.
-    intros. symmetry in H0.
-    eapply fit_gv__getTypeSizeInBits in H0; eauto.
-    destruct H0 as [sz0 [H1 H2]].
+    intros. symmetry in H.
+    eapply fit_gv__getTypeSizeInBits in H; eauto.
+    destruct H as [sz0 [H1 H2]].
     unfold getTypeSizeInBits in H1.
     rewrite J1 in H1. inv H1. auto.
 
@@ -1061,12 +1058,10 @@ Proof.
   eapply wf_GVs_intro; eauto.
     unfold getTypeSizeInBits. simpl. eauto.
 
-    intros gv Hin.
     eapply GenericValueHelper.lift_op2__getTypeSizeInBits with (los:=los)(nts:=nts); eauto.
       simpl. eauto.
       intros. erewrite mbop_typsize; eauto.
 
-    intros gv Hin.
     eapply GenericValueHelper.lift_op2__matches_chunks with (los:=los)(nts:=nts); eauto.
       simpl. eauto.
       intros. eapply mbop_matches_chunks; eauto.
@@ -1092,18 +1087,16 @@ Proof.
   eapply wf_GVs_intro with (sz:=sz); eauto.
     unfold getTypeSizeInBits. rewrite H1. auto.
 
-    intros gv Hin.
     eapply GenericValueHelper.lift_op2__getTypeSizeInBits with (los:=los)(nts:=nts); eauto.
       simpl. eauto.
 
-      intros x y z ? ? J3.
+      intros z J3.
       eapply mfbop_typsize in J3; eauto.
       destruct J3 as [sz1 [al1 [J5 J6]]].
       unfold getTypeSizeInBits_and_Alignment in H1.
       unfold getTypeSizeInBits_and_Alignment_for_namedts in *.
       rewrite H1 in J5. inv J5. auto.
 
-    intros gv Hin.
     eapply GenericValueHelper.lift_op2__matches_chunks with (los:=los)(nts:=nts); eauto.
       intros. eapply mfbop_matches_chunks; eauto.
 Qed.
@@ -1124,13 +1117,11 @@ Proof.
   remember(getOperandValue (los,nts) v2 lc gl) as R2.
   destruct R2; inv Hiop.
   eapply wf_GVs_intro with (sz:=Size.to_nat Size.One); eauto.
-    intros gv Hin.
     eapply GenericValueHelper.lift_op2__getTypeSizeInBits with (los:=los)(nts:=nts)(S:=S);
       eauto.
       simpl. eauto.
       intros. unfold Size.to_nat. erewrite micmp_typsize; eauto.
 
-    intros gv Hin.
     eapply GenericValueHelper.lift_op2__matches_chunks with (los:=los)(nts:=nts); eauto.
       intros. eapply micmp_matches_chunks; eauto.
 Qed.
@@ -1151,13 +1142,11 @@ Proof.
   remember(getOperandValue (los,nts) v2 lc gl) as R2.
   destruct R2; inv Hiop.
   eapply wf_GVs_intro with (sz:=Size.to_nat Size.One); eauto.
-    intros gv Hin.
     eapply GenericValueHelper.lift_op2__getTypeSizeInBits with (los:=los)(nts:=nts)(S:=S);
       eauto.
       simpl. eauto.
       intros. unfold Size.to_nat. erewrite mfcmp_typsize; eauto.
 
-    intros gv Hin.
     eapply GenericValueHelper.lift_op2__matches_chunks with (los:=los)(nts:=nts); eauto.
       intros. eapply mfcmp_matches_chunks; eauto.
 Qed.
@@ -1179,23 +1168,21 @@ Proof.
   destruct R4; inv Hgt'.
   destruct TD as [los nts].
   apply wf_GVs_intro with (sz:=32%nat); auto.
-    intros gv Hin'.
     eapply GenericValueHelper.lift_op1__getTypeSizeInBits with (los:=los)(nts:=nts)
       (f:=gep (los, nts) t vidxs0 inbounds0 t') (g:=mp)
       (S:=S)(t:=typ_pointer t'); eauto.
       simpl. auto.
 
-      intros x y ? J3.
+      intros y J3.
       unfold gep, LLVMgv.GEP in J3.
       assert(gundef (los, nts) (typ_pointer t') = ret y ->
              sizeGenericValue y = nat_of_Z (ZRdiv (Z_of_nat 32) 8)) as G.
         intro W. unfold gundef in W. simpl in W. inv W. simpl. auto.
-      destruct (GV2ptr (los, nts) (getPointerSize (los, nts)) x); eauto.
+      destruct (GV2ptr (los, nts) (getPointerSize (los, nts)) mp); eauto.
       destruct (GVs2Nats (los, nts) vidxs0); eauto.
       destruct (mgep (los, nts) t v0 l0); eauto.
         inv J3. unfold ptr2GV, val2GV. simpl. auto.
 
-    intros gv Hin'.
     eapply GenericValueHelper.lift_op1__matches_chunks with (los:=los)(nts:=nts)
       (f:=gep (los, nts) t vidxs0 inbounds0 t')(S:=S)
       (t:=typ_pointer t'); eauto.
@@ -1219,11 +1206,10 @@ Proof.
   inv Hwfc.
     eapply getOperandValue__wf_gvs in HeqR1; eauto.
     eapply wf_GVs_intro with (sz:=sz5); eauto.
-      intros gv Hin.
       eapply GenericValueHelper.lift_op1__getTypeSizeInBits with (los:=los)(nts:=nts);eauto.
         simpl. eauto.
 
-        intros x y ? J2.
+        intros y J2.
         symmetry in J2.
         eapply gundef__getTypeSizeInBits in J2; eauto.
         destruct J2 as [sz1 [al1 [J4 J5]]].
@@ -1235,11 +1221,10 @@ Proof.
 
     eapply getOperandValue__wf_gvs in HeqR1; eauto.
     eapply wf_GVs_intro with (sz:=32%nat); eauto.
-      intros gv Hin.
       eapply GenericValueHelper.lift_op1__getTypeSizeInBits with (los:=los)(nts:=nts);eauto.
         simpl. eauto.
 
-        intros x y ? J2.
+        intros y J2.
         symmetry in J2.
         eapply gundef__getTypeSizeInBits in J2; eauto.
         destruct J2 as [sz1 [al1 [J4 J5]]].
@@ -1251,20 +1236,19 @@ Proof.
 
     eapply getOperandValue__wf_gvs in HeqR1; eauto.
     eapply wf_GVs_intro with (sz:=32%nat); eauto.
-      intros gv Hin.
-      eapply GenericValueHelper.lift_op1__getTypeSizeInBits with(los:=los)(nts:=nts) in Hin;
+      eapply GenericValueHelper.lift_op1__getTypeSizeInBits with(los:=los)(nts:=nts);
         eauto.
         simpl. eauto.
-        intros x y Hin' Heq. inv Heq.
+        intros y Heq. inv Heq.
         inv HeqR1.
         unfold getTypeSizeInBits in H. inv H. simpl in *. eauto.
 
       intros.
       eapply GenericValueHelper.lift_op1__matches_chunks with (los:=los)(nts:=nts); eauto.
         unfold mcast, mbitcast. intros.
-        inv HeqR1.
-        apply H6 in H1. uniq_result.
-        unfold gv_chunks_match_typ. unfold gv_chunks_match_typ in H1.
+        inv HeqR1. uniq_result.
+        unfold gv_chunks_match_typ. unfold gv_chunks_match_typ in H4.
+        
         simpl  in *. auto.
 Qed.
 
@@ -1291,9 +1275,8 @@ Proof.
     unfold getTypeSizeInBits.
     rewrite J3. auto.
 
-    intros gv Hin.
     eapply GenericValueHelper.lift_op1__getTypeSizeInBits with (los:=los)(nts:=nts); eauto.
-      intros x y Hin' J2'.
+      intros y J2'.
       eapply mtrunc_typsize in J2'; eauto.
       destruct J2' as [sz' [al' [J2' J4']]].
       unfold getTypeSizeInBits_and_Alignment in J3.
@@ -1304,9 +1287,8 @@ Proof.
       eapply getOperandValue__wf_gvs in HeqR1; eauto using wf_trunc__wf_value.
       inv HeqR1; auto.
 
-    intros gv Hin.
     eapply GenericValueHelper.lift_op1__matches_chunks with (los:=los)(nts:=nts); eauto.
-      intros x y Hin' J2'.
+      intros y J2'.
       eapply mtrunc_matches_chunks in J2'; eauto.
 Qed.
 
@@ -1332,18 +1314,16 @@ Proof.
     unfold getTypeSizeInBits.
     rewrite J4. auto.
 
-    intros gv Hin.
     eapply GenericValueHelper.lift_op1__getTypeSizeInBits with (los:=los)(nts:=nts); eauto.
-      intros x y Hin' J2'.
+      intros y J2'.
       eapply mext_typsize in J2'; eauto.
       destruct J2' as [sz' [al' [J2' J4']]].
       unfold getTypeSizeInBits_and_Alignment in J4.
       unfold layouts, namedts in *.
       rewrite J4 in J2'. inv J2'. auto.
 
-    intros gv Hin.
     eapply GenericValueHelper.lift_op1__matches_chunks with (los:=los)(nts:=nts); eauto.
-      intros x y Hin' J2'.
+      intros y J2'.
       eapply mext_matches_chunks in J2'; eauto.
 Qed.
 
@@ -1383,13 +1363,11 @@ Proof.
            getTypeSizeInBits_and_Alignment_for_namedts in *.
     inv_mbind.
     uniq_result. symmetry_ctx. uniq_result.
-    intros gv0 Hin.
     eapply GenericValueHelper.lift_op2__getTypeSizeInBits with (los:=los)(nts:=nts)(t:=t1);
       eauto.
-      intros x y z0 J4 J5 J6.
-      apply H1 in J4. apply H5 in J5.
+      intros z0 J6.
       unfold mset' in J6.
-      remember (mset (los, nts) x z t2 y) as R4.
+      remember (mset (los, nts) gvs1 z t2 gvs2) as R4.
       destruct R4 as [gv'|]; inv J6.
         eapply mset_typsize in HeqR4; eauto.
         rewrite <- HeqR4. auto.
@@ -1402,10 +1380,9 @@ Proof.
           symmetry_ctx; uniq_result; auto
         end.
 
-    intros gv0 Hin.
     eapply GenericValueHelper.lift_op2__matches_chunks with (los:=los)(nts:=nts)(t:=t1);
       eauto.
-      intros. apply H3 in H8. apply H7 in H9.  eapply mset'_matches_chunks; eauto.
+      intros. eapply mset'_matches_chunks; eauto.
 Qed.
 
 Lemma extractGenericValue__wf_gvs : forall S los nts t1 gv1 const_list gv typ'
@@ -1433,13 +1410,12 @@ Proof.
     unfold getTypeSizeInBits.
     rewrite J2. auto.
 
-    intros gv0 Hin.
     eapply GenericValueHelper.lift_op1__getTypeSizeInBits with (los:=los)(nts:=nts); eauto.
-      intros x y J4 J5.
+      intros y J5.
       unfold mget' in J5.
       unfold getTypeSizeInBits_and_Alignment,
              getTypeSizeInBits_and_Alignment_for_namedts in J2.
-      remember (mget (los, nts) x z typ') as R4.
+      remember (mget (los, nts) gv1 z typ') as R4.
       destruct R4 as [gv'|]; inv J5.
         eapply mget_typsize in HeqR4; eauto.
           destruct HeqR4 as [sz1 [al1 [J7 J8]]].
@@ -1454,10 +1430,9 @@ Proof.
         end.
         rewrite J2 in J7. inv J7. auto.
 
-    intros gv0 Hin.
     eapply GenericValueHelper.lift_op1__matches_chunks with (los:=los)(nts:=nts);
       eauto.
-      intros. inv Hwfg. apply H3 in H. eapply mget'_matches_chunks; eauto.
+      intros. inv Hwfg. eapply mget'_matches_chunks; eauto.
 Qed.
 
 (* Properties of wf_State *)
@@ -2069,31 +2044,31 @@ Case "sBranch".
     assert (HuniqF := HwfSystem).
     eapply wf_system__uniqFdef with (f:=F) in HuniqF; eauto.
     assert (isReachableFromEntry F 
-             (if isGVZero (los, nts) c then l2 else l1,
+             (if isGVZero (los, nts) conds then l2 else l1,
               stmts_intro ps' cs' tmn')) as Hreach'.
       clear - Hreach1 H1 HBinF1 HFinPs1 HmInS HwfSystem HuniqF HwfF.
       unfold isReachableFromEntry in *.
-      destruct (isGVZero (los, nts) c);
+      destruct (isGVZero (los, nts) conds);
         symmetry in H1;
         apply lookupBlockViaLabelFromFdef_inv in H1; eauto;
-        eapply reachable_successors; eauto; simpl; auto.
+        eapply reachable_successors; try apply HBinF1; eauto; simpl; auto.
     split; auto.
     split.
       clear - H1 HBinF1 HFinPs1 HmInS HwfSystem HuniqF.
-      destruct (isGVZero (los, nts) c);
+      destruct (isGVZero (los, nts) conds);
         symmetry in H1; apply lookupBlockViaLabelFromFdef_inv in H1; auto.
     split; auto.
     split.
-      destruct (isGVZero (los, nts) c);
+      destruct (isGVZero (los, nts) conds);
         eapply wf_lc_br_aux in H1; eauto.
     split.
-      clear - H0 HeqR1 H1 Hinscope1 H2 HwfSystem HBinF1 HwfF HuniqF Hwflc1 Hwfg
+      clear - HeqR1 H1 Hinscope1 H2 HwfSystem HBinF1 HwfF HuniqF Hwflc1 Hwfg
               Hwftd Hreach'.
       eapply inscope_of_tmn_br in HeqR1; eauto.
       destruct HeqR1 as [ids0' [HeqR1 [J1 J2]]].
       destruct cs'; rewrite <- HeqR1; auto.
 
-      exists (if isGVZero (los, nts) c then l2 else l1). 
+      exists (if isGVZero (los, nts) conds then l2 else l1). 
       exists ps'. exists nil. simpl_env. auto.
 
 Focus.
@@ -2187,14 +2162,11 @@ Case "sMalloc". eapply preservation_cmd_updated_case in HwfS1; simpl; eauto.
   unfold blk2GV, ptr2GV, val2GV. simpl.
   eapply wf_GVs_intro; eauto.
     unfold getTypeSizeInBits. simpl. eauto.
-    intros gv Hin.
-    apply GenericValueHelper.none_undef2gvs_inv in Hin; subst; auto.
-      intros mc. congruence.
+    subst; auto.
 
-    intros gv Hin. unfold gv_chunks_match_typ, vm_matches_typ.
-    apply GenericValueHelper.none_undef2gvs_inv in Hin; subst; simpl.
+    unfold gv_chunks_match_typ, vm_matches_typ.
+    subst; simpl.
     constructor; auto. simpl. split; auto.
-      intros mc. congruence.
 
 Case "sFree". eapply preservation_cmd_non_updated_case in HwfS1; eauto.
 Case "sAlloca". eapply preservation_cmd_updated_case in HwfS1; simpl; eauto.
@@ -2208,14 +2180,11 @@ Case "sAlloca". eapply preservation_cmd_updated_case in HwfS1; simpl; eauto.
   unfold blk2GV, ptr2GV, val2GV. simpl.
   eapply wf_GVs_intro; eauto.
     unfold getTypeSizeInBits. simpl. eauto.
-    intros gv Hin.
-    apply GenericValueHelper.none_undef2gvs_inv in Hin; subst; auto.
-      intros mc. congruence.
+    subst; auto.
 
-    intros gv Hin. unfold gv_chunks_match_typ, vm_matches_typ.
-    apply GenericValueHelper.none_undef2gvs_inv in Hin; subst; simpl.
+    unfold gv_chunks_match_typ, vm_matches_typ.
+    subst; simpl.
     constructor; auto. simpl. split; auto.
-      intros mc. congruence.
 
 Case "sLoad".  eapply preservation_cmd_updated_case in HwfS1; simpl; eauto.
   apply wf_State__inv in HwfS1; auto.
@@ -2235,11 +2204,8 @@ Case "sLoad".  eapply preservation_cmd_updated_case in HwfS1; simpl; eauto.
     remember (getTypeSizeInBits_and_Alignment (los, nts) true t) as R.
     destruct R as [[]|]; inv J1.
     unfold getTypeSizeInBits_and_Alignment in HeqR.
-    eapply GenericValueHelper.gv2gvs__getTypeSizeInBits; eauto.
 
-    intros gv0 Hin.
     eapply mload__matches_chunks in H1'; eauto.
-    eapply GenericValueHelper.gv2gvs__matches_chunks; eauto.
 
 Case "sStore". eapply preservation_cmd_non_updated_case in HwfS1; eauto.
 Case "sGEP".
@@ -2257,7 +2223,7 @@ Case "sGEP".
     assert (H0':=H0).
     eapply values2GVs__inhabited in H0; eauto.
     destruct H0 as [vidxs0 H0].
-    eapply GEP__wf_gvs in H1; eauto.
+    eapply GEP__wf_gvs in H2; eauto.
     solve_wf_value_list.
 
 Case "sTrunc".
@@ -2287,7 +2253,7 @@ Case "sSelect".
   inv Hwfc.
   eapply getOperandValue__wf_gvs in H0; eauto.
   eapply getOperandValue__wf_gvs in H1; eauto.
-  destruct (isGVZero (los, nts) c);
+  destruct (isGVZero (los, nts) cond0);
     eapply preservation_cmd_updated_case in HwfS1; simpl; eauto.
 
 Focus.
@@ -2796,19 +2762,12 @@ Qed.
 
 Ltac gvs_inhabited_inv H := apply GenericValueHelper.inhabited_inv in H; inv H.
 
-Lemma wf_params_spec' : forall TD gvss lp,
-  wf_params TD gvss lp ->
-  exists gvs, gvs @@ gvss.
-Proof.
-  induction gvss; simpl; intros.
-    exists nil. simpl. auto.
-
-    destruct lp as [|[[]]]; tinv H.
-    destruct H as [J1 J2].
-    inv J1. gvs_inhabited_inv H1.
-    apply IHgvss in J2. destruct J2 as [gvs J2].
-    exists (x::gvs). simpl. auto.
-Qed.
+(* Lemma wf_params_spec' : forall TD gvss lp, *)
+(*   wf_params TD gvss lp -> *)
+(*   exists gvs, gvs @@ gvss. *)
+(* Proof. *)
+(*   intros. exists gvss. eauto. *)
+(* Qed. *)
 
 Lemma params2GVs_inhabited : forall los nts Ps F gl lc
   (Hwfc : wf_lc (los,nts) F lc) S
@@ -2828,7 +2787,6 @@ Lemma params2GVs_inhabited : forall los nts Ps F gl lc
 Proof.
   intros.
   eapply params2GVs_wf_gvs in H; eauto.
-  apply wf_params_spec' in H; auto.
 Qed.
 
 Definition undefined_state (cfg: Config) (S : State): Prop :=
@@ -2894,7 +2852,7 @@ match cfg with
                              Locals := lc|};
        Mem := M |} =>
        match getOperandValue td v lc gl with
-       | Some gvs => exists gv, gv @ gvs /\
+       | Some gvs => exists gv, gv = gvs /\
            match free td M gv with
            | None => True
            | _ => False
@@ -2908,7 +2866,7 @@ match cfg with
                              Locals := lc|};
        Mem := M |} =>
        match getOperandValue td v lc gl with
-       | Some gvs => exists gv, gv @ gvs /\
+       | Some gvs => exists gv, gv = gvs /\
            match mload td M gv t a with
            | None => True
            | _ => False
@@ -2923,7 +2881,7 @@ match cfg with
        Mem := M |} =>
        match getOperandValue td v lc gl,
              getOperandValue td v0 lc gl with
-       | Some gvs, Some mgvs => exists gv, exists mgv, gv @ gvs /\ mgv @ mgvs /\
+       | Some gvs, Some mgvs => exists gv, exists mgv, gv = gvs /\ mgv = mgvs /\
            match mstore td M mgv t gv a with
            | None => True
            | _ => False
@@ -2939,7 +2897,7 @@ match cfg with
        Mem := M |} =>
        match getOperandValue td v lc gl with
        | Some fptrs =>
-            exists fptr, fptr @ fptrs /\
+            exists fptr, fptr = fptrs /\
             match lookupFdefViaPtr ps fs fptr,
                   lookupExFdecViaPtr ps fs fptr with
             | None, Some (fdec_intro (fheader_intro fa rt fid la va) dck) =>
@@ -3088,7 +3046,7 @@ Proof.
       destruct Hget as [cond Hget].
       assert (Hwfc := HbInF).
       eapply wf_system__wf_tmn in Hwfc; eauto.
-      assert (exists c, c @ cond) as Hinh.
+      assert (exists c, c = cond) as Hinh.
         inv Hwfc.
         eapply getOperandValue__inhabited in Hget; eauto.
       destruct Hinh as [c Hinh].
@@ -3098,7 +3056,7 @@ Proof.
                  then lookupBlockViaLabelFromFdef f l3
                  else lookupBlockViaLabelFromFdef f l2)) as HlkB.
         inv Hwfc.
-        destruct (isGVZero (los, nts) c); eauto.
+        destruct (isGVZero (los, nts) cond); eauto.
 
       destruct HlkB as [[ps' cs' tmn'] HlkB].
       assert (exists lc', switchToNewBasicBlock (los, nts)
@@ -3358,7 +3316,7 @@ Proof.
       eapply getOperandValue_inCmdOps_isnt_stuck; eauto.
         simpl; auto.
     destruct J as [gvs J].
-    assert (exists gn, gn @ gvs) as Hinh.
+    assert (exists gn, gn = gvs) as Hinh.
       eapply getOperandValue__inhabited in J; eauto.
     destruct Hinh as [gn Hinh].
     remember (malloc (los, nts) M asz gn a) as R.
@@ -3391,7 +3349,7 @@ Proof.
       eapply getOperandValue_inCmdOps_isnt_stuck; eauto.
         simpl; auto.
     destruct J as [gvs J].
-    assert (exists gv, gv @ gvs) as Hinh.
+    assert (exists gv, gv = gvs) as Hinh.
       inv Hwfc.
       eapply getOperandValue__inhabited in J; eauto.
     destruct Hinh as [gv Hinh].
@@ -3430,7 +3388,7 @@ Proof.
       eapply getOperandValue_inCmdOps_isnt_stuck; eauto.
         simpl; auto.
     destruct J as [gvs J].
-    assert (exists gn, gn @ gvs) as Hinh.
+    assert (exists gn, gn = gvs) as Hinh.
       eapply getOperandValue__inhabited in J; eauto.
     destruct Hinh as [gn Hinh].
     remember (malloc (los, nts) M asz gn a) as R.
@@ -3464,7 +3422,7 @@ Proof.
       eapply getOperandValue_inCmdOps_isnt_stuck; eauto.
         simpl; auto.
     destruct J as [gvs J].
-    assert (exists gv, gv @ gvs) as Hinh.
+    assert (exists gv, gv = gvs) as Hinh.
       inv Hwfc.
       eapply getOperandValue__inhabited in J; eauto.
     destruct Hinh as [gv Hinh].
@@ -3503,10 +3461,10 @@ Proof.
         simpl; auto.
     destruct J0 as [mgvs J0].
     inv Hwfc.
-    assert (exists gv, gv @ gvs) as Hinh1.
+    assert (exists gv, gv = gvs) as Hinh1.
       eapply getOperandValue__inhabited in J; eauto.
     destruct Hinh1 as [gv Hinh1].
-    assert (exists mgv, mgv @ mgvs) as Hinh2.
+    assert (exists mgv, mgv = mgvs) as Hinh2.
       eapply getOperandValue__inhabited in J0; eauto.
     destruct Hinh2 as [mgv Hinh2].
     remember (mstore (los,nts) M mgv t gv a) as R.
@@ -3734,7 +3692,7 @@ Proof.
       eapply getOperandValue_inCmdOps_isnt_stuck; eauto.
         simpl; auto.
     destruct J as [cond J].
-    assert (exists c, c @ cond) as Hinh.
+    assert (exists c, c = cond) as Hinh.
       inv Hwfc.
       eapply getOperandValue__inhabited in J; eauto.
     destruct Hinh as [c Hinh].
@@ -3775,7 +3733,7 @@ Proof.
       eapply getOperandValue_inCmdOps_isnt_stuck; eauto.
         simpl; auto.
     destruct J' as [fptrs J'].
-    assert (exists fptr, fptr @ fptrs) as Hinh.
+    assert (exists fptr, fptr = fptrs) as Hinh.
       inv Hwfc.
       eapply getOperandValue__inhabited in J'; eauto.
     destruct Hinh as [fptr Hinh].

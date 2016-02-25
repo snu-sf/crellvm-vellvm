@@ -277,8 +277,8 @@ Import LLVMinfra.
 (* MDGVs.instantiate_gv__gv2gvs *)
 (* MDGVs.none_undef2gvs_inv. *)
 
-Notation "gv @ gvs" :=
-  (GenericValueHelper.instantiate_gvs gv gvs) (at level 43, right associativity).
+(* Notation "gv @ gvs" := *)
+(*   (GenericValueHelper.instantiate_gvs gv gvs) (at level 43, right associativity). *)
 Notation "$ gv # t $" := (GenericValueHelper.gv2gvs gv t) (at level 41).
 Notation "vidxs @@ vidxss" := (Opsem.in_list_gvs vidxs vidxss)
   (at level 43, right associativity).
@@ -287,35 +287,34 @@ Notation "vidxs @@ vidxss" := (Opsem.in_list_gvs vidxs vidxss)
 Lemma dos_in_list_gvs_inv : forall gvs gvss, gvs @@ gvss -> gvs = gvss.
 Proof.
   induction 1; subst; auto.
-    inv H; auto.
 Qed.
 
-Lemma dos_in_gvs_inv : forall gvs gvss, gvs @ gvss -> gvs = gvss.
-Proof.
-  intros. inv H; auto.
-Qed.
+(* Lemma dos_in_gvs_inv : forall gvs gvss, gvs = gvss -> gvs = gvss. *)
+(* Proof. *)
+(*   intros. inv H; auto. *)
+(* Qed. *)
 
 Ltac dgvs_instantiate_inv :=
   match goal with
-  | [ H : GenericValueHelper.instantiate_gvs _ _ |- _ ] => inv H
+  | [ H : _ = _ |- _ ] => subst
   | [ H : _ @@ _ |- _ ] => apply dos_in_list_gvs_inv in H; subst
   end.
 
-Lemma dos_instantiate_gvs_intro : forall gv, gv @ gv.
-Proof.
-Local Transparent GenericValueHelper.instantiate_gvs.
-  unfold GenericValueHelper.instantiate_gvs. simpl. auto.
-Global Opaque GenericValueHelper.instantiate_gvs.
-Qed.
+(* Lemma dos_instantiate_gvs_intro : forall gv, gv = gv. *)
+(* Proof. *)
+(* Local Transparent GenericValueHelper.instantiate_gvs. *)
+(*   unfold GenericValueHelper.instantiate_gvs. simpl. auto. *)
+(* Global Opaque GenericValueHelper.instantiate_gvs. *)
+(* Qed. *)
 
-Hint Resolve dos_instantiate_gvs_intro.
+(* Hint Resolve dos_instantiate_gvs_intro. *)
 
-Lemma dos_in_list_gvs_intro : forall gvs, gvs @@ gvs.
-Proof.
-  induction gvs; simpl; auto.
-Qed.
+(* Lemma dos_in_list_gvs_intro : forall gvs, gvs @@ gvs. *)
+(* Proof. *)
+(*   induction gvs; simpl; auto. *)
+(* Qed. *)
 
-Hint Resolve dos_in_list_gvs_intro.
+(* Hint Resolve dos_in_list_gvs_intro. *)
 
 (*************************************)
 Definition DGVMap := Opsem.GVsMap.
@@ -487,10 +486,8 @@ Proof.
   intros.
   eapply OpsemPP.getOperandValue__wf_gvs in Hwflc1; eauto.
   inv Hwflc1.
-  assert (gv1 @ gv1) as Hinst. auto.
-  apply H2 in Hinst.
-  unfold gv_chunks_match_typ in Hinst.
-  clear - Hinst HeqR Hwfv. inv_mbind.
+  unfold gv_chunks_match_typ in H2.
+  clear - H2 HeqR Hwfv. inv_mbind.
   apply wf_value__wf_typ in Hwfv. destruct Hwfv as [J1 J2].
   symmetry in HeqR0.
   eapply flatten_typ__getTypeSizeInBits in HeqR0; eauto.
