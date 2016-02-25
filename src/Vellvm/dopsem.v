@@ -486,8 +486,8 @@ Proof.
   intros.
   eapply OpsemPP.getOperandValue__wf_gvs in Hwflc1; eauto.
   inv Hwflc1.
-  unfold gv_chunks_match_typ in H2.
-  clear - H2 HeqR Hwfv. inv_mbind.
+  unfold gv_chunks_match_typ in H1.
+  clear - H1 HeqR Hwfv. inv_mbind.
   apply wf_value__wf_typ in Hwfv. destruct Hwfv as [J1 J2].
   symmetry in HeqR0.
   eapply flatten_typ__getTypeSizeInBits in HeqR0; eauto.

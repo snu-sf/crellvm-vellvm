@@ -35,9 +35,9 @@ Module GenericValueHelper.
 (* instantiate_gvs gv gvs ensures that gvs includes gv. *) 
 (* Definition instantiate_gvs : GenericValue -> GenericValue -> Prop := fun gv1 gv2 => gv1 = gv2. *)
 (* inhabited gvs ensures that gvs is not empty. *)
-Definition inhabited : GenericValue -> Prop := fun _ => True.
+(* Definition inhabited : GenericValue -> Prop := fun _ => True. *)
 
-Hint Unfold inhabited.
+(* Hint Unfold inhabited. *)
 
 (* cgv2gvs cgv t converts the constant cgv to GenericValues w.r.t type t. *)
 Definition cgv2gvs : GenericValue -> typ -> GenericValue := LLVMgv.cgv2gv.
@@ -98,8 +98,8 @@ Proof.
   eapply cundef_gvs__matches_chunks; eauto.
 Qed.
 
-Lemma cgv2gvs__inhabited : forall gv t, inhabited (cgv2gvs gv t).
-Proof. auto. Qed.
+(* Lemma cgv2gvs__inhabited : forall gv t, inhabited (cgv2gvs gv t). *)
+(* Proof. auto. Qed. *)
 
 (* All values in (gv2gvs gv t) are of type size t, match type t, and non-empty.
  *)
@@ -123,24 +123,24 @@ Proof.
   intros. auto.
 Qed.
 
-Lemma gv2gvs__inhabited : forall gv t, inhabited (gv2gvs gv t).
-Proof. auto. Qed.
+(* Lemma gv2gvs__inhabited : forall gv t, inhabited (gv2gvs gv t). *)
+(* Proof. auto. Qed. *)
 
 (* lift_op1 and lift_op2 preserve inhabitedness, totalness, type size, and 
    chunks. *)
-Lemma lift_op1__inhabited : forall f gvs1 t gvs2
-  (H:forall x, exists z, f x = Some z),
-  inhabited gvs1 ->
-  lift_op1 f gvs1 t = Some gvs2 ->
-  inhabited gvs2.
-Proof. auto. Qed.
+(* Lemma lift_op1__inhabited : forall f gvs1 t gvs2 *)
+(*   (H:forall x, exists z, f x = Some z), *)
+(*   inhabited gvs1 -> *)
+(*   lift_op1 f gvs1 t = Some gvs2 -> *)
+(*   inhabited gvs2. *)
+(* Proof. auto. Qed. *)
 
-Lemma lift_op2__inhabited : forall f gvs1 gvs2 t gvs3
-  (H:forall x y, exists z, f x y = Some z),
-  inhabited gvs1 -> inhabited gvs2 ->
-  lift_op2 f gvs1 gvs2 t = Some gvs3 ->
-  inhabited gvs3.
-Proof. auto. Qed.
+(* Lemma lift_op2__inhabited : forall f gvs1 gvs2 t gvs3 *)
+(*   (H:forall x y, exists z, f x y = Some z), *)
+(*   inhabited gvs1 -> inhabited gvs2 -> *)
+(*   lift_op2 f gvs1 gvs2 t = Some gvs3 -> *)
+(*   inhabited gvs3. *)
+(* Proof. auto. Qed. *)
 
 Lemma lift_op1__isnt_stuck : forall f gvs1 t
   (H:forall x, exists z, f x = Some z),
@@ -194,8 +194,8 @@ Proof. intros. unfold lift_op2 in H1. eauto. Qed.
 
 
 (* Inhabited values are not empty. *)
-Lemma inhabited_inv : forall gvs, inhabited gvs -> exists gv, gv=gvs.
-Proof. eauto. Qed.
+(* Lemma inhabited_inv : forall gvs, inhabited gvs -> exists gv, gv=gvs. *)
+(* Proof. eauto. Qed. *)
 
 (* gv is in (gv2gvs gv t). *)
 Lemma instantiate_gv__gv2gvs : forall gv t, gv = (gv2gvs gv t).
@@ -209,7 +209,7 @@ Proof.
   intros. eauto.
 Qed.
 
-Global Opaque gv2gvs inhabited cgv2gvs lift_op1 lift_op2.
+Global Opaque gv2gvs cgv2gvs lift_op1 lift_op2.
 
 End GenericValueHelper.
 
