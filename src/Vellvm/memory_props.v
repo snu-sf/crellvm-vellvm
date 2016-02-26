@@ -752,8 +752,7 @@ Lemma GEP_preserves_no_alias: forall TD t mp vidxs inbounds0 mp' gvsa t',
   Opsem.GEP TD t mp vidxs inbounds0 t' = ret mp' ->
   no_alias mp gvsa -> no_alias mp' gvsa.
 Proof.
-Local Transparent GenericValueHelper.lift_op1.
-  unfold Opsem.GEP. unfold GenericValueHelper.lift_op1. simpl. unfold gep.
+  unfold Opsem.GEP. unfold gep.
   unfold GEP. intros.
   remember (GV2ptr TD (getPointerSize TD) mp) as R1.
   destruct R1; eauto using undef_disjoint_with_ptr.
@@ -763,7 +762,6 @@ Local Transparent GenericValueHelper.lift_op1.
   inv H.
   eapply GV2ptr_preserves_no_alias in HeqR1; eauto.
   eapply mgep_preserves_no_alias; eauto.
-Opaque GenericValueHelper.lift_op1.
 Qed.
 
 Lemma initializeFrameValues_preserves_no_alias: forall TD mb la
@@ -775,7 +773,6 @@ Lemma initializeFrameValues_preserves_no_alias: forall TD mb la
   no_alias gvs1 (blk2GV TD mb).
 Proof.
 Local Opaque no_alias.
-Local Transparent GenericValueHelper.lift_op1.
   unfold Opsem.initLocals.
   induction la; simpl; intros.
     inv Hinit. inv Hlkup.
@@ -793,7 +790,7 @@ Local Transparent GenericValueHelper.lift_op1.
       inv_mbind. symmetry in HeqR.
       destruct (id_dec i0 id1); subst.
         rewrite lookupAL_updateAddAL_eq in Hlkup. inv Hlkup.
-        unfold GenericValueHelper.lift_op1, fit_gv in HeqR0.
+        unfold fit_gv in HeqR0.
         symmetry in HeqR0.
         inv_mbind.
         destruct_if.
@@ -804,7 +801,6 @@ Local Transparent GenericValueHelper.lift_op1.
         rewrite <- lookupAL_updateAddAL_neq in Hlkup; auto.
         eapply IHla in HeqR; eauto.
         intros. apply Hwf. simpl. auto.
-Opaque GenericValueHelper.lift_op1.
 Transparent no_alias.
 Qed.
 
