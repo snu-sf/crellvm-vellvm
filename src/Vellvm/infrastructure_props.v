@@ -3311,6 +3311,7 @@ Proof.
     apply in_app_or in H;
       destruct H as [H | H]; apply InGetValueIDs__eq in H; auto |
     apply InGetValueIDs__eq in H; auto].
+  inversion H.
 
     apply in_app_or in H.
     destruct H as [H | H].

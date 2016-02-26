@@ -305,6 +305,8 @@ clattrs :: 'clattrs_'                                   ::=                     
   | tailc callconv attributes1 attributes2              ::   :: intro
 
 cmd {{ tex c }} :: 'insn_'				::=			{{ com commands }}
+%% Nop
+  | id = nop  ::   :: nop  {{ com nop }}
 %% Binary Operations and Bitwise Binary Operations
   | id = bop ( int sz ) value1 value2			::   :: bop		{{ com bop }}
   | id = fbop floating_point value1 value2		::   :: fbop		{{ com fbop }}

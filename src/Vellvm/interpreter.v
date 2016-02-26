@@ -91,6 +91,7 @@ match state with
 
   | c::cs => (* non-terminator *)
     match c with
+    | insn_nop id0 => ret ((mkState (mkEC F B cs tmn lc als) EC Mem0), E0)
     | insn_bop id0 bop0 sz0 v1 v2 =>
       do gv3 <- BOP TD lc gl bop0 sz0 v1 v2;
          ret ((mkState (mkEC F B cs tmn (updateAddAL _ lc id0 gv3) 
@@ -357,11 +358,14 @@ Proof.
       Case "insn_unreachable".
         inversion HinterInsn.
 
-      destruct c as [i0 b s v v0|i0 f f0 v v0|i0 t v l0|i0 t v t0 v0 l0 t1|
+      destruct c as [i0|
+                     i0 b s v v0|i0 f f0 v v0|i0 t v l0|i0 t v t0 v0 l0 t1|
                      i0 t v a|i0 t v|i0 t v a|i0 t v a|i0 t v v0 a|i0 i1 t v l0|
                      i0 t t0 v t1|i0 e t v t0|i0 c t v t0|i0 c t v v0|
                      i0 f f0 v v0|i0 v t v0 v1|i0 n c rt1 va1 v p].
-
+      Case "insn_nop".
+        inversion HinterInsn; subst; simpl.
+        auto.
       Case "insn_bop".
         remember (BOP CurTargetData0 lc Globals0 b s v v0) as R1.
         destruct R1;

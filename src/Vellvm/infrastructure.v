@@ -59,6 +59,7 @@ Definition noret_dec : forall x y : noret, {x=y} + {x<>y} := bool_dec.
 
   Definition getCmdLoc (i:cmd) : id :=
   match i with
+  | insn_nop id => id
   | insn_bop id _ sz v1 v2 => id
   | insn_fbop id _ _ _ _ => id
   (* | insn_extractelement id typ0 id0 c1 => id *)
@@ -121,6 +122,7 @@ Definition noret_dec : forall x y : noret, {x=y} + {x<>y} := bool_dec.
 
   Definition getCmdID (i:cmd) : option id :=
   match i with
+  | insn_nop id => None
   | insn_bop id _ sz v1 v2 => Some id
   | insn_fbop id _ _ _ _ => Some id
   (* | insn_extractelement id typ0 id0 c1 => id *)
@@ -305,6 +307,7 @@ end.
 
 Definition getCmdTyp (i:cmd) : option typ :=
 match i with
+| insn_nop _ => Some typ_void
 | insn_bop _ _ sz _ _ => Some (typ_int sz)
 | insn_fbop _ _ ft _ _ => Some (typ_floatpoint ft)
 (*
@@ -387,6 +390,7 @@ end.
 
 Definition getCmdOperands (i:cmd) : ids :=
 match i with
+| insn_nop _ => nil
 | insn_bop _ _ _ v1 v2 => getValueIDs v1 ++ getValueIDs v2
 | insn_fbop _ _ _ v1 v2 => getValueIDs v1 ++ getValueIDs v2
 (* | insn_extractelement _ _ v _ => getValueIDs v
@@ -418,6 +422,7 @@ let '(_, vs) := split lp in In v0 vs.
 
 Definition valueInCmdOperands (v0:value) (i:cmd) : Prop :=
 match i with
+| insn_nop _ => False
 | insn_bop _ _ _ v1 v2 => v0 = v1 \/ v0 = v2
 | insn_fbop _ _ _ v1 v2 => v0 = v1 \/ v0 = v2
 | insn_extractvalue _ _ v _ _ => v0 = v
@@ -479,6 +484,7 @@ end.
 
 Definition getCmdLabels (i:cmd) : ls :=
 match i with
+| insn_nop _ => nil
 | insn_bop _ _ _ _ _ => nil
 | insn_fbop _ _ _ _ _ => nil
 (* | insn_extractelement _ _ _ _ => nil

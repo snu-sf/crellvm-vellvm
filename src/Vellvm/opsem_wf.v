@@ -1600,17 +1600,6 @@ Proof.
   exists l3. exists ps3. exists (cs3'++[c0]). simpl_env. auto.
 Qed.
 
-Tactic Notation "sInsn_cases" tactic(first) tactic(c) :=
-  first;
-  [ c "sReturn" | c "sReturnVoid" | c "sBranch" | c "sBranch_uncond" |
-    c "sBop" | c "sFBop" | c "sExtractValue" | c "sInsertValue" |
-    c "sMalloc" | c "sFree" |
-    c "sAlloca" | c "sLoad" | c "sStore" | c "sGEP" |
-    c "sTrunc" | c "sExt" |
-    c "sCast" |
-    c "sIcmp" | c "sFcmp" | c "sSelect" |
-    c "sCall" | c "sExCall" ].
-
 Ltac solve_wf_gvs :=
 match goal with
 | HwfS1 : wf_State _ _, H: _ = Some ?gv3 |- wf_GVs _ ?gv3 _ =>
@@ -1738,7 +1727,7 @@ Case "sReturn".
   (* split. intros; congruence. *)
   SCase "1".
     remember (getCmdID c') as R.
-    destruct c' as [ | | | | | | | | | | | | | | | | i0 n c rt va v p];
+    destruct c' as [ | | | | | | | | | | | | | | | | | i0 n c rt va v p];
       try solve [inversion H].
     assert (In (insn_call i0 n c rt va v p)
       (cs2'++[insn_call i0 n c rt va v p] ++ cs')) as HinCs.
@@ -1980,6 +1969,10 @@ Case "sBranch_uncond".
       destruct cs'; rewrite <- HeqR1; auto.
 
       exists l0. exists ps'. exists nil. simpl_env. auto.
+
+Case "sNop".
+  eapply preservation_cmd_non_updated_case; eauto.
+  simpl. auto.
 
 Case "sBop".
   abstract (eapply preservation_cmd_updated_case in HwfS1; simpl;
@@ -2810,7 +2803,7 @@ Proof.
         assert (J:=HbInF).
         apply HwfCall in J. clear HwfCall.
         destruct cs'; try solve [inversion J].
-        destruct c as [ | | | | | | | | | | | | | | | |i1 n c rt0 va0 v0 p];
+        destruct c as [ | | | | | | | | | | | | | | | | |i1 n c rt0 va0 v0 p];
           try solve [inversion J].
         clear J.
         remember (free_allocas (los,nts) M als) as Rm.
@@ -2990,10 +2983,16 @@ Proof.
     remember (inscope_of_cmd f (l1, stmts_intro ps1 (cs1 ++ c :: cs) tmn) c) as R.
     destruct R; try solve [inversion Hinscope].
     right.
-    destruct c as [i0 b s0 v v0|i0 f0 f1 v v0|i0 t v l2|i0 t v t0 v0 l2 t0'|
+    destruct c as [i0|
+                   i0 b s0 v v0|i0 f0 f1 v v0|i0 t v l2|i0 t v t0 v0 l2 t0'|
                    i0 t v a|i0 t v|i0 t v a|i0 t v a|i0 t v v0 a|i0 i1 t v l2|
                    i0 t t0 v t1|i0 e t v t0|i0 c t v t0|i0 c t v v0|
                    i0 f0 f1 v v0|i0 v t v0 v1|i0 n c rt1 va1 v p].
+  SCase "c=nop".
+    left.
+    eexists. eexists.
+    eapply sNop; eauto.
+
   SCase "c=bop".
     left.
     assert (exists gv3, BOP (los,nts) lc gl b s0 v v0 = Some gv3)
