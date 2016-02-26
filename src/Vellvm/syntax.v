@@ -22,7 +22,8 @@ Include LLVMsyntax_base.
 
 Tactic Notation "cmd_cases" tactic(first) tactic(c) :=
   first;
-  [ c "insn_bop" | c "insn_fbop" |
+  [ c "insn_nop" |
+    c "insn_bop" | c "insn_fbop" |
     c "insn_extractvalue" | c "insn_insertvalue" |
     c "insn_malloc" | c "insn_free" |
     c "insn_alloca" | c "insn_load" | c "insn_store" | c "insn_gep" |
@@ -408,7 +409,8 @@ let p := fresh "p" in
 let n := fresh "n" in
 let c := fresh "c" in
 let e := fresh "e" in
-destruct cmd as [i0 b s0 v v0|i0 f0 f1 v v0|i0 t v l2 t0|i0 t v t0 v0 l2|
+destruct cmd as [i0|
+                 i0 b s0 v v0|i0 f0 f1 v v0|i0 t v l2 t0|i0 t v t0 v0 l2|
                  i0 t v a|i0 t v|i0 t v a|i0 t v a|i0 t v v0 a|i0 i1 t v l2 t0|
                  i0 t t0 v t1|i0 e t v t0|i0 c t v t0|i0 c t v v0|
                  i0 f0 f1 v v0|i0 v t v0 v1|i0 n c t0 v0 v p].
