@@ -117,7 +117,7 @@ match state with
       | None => None
       | Some (Mem', mb) =>
         ret ((mkState (mkEC F B cs tmn (updateAddAL _ lc id0
-               ($ (blk2GV TD mb) # (typ_pointer t) $)) als) EC Mem'),
+               (blk2GV TD mb)) als) EC Mem'),
             E0)
       end
     | insn_free fid t v =>
@@ -131,7 +131,7 @@ match state with
       | None => None
       | Some (Mem', mb) =>
           ret ((mkState (mkEC F B cs tmn (updateAddAL _ lc id0
-                 ($ (blk2GV TD mb) # (typ_pointer t) $))
+                 (blk2GV TD mb))
                  (mb::als)) EC Mem'),
                E0)
       end
@@ -139,7 +139,7 @@ match state with
       do mp <- getOperandValue TD v lc gl;
       do gv <- mload TD Mem0 mp t align0;
          ret ((mkState (mkEC F B cs tmn (updateAddAL _ lc id0
-                ($ gv # t $)) als)
+                gv) als)
                EC Mem0), E0)
     | insn_store sid t v1 v2 align0 =>
       do gv1 <- getOperandValue TD v1 lc gl;
@@ -237,7 +237,7 @@ Ltac dos_rewrite :=
   | [ H : _ = merror |- _ ] => rewrite H; simpl
   end.
 
-Ltac dos_simpl := simpl; repeat dgvs_instantiate_inv; repeat dos_rewrite.
+Ltac dos_simpl := simpl; subst; repeat dos_rewrite.
 
 (* the small-step semantics implies the interpreter. *)
 Lemma dsInsn__implies__interInsn : forall cfg state state' tr,
@@ -248,17 +248,17 @@ Proof.
   Opaque malloc GEP.
   (sInsn_cases (destruct HdsInsn) Case); dos_simpl; auto.
   Case "sCall".
-    apply lookupFdefViaPtr_inversion in H1.
-    destruct H1 as [fn [J1 J2]].
+    apply lookupFdefViaPtr_inversion in H0.
+    destruct H0 as [fn [J1 J2]].
     rewrite J1. simpl.
     rewrite J2.
     apply lookupFdefViaIDFromProducts_ideq in J2; subst; auto.
     destruct (id_dec fid fid); try congruence.
-    destruct lb; inv H2.
-    rewrite H4. simpl. auto.
+    destruct lb; inv H1.
+    rewrite H3. simpl. auto.
   Case "sExCall".
-    apply lookupExFdecViaPtr_inversion in H1.
-    destruct H1 as [fn [J1 [J2 J3]]].
+    apply lookupExFdecViaPtr_inversion in H0.
+    destruct H0 as [fn [J1 [J2 J3]]].
     rewrite J1. simpl.
     rewrite J2. rewrite J3.
     apply lookupFdecViaIDFromProducts_ideq in J3; subst; auto.
@@ -446,7 +446,7 @@ Proof.
         destruct R3; simpl in HinterInsn; try solve [inversion HinterInsn].
         remember (GEP CurTargetData0 t g l1 i1 typ') as R2.
         destruct R2; simpl in HinterInsn; inv HinterInsn;
-          eauto using dos_in_list_gvs_intro.
+          eauto.
 
       Case "insn_trunc".
         remember (TRUNC CurTargetData0 lc Globals0 t t0 v t1) as R.
@@ -517,7 +517,7 @@ Proof.
             end.
             remember (exCallUpdateLocals CurTargetData0 rt1 n i0 oresult lc) as R4.
             destruct R4; inv HinterInsn.
-            eapply sExCall; eauto using dos_in_list_gvs_intro.
+            eapply sExCall with (gvs:=l0); eauto.
               unfold lookupExFdecViaPtr.
               rewrite <- HeqR4. simpl. rewrite <- HeqR1. eauto.
 Qed.

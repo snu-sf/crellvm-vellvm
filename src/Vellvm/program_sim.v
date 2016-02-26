@@ -234,16 +234,14 @@ Proof.
       destruct_cmd c; tinv Hundef.
         remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R.
         destruct R; tinv Hundef.
-        destruct Hundef as [gn [Hinst Hundef]].
-        remember (free CurTargetData Mem gn) as R.
+        remember (free CurTargetData Mem g) as R.
         destruct R; tinv Hundef.
         inv Hop. symmetry_ctx. uniq_result. 
 
       destruct_cmd c; tinv Hundef.
         remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R.
         destruct R; tinv Hundef.
-        destruct Hundef as [gn [Hinst Hundef]].
-        remember (mload CurTargetData Mem gn t a) as R.
+        remember (mload CurTargetData Mem g t a) as R.
         destruct R; tinv Hundef.
         inv Hop. symmetry_ctx. uniq_result. 
 
@@ -252,23 +250,20 @@ Proof.
         destruct R; tinv Hundef.
         remember (Opsem.getOperandValue CurTargetData v0 Locals Globals) as R.
         destruct R; tinv Hundef.
-        destruct Hundef as [gn [mgv [Hinst1 [Hinst2 Hundef]]]].
-        remember (mstore CurTargetData Mem mgv t gn a) as R.
+        remember (mstore CurTargetData Mem g0 t g a) as R.
         destruct R; tinv Hundef.
         inv Hop. symmetry_ctx. uniq_result. 
 
       destruct_cmd c; tinv Hundef.
         remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R.
         destruct R; tinv Hundef.
-        destruct Hundef as [fptr [Hinst Hundef]].
-        remember (OpsemAux.lookupFdefViaPtr CurProducts FunTable fptr) as R.
+        remember (OpsemAux.lookupFdefViaPtr CurProducts FunTable g) as R.
         destruct R; tinv Hundef.
-        remember (OpsemAux.lookupExFdecViaPtr CurProducts FunTable fptr) as R.
+        remember (OpsemAux.lookupExFdecViaPtr CurProducts FunTable g) as R.
         destruct R as [f|].
           destruct f as [[fnattrs5 typ5 id5 args5 varg5] bs].
           remember (Opsem.params2GVs CurTargetData p Locals Globals) as R.
           destruct R; tinv Hundef.
-          destruct Hundef as [gvs [Hinst' Hundef]].
           match goal with
           | _: match ?ef with
                | Some _ => _

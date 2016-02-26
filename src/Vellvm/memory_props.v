@@ -3,15 +3,12 @@ Require Import memory_sim.
 
 Ltac unfold_blk2GV := unfold blk2GV, ptr2GV, val2GV.
 
-Lemma simpl_blk2GV: forall td mb t,
-  $ blk2GV td mb # typ_pointer t $ =
+Lemma simpl_blk2GV: forall td mb,
+  blk2GV td mb =
   ((Vptr mb (Int.repr 31 0),
     AST.Mint (Size.mul Size.Eight (getPointerSize td) - 1)) :: nil).
 Proof.
-Local Transparent GenericValueHelper.gv2gvs.
-  intros. unfold_blk2GV.
-  unfold GenericValueHelper.gv2gvs. simpl. auto.
-Opaque GenericValueHelper.gv2gvs.
+  intros. unfold_blk2GV. auto.
 Qed.
 
 Module MemProps.
@@ -723,11 +720,10 @@ Qed.
 Lemma cgv2gvs_preserves_no_alias: forall g0 mb ofs m t0 maxb,
   no_alias g0 [(Vptr mb ofs, m)] ->
   (xH <= maxb < mb)%positive ->
-  no_alias (GenericValueHelper.cgv2gvs g0 t0) [(Vptr mb ofs, m)].
+  no_alias (genericvalues.LLVMgv.cgv2gv g0 t0) [(Vptr mb ofs, m)].
 Proof.
-Local Transparent GenericValueHelper.cgv2gvs.
   intros.
-  unfold GenericValueHelper.cgv2gvs. simpl.
+  unfold cgv2gv. simpl.
   destruct g0 as [|[]]; auto.
   destruct v; auto.
   destruct g0 as [|]; auto.
@@ -738,7 +734,6 @@ Local Transparent GenericValueHelper.cgv2gvs.
 
     simpl. split; auto. split; auto. unfold Mem.nullptr. intro J. subst.
     inv H0; destruct maxb; inv H2.
-Global Opaque GenericValueHelper.cgv2gvs.
 Qed.
 
 Lemma no_alias_GV2ptr__neq_blk: forall TD sz0 ptr1 ptr2 b1 i1 b2 i2
@@ -757,8 +752,7 @@ Lemma GEP_preserves_no_alias: forall TD t mp vidxs inbounds0 mp' gvsa t',
   Opsem.GEP TD t mp vidxs inbounds0 t' = ret mp' ->
   no_alias mp gvsa -> no_alias mp' gvsa.
 Proof.
-Local Transparent GenericValueHelper.lift_op1.
-  unfold Opsem.GEP. unfold GenericValueHelper.lift_op1. simpl. unfold gep.
+  unfold Opsem.GEP. unfold gep.
   unfold GEP. intros.
   remember (GV2ptr TD (getPointerSize TD) mp) as R1.
   destruct R1; eauto using undef_disjoint_with_ptr.
@@ -768,18 +762,17 @@ Local Transparent GenericValueHelper.lift_op1.
   inv H.
   eapply GV2ptr_preserves_no_alias in HeqR1; eauto.
   eapply mgep_preserves_no_alias; eauto.
-Opaque GenericValueHelper.lift_op1.
 Qed.
 
-Lemma initializeFrameValues_preserves_no_alias: forall TD mb t la
+Lemma initializeFrameValues_preserves_no_alias: forall TD mb la
   (gvs:list GenericValue)
-  (Hwf: forall gv, In gv gvs -> no_alias gv ($ blk2GV TD mb # typ_pointer t $))
+  (Hwf: forall gv, In gv gvs -> no_alias gv (blk2GV TD mb))
   lc (Hinit : Opsem.initLocals TD la gvs = ret lc)
   (id1 : atom) (gvs1 : GenericValue)
   (Hlkup : lookupAL GenericValue lc id1 = ret gvs1),
-  no_alias gvs1 ($ blk2GV TD mb # typ_pointer t $).
+  no_alias gvs1 (blk2GV TD mb).
 Proof.
-Local Transparent GenericValueHelper.lift_op1.
+Local Opaque no_alias.
   unfold Opsem.initLocals.
   induction la; simpl; intros.
     inv Hinit. inv Hlkup.
@@ -797,7 +790,7 @@ Local Transparent GenericValueHelper.lift_op1.
       inv_mbind. symmetry in HeqR.
       destruct (id_dec i0 id1); subst.
         rewrite lookupAL_updateAddAL_eq in Hlkup. inv Hlkup.
-        unfold GenericValueHelper.lift_op1, fit_gv in HeqR0.
+        unfold fit_gv in HeqR0.
         symmetry in HeqR0.
         inv_mbind.
         destruct_if.
@@ -808,7 +801,7 @@ Local Transparent GenericValueHelper.lift_op1.
         rewrite <- lookupAL_updateAddAL_neq in Hlkup; auto.
         eapply IHla in HeqR; eauto.
         intros. apply Hwf. simpl. auto.
-Opaque GenericValueHelper.lift_op1.
+Transparent no_alias.
 Qed.
 
 (*****************************************************************)
@@ -1043,13 +1036,11 @@ Proof.
 Qed.
 
 Lemma undef__valid_lift_ptrs: forall g td t1 blk
-  (Hc2g : ret g = gundef td t1), valid_ptrs blk ($ g # t1 $).
+  (Hc2g : ret g = gundef td t1), valid_ptrs blk g.
 Proof.
   unfold gundef. intros.
   inv_mbind'.
-Local Transparent GenericValueHelper.gv2gvs.
-  unfold GenericValueHelper.gv2gvs. simpl. apply mc2undefs_valid_ptrs.
-Opaque GenericValueHelper.gv2gvs.
+  apply mc2undefs_valid_ptrs.
 Qed.
 
 Lemma in_valid_ptrs: forall bd m b ofs gvs,
@@ -1086,10 +1077,11 @@ Proof.
       eapply in_valid_ptrs in H; eauto.
 Qed.
 
-Lemma valid_ptrs__no_alias__fresh_ptr: forall bound TD mb t (Hbd: (bound <= mb)%positive)
+Lemma valid_ptrs__no_alias__fresh_ptr: forall bound TD mb (Hbd: (bound <= mb)%positive)
   gvs, valid_ptrs bound gvs ->
-  no_alias gvs ($ blk2GV TD mb # typ_pointer t $).
+  no_alias gvs (blk2GV TD mb).
 Proof.
+Local Opaque no_alias.
   induction gvs as [|[]]; simpl; intros.
     apply no_alias_nil.
 
@@ -1099,6 +1091,7 @@ Proof.
     destruct H0.
     repeat split; auto.
       intro J. subst. contradict H; apply Pos.le_nlt; auto.
+Transparent no_alias.
 Qed.
 
 Lemma undefs_valid_ptrs: forall bd gvs1
@@ -1134,11 +1127,10 @@ Proof.
 Qed.
 
 Lemma cgv2gvs_preserves_valid_ptrs: forall g0 t0 bd,
-  (bd > xH)%positive -> valid_ptrs bd g0 -> valid_ptrs bd (GenericValueHelper.cgv2gvs g0 t0).
+  (bd > xH)%positive -> valid_ptrs bd g0 -> valid_ptrs bd (genericvalues.LLVMgv.cgv2gv g0 t0).
 Proof.
   intros.
-Local Transparent GenericValueHelper.cgv2gvs.
-  unfold GenericValueHelper.cgv2gvs. simpl. unfold cgv2gv.
+  unfold cgv2gv.
   destruct g0 as [|[]]; auto.
   destruct v; auto.
   destruct g0 as [|]; auto.
@@ -1147,7 +1139,6 @@ Local Transparent GenericValueHelper.cgv2gvs.
     destruct f; auto.
 
     apply null_valid_ptrs; auto.
-Global Opaque GenericValueHelper.cgv2gvs.
 Qed.
 
 (*****************************************************************)
@@ -2368,7 +2359,7 @@ Lemma malloc_mload_undef: forall TD t tsz M gn align0 M' mb gvs gl S
   (Hsz: getTypeAllocSize TD t = Some tsz)
   (Hal : malloc TD M tsz gn align0 = ret (M', mb))
   (Hc2v : Opsem.const2GV TD gl (const_undef t) = ret gvs),
-  mload TD M' ($ blk2GV TD mb # typ_pointer t $) t align0 = ret gvs.
+  mload TD M' (blk2GV TD mb) t align0 = ret gvs.
 Proof.
   intros.
   unfold mload. rewrite simpl_blk2GV. simpl.
@@ -2442,8 +2433,8 @@ Qed.
 Lemma malloc_preserves_encode_decode_ident: forall TD M tsz gn align0 M' mb
   ty al mb' (Hal: malloc TD M tsz gn align0 = ret (M', mb))
   (Hlt: (mb' < Mem.nextblock M)%positive)
-  (Hid: encode_decode_ident TD M ($ blk2GV TD mb' # typ_pointer ty $) ty al),
-  encode_decode_ident TD M' ($ blk2GV TD mb' # typ_pointer ty $) ty al.
+  (Hid: encode_decode_ident TD M (blk2GV TD mb') ty al),
+  encode_decode_ident TD M' (blk2GV TD mb') ty al.
 Proof.
   unfold encode_decode_ident. intros.
   match goal with
@@ -2648,11 +2639,11 @@ Proof.
     eapply zeroconst2GV_for_namedts_spec1 in J6; eauto.
 Qed.
 
-Lemma zeroconst2GV_disjoint_with_runtime_alloca: forall t maxb gl g td mb t0
+Lemma zeroconst2GV_disjoint_with_runtime_alloca: forall t maxb gl g td mb
   (Hwfg: wf_globals maxb gl) S (Hwft: wf_typ S td t)
   (Hc2g : ret g = zeroconst2GV td t)
   (Hle: (maxb < mb)%positive),
-  no_alias g ($ blk2GV td mb # typ_pointer t0 $) /\ valid_ptrs ((maxb + 1)%positive) g.
+  no_alias g (blk2GV td mb) /\ valid_ptrs ((maxb + 1)%positive) g.
 Proof.
   intros. rewrite simpl_blk2GV.
   eapply zeroconst2GV_disjoint_with_runtime_ptr; eauto.
@@ -2704,10 +2695,10 @@ Proof.
   induction gl; auto.
 Qed.
 
-Lemma wf_globals_disjoint_with_runtime_alloca: forall maxb td t0
+Lemma wf_globals_disjoint_with_runtime_alloca: forall maxb td
   (g0 : GenericValue) i0  mb (Hle : (maxb < mb)%positive) gl (Hwfg : wf_globals maxb gl)
   (HeqR : ret g0 = lookupAL GenericValue gl i0),
-  no_alias g0 ($ blk2GV td mb # typ_pointer t0 $) /\ valid_ptrs ((maxb + 1)%positive) g0.
+  no_alias g0 (blk2GV td mb) /\ valid_ptrs ((maxb + 1)%positive) g0.
 Proof.
   intros. rewrite simpl_blk2GV.
   eapply wf_globals_disjoint_with_runtime_ptr; eauto.
@@ -2801,7 +2792,7 @@ Case "wfconst_struct". Focus.
   destruct (@H0 system5 (layouts5, namedts5) maxb gl mb ofs m) as [J1 J2];
     eauto using const2GV_typsize_mutind_struct'.
   destruct_if.
-  destruct g0; inv H5.
+  destruct g0; inv H6.
     split; simpl; auto.
     split; auto.
       symmetry in HeqR.
@@ -2864,13 +2855,13 @@ Case "wfconst_gep". Focus.
   eapply H0 with (ofs:=ofs)(m:=m) in HeqR; eauto.
   destruct HeqR as [J1 [J2 J3]]; subst.
   remember (getConstGEPTyp const_list (typ_pointer typ5)) as R2.
-  destruct R2; tinv H8. uniq_result.
+  destruct R2; tinv H7. uniq_result.
   remember (GV2ptr targetdata5 (getPointerSize targetdata5) g0) as R3.
-  destruct R3; tinv H8.
+  destruct R3; tinv H7.
     remember (intConsts2Nats targetdata5 const_list) as R4.
-    destruct R4; tinv H8.
+    destruct R4; tinv H7.
       remember (mgep targetdata5 typ5 v l0) as R5.
-      destruct R5; inv H8.
+      destruct R5; inv H7.
         symmetry_ctx. uniq_result. 
         split; auto.
         split.
@@ -2893,7 +2884,7 @@ Case "wfconst_icmp".
     eapply micmp_preserves_no_alias; eauto.
     eapply micmp_preserves_valid_ptrs; eauto.
 Case "wfconst_fcmp".
-  destruct t; tinv H8. inv_mbind'.
+  destruct t; tinv H7. inv_mbind'.
   split; auto.
   split.
     eapply mfcmp_preserves_no_alias; eauto.
@@ -2993,11 +2984,11 @@ Local Opaque no_alias.
 Global Transparent no_alias.
 Qed.
 
-Lemma const2GV_disjoint_with_runtime_alloca: forall c0 maxb gl g td mb t t'
+Lemma const2GV_disjoint_with_runtime_alloca: forall c0 maxb gl g td mb t'
   (Hwfg: wf_globals maxb gl) S (Hwfc: wf_const S td c0 t')
   (Hc2g : ret g = Opsem.const2GV td gl c0)
   (Hle: (maxb < mb)%positive),
-  no_alias g ($ blk2GV td mb # typ_pointer t $).
+  no_alias g (blk2GV td mb).
 Proof.
   unfold Opsem.const2GV.
   intros.
@@ -3034,11 +3025,11 @@ Proof.
 Qed.
 
 Lemma params2GVs_preserves_no_alias: forall maxb gl
-  (Hwfg : wf_globals maxb gl) los nts lc mb t (Hinbound: (maxb < mb)%positive) S F Ps tavl
+  (Hwfg : wf_globals maxb gl) los nts lc mb (Hinbound: (maxb < mb)%positive) S F Ps tavl
   lp (Hwf : forall (id1 : atom) (gvs1 : GenericValue) t1,
          In (t1, value_id id1) lp ->
          lookupAL GenericValue lc id1 = ret gvs1 ->
-         no_alias gvs1 ($ blk2GV (los,nts) mb # typ_pointer t $)) gvs
+         no_alias gvs1 (blk2GV (los,nts) mb)) gvs
   (Heq: lp = (List.map
     (fun p : typ * attributes * value =>
       let '(typ_', attributes_', value_'') := p in
@@ -3050,8 +3041,9 @@ Lemma params2GVs_preserves_no_alias: forall maxb gl
          (S,(module_intro los nts Ps),F,value_'',typ_')) tavl))
   (Hps2GVs : Opsem.params2GVs (los,nts) lp lc gl = ret gvs),
   forall gv,
-    In gv gvs -> no_alias gv ($ blk2GV (los,nts) mb # typ_pointer t $).
+    In gv gvs -> no_alias gv (blk2GV (los,nts) mb).
 Proof.
+Local Opaque no_alias.
   induction tavl; simpl; intros; subst.
     inv Hps2GVs. inv H.
 
@@ -3067,12 +3059,13 @@ Proof.
       symmetry in HeqR0.
       eapply IHtavl in HeqR0; eauto.
         intros. eapply Hwf; simpl; eauto.
+Transparent no_alias.        
 Qed.
 
 Lemma operand__lt_nextblock: forall maxb los nts M (lc:DGVMap) mptr gl
   (Hwfgl : wf_globals maxb gl) v mptrs (Hlt: (maxb < Mem.nextblock M)%positive)
   (Hwflc: wf_lc M lc)
-  (Hin: mptr @ mptrs) S Ps t F
+  (Hin: mptr = mptrs) S Ps t F
   (Hwft: wf_value S (module_intro los nts Ps) F v t)
   (Hgetop : Opsem.getOperandValue (los,nts) v lc gl = ret mptrs),
   valid_ptrs (Mem.nextblock M) mptr.
@@ -3199,8 +3192,8 @@ Qed.
 Lemma free_allocas_preserves_mload: forall TD al t mb gv als Mem' Mem
   (H0 : ~ In mb als)
   (H1 : free_allocas TD Mem als = ret Mem')
-  (H2 : mload TD Mem ($ blk2GV TD mb # typ_pointer t $) t al = ret gv),
-  mload TD Mem' ($ blk2GV TD mb # typ_pointer t $) t al = ret gv.
+  (H2 : mload TD Mem (blk2GV TD mb) t al = ret gv),
+  mload TD Mem' (blk2GV TD mb) t al = ret gv.
 Proof.
   induction als; simpl; intros.
     inv H1. auto.
@@ -3213,9 +3206,9 @@ Qed.
 
 Lemma free_allocas_preserves_encode_decode_ident: forall TD mb ty al als M M'
   (Hnoalias: ~ In mb als)
-  (Hid: encode_decode_ident TD M ($ blk2GV TD mb # typ_pointer ty $) ty al)
+  (Hid: encode_decode_ident TD M (blk2GV TD mb) ty al)
   (Hfrees: free_allocas TD M als = Some M'),
-  encode_decode_ident TD M' ($ blk2GV TD mb # typ_pointer ty $) ty al.
+  encode_decode_ident TD M' (blk2GV TD mb) ty al.
 Proof.
   induction als; simpl; intros.
     inv Hfrees. auto.

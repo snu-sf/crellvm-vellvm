@@ -93,7 +93,7 @@ Ltac repeat_bsplit :=
   repeat (bsplit; auto using eq_sumbool2bool_true).
 
 Ltac uniq_result :=
-repeat dgvs_instantiate_inv;
+subst;
 repeat match goal with
 | H1 : ?f ?a ?b ?c ?d = _,
   H2 : ?f ?a ?b ?c ?d = _ |- _ =>
@@ -107,7 +107,6 @@ repeat match goal with
 | H1 : ?f ?a = _,
   H2 : ?f ?a = _ |- _ =>
   rewrite H1 in H2; inv H2
-| H1 : _ @ _ |- _ => inv H1
 | H : ?f _ = ?f _ |- _ => inv H
 | H : ?f _ _ = ?f _ _ |- _ => inv H
 | H : ?f _ _ _ = ?f _ _ _ |- _ => inv H

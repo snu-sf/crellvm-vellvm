@@ -31,10 +31,6 @@ Module OpsemProps. Section OpsemProps.
 
 Export Opsem.
 
-Notation "gv @ gvs" :=
-  (GenericValueHelper.instantiate_gvs gv gvs) (at level 43, right associativity).
-Notation "$ gv # t $" := (GenericValueHelper.gv2gvs gv t) (at level 41).
-
 (***********************************************************)
 (* Properties of updating locals after calls. *)
 Lemma func_callUpdateLocals_is_returnUpdateLocals :
@@ -316,11 +312,10 @@ als' Mem' B'' rid oResult tr
 (db:bFdef fv rt lp S TD Ps lc gl fs Mem lc' als' Mem' B'' rid oResult tr)
   :=
   match oResult with
-  | Some Result => forall ECs fptrs,
-    getOperandValue TD fv lc gl = Some fptrs ->
-    exists fptr, exists fa, exists fid, exists la, exists va, exists lb,
+  | Some Result => forall ECs fptr,
+    getOperandValue TD fv lc gl = Some fptr ->
+    exists fa, exists fid, exists la, exists va, exists lb,
     exists l', exists ps', exists cs', exists tmn', exists gvs, exists lc0,
-    fptr @ fptrs /\
     lookupFdefViaPtr Ps fs fptr =
       Some (fdef_intro (fheader_intro fa rt fid la va) lb) /\
     getEntryBlock (fdef_intro (fheader_intro fa rt fid la va) lb) =
@@ -335,11 +330,10 @@ als' Mem' B'' rid oResult tr
                                B'' nil (insn_return rid rt Result) lc'
                                als') ECs Mem')
       tr
-  | None => forall ECs fptrs,
-    getOperandValue TD fv lc gl = Some fptrs ->
-    exists fptr, exists fa, exists fid, exists la, exists va, exists lb,
+  | None => forall ECs fptr,
+    getOperandValue TD fv lc gl = Some fptr ->
+    exists fa, exists fid, exists la, exists va, exists lb,
     exists l', exists ps', exists cs', exists tmn', exists gvs, exists lc0,
-    fptr @ fptrs /\
     lookupFdefViaPtr Ps fs fptr =
       Some (fdef_intro (fheader_intro fa rt fid la va) lb) /\
     getEntryBlock (fdef_intro (fheader_intro fa rt fid la va) lb) =
@@ -390,8 +384,8 @@ Proof.
     apply H with (ECs:=(mkEC F0 B0 
                          ((insn_call rid noret0 ca rt1 va1 fv lp)::cs')
                          tmn0 lc0 als0)::ECs) in H0; auto. clear H.
-    destruct H0 as [fptr' [fa0 [fid0 [la0 [va0 [lb0 [l0 [ps0 [cs0 [tmn0' [gvs0
-      [lc0' [J1 [J2 [J3 [J4 [J5 J6]]]]]]]]]]]]]]]]].
+    destruct H0 as [fa0 [fid0 [la0 [va0 [lb0 [l0 [ps0 [cs0 [tmn0' [gvs0
+      [lc0' [J2 [J3 [J4 [J5 J6]]]]]]]]]]]]]]].
     rewrite <- E0_left.
     apply sop_plus_cons with
      (state2:=(mkState
@@ -422,8 +416,8 @@ Proof.
     apply H with (ECs:=(mkEC F0 B0 
                          ((insn_call rid noret0 ca rt1 va1 fv lp)::cs')
                          tmn0 lc0 als0)::ECs) in H0; auto. clear H.
-    destruct H0 as [fptr' [fa0 [fid0 [la0 [va0 [lb0 [l0 [ps0 [cs0 [tmn0' [gvs0
-      [lc0'' [J1 [J2 [J3 [J4 [J5 J6]]]]]]]]]]]]]]]]].
+    destruct H0 as [fa0 [fid0 [la0 [va0 [lb0 [l0 [ps0 [cs0 [tmn0' [gvs0
+      [lc0'' [J2 [J3 [J4 [J5 J6]]]]]]]]]]]]]]].
     rewrite <- E0_left.
     apply sop_plus_cons with
      (state2:=mkState
@@ -451,12 +445,12 @@ Proof.
       (state2:=mkState (mkEC F b3 cs3 tmn3 lc3 als3) ECs bMem0); auto.
 
   Case "bFdef_func".
-    rewrite H0 in e. inv e. exists fptr. exists fa. exists fid. exists la.
+    rewrite H0 in e. inv e. exists fa. exists fid. exists la.
     exists va. exists lb. exists l'. exists ps'. exists cs'. exists tmn'.
     exists gvs. exists lc0. repeat (split; auto).
 
   Case "bFdef_proc".
-   rewrite H0 in e. inv e. exists fptr. exists fa. exists fid. exists la.
+   rewrite H0 in e. inv e. exists fa. exists fid. exists la.
     exists va. exists lb. exists l'. exists ps'. exists cs'. exists tmn'.
     exists gvs. exists lc0. repeat (split; auto).
 Qed.
@@ -497,13 +491,12 @@ Proof.
 Qed.
 
 Lemma bFdef_func__implies__sop_star : forall fv rt lp S TD Ps ECs lc gl fs
-    Mem lc' als' Mem' B'' rid Result tr fptrs,
+    Mem lc' als' Mem' B'' rid Result tr fptr,
   bFdef fv rt lp S TD Ps lc gl fs Mem lc' als' Mem' B'' rid
     (Some Result) tr ->
-  getOperandValue TD fv lc gl = Some fptrs ->
-  exists fptr, exists fa, exists fid, exists la, exists va, exists lb,
+  getOperandValue TD fv lc gl = Some fptr ->
+  exists fa, exists fid, exists la, exists va, exists lb,
   exists l', exists ps', exists cs', exists tmn', exists gvs, exists lc0,
-  fptr @ fptrs /\
   lookupFdefViaPtr Ps fs fptr =
     Some (fdef_intro (fheader_intro fa rt fid la va) lb) /\
   getEntryBlock (fdef_intro (fheader_intro fa rt fid la va) lb) =
@@ -527,12 +520,11 @@ Proof.
 Qed.
 
 Lemma bFdef_proc__implies__sop_star : forall fv rt lp S TD Ps ECs lc gl fs
-    Mem lc' als' Mem' B'' rid tr fptrs,
+    Mem lc' als' Mem' B'' rid tr fptr,
   bFdef fv rt lp S TD Ps lc gl fs  Mem lc' als' Mem' B'' rid None tr ->
-  getOperandValue TD fv lc gl = Some fptrs ->
-  exists fptr, exists fa, exists fid, exists la, exists va, exists lb,
+  getOperandValue TD fv lc gl = Some fptr ->
+  exists fa, exists fid, exists la, exists va, exists lb,
   exists l', exists ps', exists cs', exists tmn', exists gvs, exists lc0,
-  fptr @ fptrs /\
   lookupFdefViaPtr Ps fs fptr =
     Some (fdef_intro (fheader_intro fa rt fid la va) lb) /\
   getEntryBlock (fdef_intro (fheader_intro fa rt fid la va) lb) =
@@ -602,8 +594,7 @@ Lemma bFdefInf_bopInf__implies__sop_diverges :
      (fid : id) (fa : fnattrs) (lc1 : GVsMap) (l' : l) 
      (ps' : phinodes) (cs' : cmds) (tmn' : terminator) 
      (la : args) (va : varg) (lb : blocks) (gvs : list GenericValue) 
-     (fptrs0 : GenericValue) (fptr : GenericValue),
-   fptr @ fptrs0 ->
+     (fptr : GenericValue),
    lookupFdefViaPtr Ps fs fptr =
    ret fdef_intro (fheader_intro fa rt fid la va) lb ->
    getEntryBlock (fdef_intro (fheader_intro fa rt fid la va) lb) =
@@ -618,7 +609,7 @@ Lemma bFdefInf_bopInf__implies__sop_diverges :
      bLocals := lc1;
      bAllocas := nil;
      bMem := Mem0 |} tr ->
-   getOperandValue TD fv lc gl = ret fptrs0 ->
+   getOperandValue TD fv lc gl = ret fptr ->
    sop_diverges (mkCfg S TD Ps gl fs)
      {|
      EC := {|
@@ -656,7 +647,7 @@ Proof.
       inv HbFdefInf.
       eapply CIH_bFdefInf with (fid:=fid)(l':=l')(ps':=ps')(cs':=cs')(tmn':=tmn')
         (fa:=fa)(la:=la)(va:=va)(lb:=lb)(gvs:=gvs)(lc1:=lc1)(fptr:=fptr)(fv:=fv)
-        (lp:=lp)(lc:=lc)(fptrs0:=fptrs) in H5; eauto.
+        (lp:=lp)(lc:=lc) in H4; eauto.
 
   assert (forall S tr TD Ps gl fs F B cs tmn lc als Mem ECs,
     bopInf (mkbCfg S TD Ps gl fs F) (mkbEC B cs tmn lc als Mem) tr ->
@@ -677,17 +668,16 @@ Proof.
         eapply sop_diverges_intro; eauto.
 
   intros fv rt lp S TD Ps ECs lc gl fs Mem0 tr fid fa lc1 l' ps' cs' tmn' la va
-    lb gvs fptrs0 fptr Hin Hlookup HgetEntryBlock Hp2gvs Hinit HbFdefInf Hget.
+    lb gvs fptr Hlookup HgetEntryBlock Hp2gvs Hinit HbFdefInf Hget.
   inversion HbFdefInf; subst; eauto.
 Qed.
 
 Lemma bFdefInf__implies__sop_diverges : forall fv rt lp S TD Ps ECs lc gl fs Mem
-    tr fptrs,
+    tr fptr,
   bFdefInf fv rt lp S TD Ps lc gl fs Mem tr ->
-  getOperandValue TD fv lc gl = Some fptrs ->
-  exists fptr, exists fa, exists fid, exists la, exists va, exists lb,
+  getOperandValue TD fv lc gl = Some fptr ->
+  exists fa, exists fid, exists la, exists va, exists lb,
   exists l', exists ps', exists cs', exists tmn', exists gvs, exists lc0,
-  fptr @ fptrs /\
   lookupFdefViaPtr Ps fs fptr =
     Some (fdef_intro (fheader_intro fa rt fid la va) lb) /\
   getEntryBlock (fdef_intro (fheader_intro fa rt fid la va) lb) =
@@ -701,7 +691,7 @@ Lemma bFdefInf__implies__sop_diverges : forall fv rt lp S TD Ps ECs lc gl fs Mem
 Proof.
   intros fv rt lp S TD Ps ECs lc gl fs Mem0 tr fptrs HdbFdefInf Hget.
   inv HdbFdefInf; subst.
-  exists fptr. exists fa. exists fid. exists la. exists va. exists lb. exists l'.
+  exists fa. exists fid. exists la. exists va. exists lb. exists l'.
   exists ps'. exists cs'. exists tmn'. exists gvs. exists lc1.
   rewrite Hget in H. inv H.
   repeat (split; auto).
@@ -731,7 +721,7 @@ Proof.
     try solve [clear CIH_bInsnInf; eauto].
     eapply bFdefInf_bopInf__implies__sop_diverges with (l':=l')(ps':=ps')
       (cs':=cs')(tmn':=tmn')(la:=la)(va:=va)(lb:=lb)(fa:=fa)(gvs:=gvs)(lc1:=lc1)
-      in H5; eauto.
+      in H4; eauto.
 Qed.
 
 Lemma bopInf__implies__sop_diverges : forall S tr TD Ps gl fs F B cs tmn lc als
@@ -775,7 +765,7 @@ Lemma BOP_inversion : forall TD lc gl b s v1 v2 gv2,
   exists gvs1, exists gvs2,
     getOperandValue TD v1 lc gl = Some gvs1 /\
     getOperandValue TD v2 lc gl = Some gvs2 /\
-    GenericValueHelper.lift_op2 (mbop TD b s) gvs1 gvs2 (typ_int s) = Some gv2.
+    (mbop TD b s) gvs1 gvs2 = Some gv2.
 Proof.
   intros TD lc gl b s v1 v2 gv2 HBOP.
   unfold BOP in HBOP.
@@ -791,7 +781,7 @@ Lemma FBOP_inversion : forall TD lc gl b fp v1 v2 gv,
   exists gv1, exists gv2,
     getOperandValue TD v1 lc gl = Some gv1 /\
     getOperandValue TD v2 lc gl = Some gv2 /\
-    GenericValueHelper.lift_op2 (mfbop TD b fp) gv1 gv2 (typ_floatpoint fp) = Some gv.
+    (mfbop TD b fp) gv1 gv2 = Some gv.
 Proof.
   intros TD lc gl b fp v1 v2 gv HFBOP.
   unfold FBOP in HFBOP.
@@ -806,7 +796,7 @@ Lemma CAST_inversion : forall TD lc gl op t1 v1 t2 gv,
   CAST TD lc gl op t1 v1 t2 = Some gv ->
   exists gv1,
     getOperandValue TD v1 lc gl = Some gv1 /\
-    GenericValueHelper.lift_op1 (mcast TD op t1 t2) gv1 t2 = Some gv.
+    (mcast TD op t1 t2) gv1 = Some gv.
 Proof.
   intros TD lc gl op t1 v1 t2 gv HCAST.
   unfold CAST in HCAST.
@@ -819,7 +809,7 @@ Lemma TRUNC_inversion : forall TD lc gl op t1 v1 t2 gv,
   TRUNC TD lc gl op t1 v1 t2 = Some gv ->
   exists gv1,
     getOperandValue TD v1 lc gl = Some gv1 /\
-    GenericValueHelper.lift_op1 (mtrunc TD op t1 t2) gv1 t2 = Some gv.
+    (mtrunc TD op t1 t2) gv1 = Some gv.
 Proof.
   intros TD lc gl op t1 v1 t2 gv HTRUNC.
   unfold TRUNC in HTRUNC.
@@ -832,7 +822,7 @@ Lemma EXT_inversion : forall TD lc gl op t1 v1 t2 gv,
   EXT TD lc gl op t1 v1 t2 = Some gv ->
   exists gv1,
     getOperandValue TD v1 lc gl = Some gv1 /\
-    GenericValueHelper.lift_op1 (mext TD op t1 t2) gv1 t2 = Some gv.
+    (mext TD op t1 t2) gv1 = Some gv.
 Proof.
   intros TD lc gl op t1 v1 t2 gv HEXT.
   unfold EXT in HEXT.
@@ -846,7 +836,7 @@ Lemma ICMP_inversion : forall TD lc gl cond t v1 v2 gv,
   exists gv1, exists gv2,
     getOperandValue TD v1 lc gl = Some gv1 /\
     getOperandValue TD v2 lc gl = Some gv2 /\
-    GenericValueHelper.lift_op2 (micmp TD cond t) gv1 gv2 (typ_int 1%nat) = Some gv.
+    (micmp TD cond t) gv1 gv2 = Some gv.
 Proof.
   intros TD lc gl cond0 t v1 v2 gv HICMP.
   unfold ICMP in HICMP.
@@ -862,7 +852,7 @@ Lemma FCMP_inversion : forall TD lc gl cond fp v1 v2 gv,
   exists gv1, exists gv2,
     getOperandValue TD v1 lc gl = Some gv1 /\
     getOperandValue TD v2 lc gl = Some gv2 /\
-    GenericValueHelper.lift_op2 (mfcmp TD cond fp) gv1 gv2 (typ_int 1%nat) = Some gv.
+    (mfcmp TD cond fp) gv1 gv2 = Some gv.
 Proof.
   intros TD lc gl cond0 fp v1 v2 gv HFCMP.
   unfold FCMP in HFCMP.
@@ -993,11 +983,11 @@ Proof.
         destruct v as [i0|c]; simpl.
           rewrite H2.
           destruct (lookupAL _ lc2' i0); auto.
-          destruct (GenericValueHelper.lift_op1 (fit_gv TD rt) g rt);
+          destruct ((fit_gv TD rt) g);
             auto using eqAL_updateAddAL.
 
           destruct (const2GV TD gl c); auto using eqAL_updateAddAL.
-          destruct (GenericValueHelper.lift_op1 (fit_gv TD rt) g rt);
+          destruct ((fit_gv TD rt) g);
             auto using eqAL_updateAddAL.
 Qed.
 
@@ -1161,7 +1151,7 @@ Proof.
 
     destruct oresult; try solve [inversion H0; subst; auto].
     destruct (getOperandValue TD v lc' gl); tinv H0.
-    destruct (GenericValueHelper.lift_op1 (fit_gv TD rt) g rt); inv H0.
+    destruct ((fit_gv TD rt) g); inv H0.
       apply updateAddAL_uniq; auto.
 Qed.
 
@@ -1200,7 +1190,7 @@ Proof.
 
       remember (_initializeFrameValues TD la l0 nil) as R.
       destruct R; tinv H.
-      destruct (GenericValueHelper.lift_op1 (fit_gv TD t) g t); inv H;
+      destruct ((fit_gv TD t) g); inv H;
         eauto using updateAddAL_uniq.
 Qed.
 
@@ -1248,7 +1238,7 @@ Proof.
 
         remember (_initializeFrameValues TD la gvs nil) as R1.
         destruct R1; tinv H0.
-        destruct (GenericValueHelper.lift_op1 (fit_gv TD t) g t); inv H0.
+        destruct ((fit_gv TD t) g); inv H0.
         eauto using lookupAL_updateAddAL_eq.
 
       destruct (eq_atom_dec id0 id1); subst.
@@ -1261,7 +1251,7 @@ Proof.
 
           remember (_initializeFrameValues TD la gvs nil) as R1.
           destruct R1; tinv H0.
-          destruct (GenericValueHelper.lift_op1 (fit_gv TD t) g t); inv H0.
+          destruct ((fit_gv TD t) g); inv H0.
           eauto using lookupAL_updateAddAL_eq.
 
         destruct gvs.
@@ -1276,7 +1266,7 @@ Proof.
 
           remember (_initializeFrameValues TD la gvs nil) as R1.
           destruct R1; tinv H0.
-          destruct (GenericValueHelper.lift_op1 (fit_gv TD t) g t); inv H0.
+          destruct ((fit_gv TD t) g); inv H0.
           symmetry in HeqR1.
           eapply IHla in HeqR1; eauto.
           destruct HeqR1 as [gv HeqR1].
@@ -1667,9 +1657,8 @@ Definition bFdef_preservation_prop fv rt lp S TD Ps lc gl fs Mem lc' als'
   TD = (los, nts) ->
   uniqSystem S ->
   moduleInSystem (module_intro los nts Ps) S ->
-  exists fptrs, exists fptr, exists F,
-    getOperandValue TD fv lc gl = Some fptrs /\
-    fptr @ fptrs /\
+  exists fptr, exists F,
+    getOperandValue TD fv lc gl = Some fptr /\
     lookupFdefViaPtr Ps fs fptr = Some F /\
     uniqFdef F /\
     blockInSystemModuleFdef B' S (module_intro los nts Ps) F.
@@ -1718,9 +1707,8 @@ Case "bops_cons".
     (B':=b2)(lc':=lc2)(cs':=cs2)(tmn':=tmn2)(als':=als2)(Mem':=M2) in H5; eauto.
 
 Case "bFdef_func".
-  exists fptrs. exists fptr.
+  exists fptr.
   exists (fdef_intro (fheader_intro fa rt fid la va) lb).
-  split; auto.
   split; auto.
   split; auto.
   split.
@@ -1729,9 +1717,8 @@ Case "bFdef_func".
       eauto using entryBlockInSystemBlockFdef''.
 
 Case "bFdef_proc".
-  exists fptrs. exists fptr.
+  exists fptr.
   exists (fdef_intro (fheader_intro fa rt fid la va) lb).
-  split; auto.
   split; auto.
   split; auto.
   split.
@@ -1775,9 +1762,8 @@ Lemma bFdef_preservation : forall fv rt lp S los nts Ps lc gl fs Mem lc'
     oResult tr ->
   uniqSystem S ->
   moduleInSystem (module_intro los nts Ps) S ->
-  exists fptrs, exists fptr, exists F,
-    getOperandValue (los, nts) fv lc gl = Some fptrs /\
-    fptr @ fptrs /\
+  exists fptr, exists F,
+    getOperandValue (los, nts) fv lc gl = Some fptr /\
     lookupFdefViaPtr Ps fs fptr = Some F /\
     uniqFdef F /\
     blockInSystemModuleFdef B' S (module_intro los nts Ps) F.
