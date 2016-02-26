@@ -248,17 +248,17 @@ Proof.
   Opaque malloc GEP.
   (sInsn_cases (destruct HdsInsn) Case); dos_simpl; auto.
   Case "sCall".
-    apply lookupFdefViaPtr_inversion in H1.
-    destruct H1 as [fn [J1 J2]].
+    apply lookupFdefViaPtr_inversion in H0.
+    destruct H0 as [fn [J1 J2]].
     rewrite J1. simpl.
     rewrite J2.
     apply lookupFdefViaIDFromProducts_ideq in J2; subst; auto.
     destruct (id_dec fid fid); try congruence.
-    destruct lb; inv H2.
-    rewrite H4. simpl. auto.
+    destruct lb; inv H1.
+    rewrite H3. simpl. auto.
   Case "sExCall".
-    apply lookupExFdecViaPtr_inversion in H1.
-    destruct H1 as [fn [J1 [J2 J3]]].
+    apply lookupExFdecViaPtr_inversion in H0.
+    destruct H0 as [fn [J1 [J2 J3]]].
     rewrite J1. simpl.
     rewrite J2. rewrite J3.
     apply lookupFdecViaIDFromProducts_ideq in J3; subst; auto.
