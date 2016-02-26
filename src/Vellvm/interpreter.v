@@ -117,7 +117,7 @@ match state with
       | None => None
       | Some (Mem', mb) =>
         ret ((mkState (mkEC F B cs tmn (updateAddAL _ lc id0
-               ($ (blk2GV TD mb) # (typ_pointer t) $)) als) EC Mem'),
+               (blk2GV TD mb)) als) EC Mem'),
             E0)
       end
     | insn_free fid t v =>
@@ -131,7 +131,7 @@ match state with
       | None => None
       | Some (Mem', mb) =>
           ret ((mkState (mkEC F B cs tmn (updateAddAL _ lc id0
-                 ($ (blk2GV TD mb) # (typ_pointer t) $))
+                 (blk2GV TD mb))
                  (mb::als)) EC Mem'),
                E0)
       end
@@ -139,7 +139,7 @@ match state with
       do mp <- getOperandValue TD v lc gl;
       do gv <- mload TD Mem0 mp t align0;
          ret ((mkState (mkEC F B cs tmn (updateAddAL _ lc id0
-                ($ gv # t $)) als)
+                gv) als)
                EC Mem0), E0)
     | insn_store sid t v1 v2 align0 =>
       do gv1 <- getOperandValue TD v1 lc gl;

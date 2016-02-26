@@ -40,7 +40,7 @@ Import AtomSet.
 
 (* Notation "gv @ gvs" := *)
 (*   (GenericValueHelper.instantiate_gvs gv gvs) (at level 43, right associativity). *)
-Notation "$ gv # t $" := (GenericValueHelper.gv2gvs gv t) (at level 41).
+(* Notation "$ gv # t $" := (GenericValueHelper.gv2gvs gv t) (at level 41). *)
 Notation "vidxs @@ vidxss" := (in_list_gvs vidxs vidxss)
   (at level 43, right associativity).
 
@@ -151,7 +151,7 @@ wf_global (los,nts) s gl /\
 wf_system s /\
 moduleInSystemB (module_intro los nts ps) s = true.
 
-Transparent GenericValueHelper.gv2gvs GenericValueHelper.lift_op1 GenericValueHelper.lift_op2.
+Transparent GenericValueHelper.lift_op1 GenericValueHelper.lift_op2.
 
 (* Properties of inhabited *)
 (* Lemma const2GV__inhabited : forall TD gl c gvs, *)
@@ -831,7 +831,7 @@ Qed.
 Lemma gundef_cgv2gvs__wf_gvs : forall los nts gv s t
   (Hwft : wf_typ s (los, nts) t)
   (HeqR : ret gv = gundef (los, nts) t),
-  wf_GVs (los, nts) ($ gv # t $) t.
+  wf_GVs (los, nts) gv t.
 Proof.
   intros.
   assert (J:=HeqR).
@@ -841,14 +841,13 @@ Proof.
     unfold getTypeSizeInBits, getTypeSizeInBits_and_Alignment,
            getTypeSizeInBits_and_Alignment_for_namedts.
     rewrite J1. auto.
-    eapply GenericValueHelper.gv2gvs__matches_chunks; eauto.
-      eapply gundef__matches_chunks in J; eauto.
+    eapply gundef__matches_chunks in J; eauto.
 Qed.
 
 Lemma fit_gv_gv2gvs__wf_gvs_aux : forall los nts gv s t gv0
   (Hwft : wf_typ s (los,nts) t)
   (HeqR : ret gv = fit_gv (los, nts) t gv0),
-  wf_GVs (los, nts) ($ gv # t $) t.
+  wf_GVs (los, nts) gv t.
 Proof.
   intros.
   assert (J:=HeqR).
@@ -862,8 +861,7 @@ Proof.
            true t) as R.
     destruct R as [[]|]; inv J1.
 
-    eapply GenericValueHelper.gv2gvs__matches_chunks; eauto.
-      eapply fit_gv__matches_chunks in J; eauto.
+    eapply fit_gv__matches_chunks in J; eauto.
 Qed.
 
 Lemma lift_fit_gv__wf_gvs : forall los nts g s t t0 gv
@@ -3323,7 +3321,7 @@ Proof.
                 CurCmds := cs;
                 Terminator := tmn;
                 Locals :=
-               (updateAddAL _ lc i0 ($ (blk2GV (los, nts) mb) # typ_pointer t$));
+               (updateAddAL _ lc i0 (blk2GV (los, nts) mb));
                 Allocas := als |};
          ECS := ecs;
          Mem := M' |}.
@@ -3395,7 +3393,7 @@ Proof.
                 CurCmds := cs;
                 Terminator := tmn;
                 Locals :=
-               (updateAddAL _ lc i0 ($ (blk2GV (los, nts) mb) # typ_pointer t$));
+               (updateAddAL _ lc i0 (blk2GV (los, nts) mb));
                 Allocas := (mb::als) |};
          ECS := ecs;
          Mem := M' |}.
@@ -3429,7 +3427,7 @@ Proof.
                            (cs1 ++ insn_load i0 t v a :: cs) tmn);
                 CurCmds := cs;
                 Terminator := tmn;
-                Locals := updateAddAL _ lc i0 ($ gv' # t$);
+                Locals := updateAddAL _ lc i0 gv';
                 Allocas := als |};
          ECS := ecs;
          Mem := M |}.

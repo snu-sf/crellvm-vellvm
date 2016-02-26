@@ -279,7 +279,7 @@ Import LLVMinfra.
 
 (* Notation "gv @ gvs" := *)
 (*   (GenericValueHelper.instantiate_gvs gv gvs) (at level 43, right associativity). *)
-Notation "$ gv # t $" := (GenericValueHelper.gv2gvs gv t) (at level 41).
+(* Notation "$ gv # t $" := (GenericValueHelper.gv2gvs gv t) (at level 41). *)
 Notation "vidxs @@ vidxss" := (Opsem.in_list_gvs vidxs vidxss)
   (at level 43, right associativity).
 

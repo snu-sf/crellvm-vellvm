@@ -42,13 +42,13 @@ Module GenericValueHelper.
 (* cgv2gvs cgv t converts the constant cgv to GenericValues w.r.t type t. *)
 (* Definition cgv2gvs : GenericValue -> typ -> GenericValue := LLVMgv.cgv2gv. *)
 (* gv2gvs gv t converts gv to GenericValues in terms of type t. *)
-Definition gv2gvs : GenericValue -> typ -> GenericValue := fun gv _ => gv.
+(* Definition gv2gvs : GenericValue -> typ -> GenericValue := fun gv _ => gv. *)
 (* f is a unary operation of gv, lift_op1 f returns a unary operation of 
    GenericValues. *)
 
 (* Notation "gv @ gvs" := *)
 (*   (instantiate_gvs gv gvs) (at level 43, right associativity). *)
-Notation "$ gv # t $" := (gv2gvs gv t) (at level 41).
+(* Notation "$ gv # t $" := (gv2gvs gv t) (at level 41). *)
 
 
 Definition lift_op1 : (GenericValue -> option GenericValue) -> GenericValue -> typ -> option GenericValue :=
@@ -103,25 +103,26 @@ Qed.
 
 (* All values in (gv2gvs gv t) are of type size t, match type t, and non-empty.
  *)
-Lemma gv2gvs__getTypeSizeInBits : forall S los nts gv t sz al,
-  wf_typ S (los,nts) t ->
-  _getTypeSizeInBits_and_Alignment los
-    (getTypeSizeInBits_and_Alignment_for_namedts (los,nts) true) true t =
-      Some (sz, al) ->
-  Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz) 8) = sizeGenericValue gv ->
-  sizeGenericValue (gv2gvs gv t) = Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz) 8).
-Proof.
-  intros. auto.
-Qed.
+(* Lemma gv2gvs__getTypeSizeInBits : forall S los nts gv t sz al, *)
+(*   wf_typ S (los,nts) t -> *)
+(*   _getTypeSizeInBits_and_Alignment los *)
+(*     (getTypeSizeInBits_and_Alignment_for_namedts (los,nts) true) true t = *)
+(*       Some (sz, al) -> *)
+(*   Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz) 8) = sizeGenericValue gv -> *)
+(*   sizeGenericValue gv = Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz) 8). *)
+(* Proof. *)
+(*   intros. *)
+(*   intros. auto. *)
+(* Qed. *)
 
 
-Lemma gv2gvs__matches_chunks : forall S los nts gv t,
-  wf_typ S (los,nts) t ->
-  gv_chunks_match_typ (los, nts) gv t ->
-  gv_chunks_match_typ (los, nts) (gv2gvs gv t) t.
-Proof.
-  intros. auto.
-Qed.
+(* Lemma gv2gvs__matches_chunks : forall S los nts gv t, *)
+(*   wf_typ S (los,nts) t -> *)
+(*   gv_chunks_match_typ (los, nts) gv t -> *)
+(*   gv_chunks_match_typ (los, nts) gv t. *)
+(* Proof. *)
+(*   intros. auto. *)
+(* Qed. *)
 
 (* Lemma gv2gvs__inhabited : forall gv t, inhabited (gv2gvs gv t). *)
 (* Proof. auto. Qed. *)
@@ -179,6 +180,8 @@ Lemma lift_op1__matches_chunks : forall S los nts f g t gvs,
   wf_typ S (los,nts) t ->
   (forall y, f g = Some y ->
    gv_chunks_match_typ (los, nts) y t) ->
+
+
   lift_op1 f g t = Some gvs ->
   gv_chunks_match_typ (los, nts) gvs t.
 Proof. intros. unfold lift_op1 in H1. eauto. Qed.
@@ -198,18 +201,18 @@ Proof. intros. unfold lift_op2 in H1. eauto. Qed.
 (* Proof. eauto. Qed. *)
 
 (* gv is in (gv2gvs gv t). *)
-Lemma instantiate_gv__gv2gvs : forall gv t, gv = (gv2gvs gv t).
-Proof. auto. Qed.
+(* Lemma instantiate_gv__gv2gvs : forall gv t, gv = (gv2gvs gv t). *)
+(* Proof. auto. Qed. *)
 
-(* If gv's is not undefined, (gv2gvs gv' t) only includes gv'. *)
-Lemma none_undef2gvs_inv : forall gv' t,
-  (forall mc, (Vundef, mc)::nil <> gv') ->
-  (gv2gvs gv' t) = gv'.
-Proof.
-  intros. eauto.
-Qed.
+(* (* If gv's is not undefined, (gv2gvs gv' t) only includes gv'. *) *)
+(* Lemma none_undef2gvs_inv : forall gv' t, *)
+(*   (forall mc, (Vundef, mc)::nil <> gv') -> *)
+(*   (gv2gvs gv' t) = gv'. *)
+(* Proof. *)
+(*   intros. eauto. *)
+(* Qed. *)
 
-Global Opaque gv2gvs lift_op1 lift_op2.
+Global Opaque lift_op1 lift_op2.
 
 End GenericValueHelper.
 
@@ -437,7 +440,7 @@ Section Opsem.
 Definition GVsMap := list (id * GenericValue).
 (* Notation "gv @ gvs" := *)
 (*   (GenericValueHelper.instantiate_gvs gv gvs) (at level 43, right associativity). *)
-Notation "$ gv # t $" := (GenericValueHelper.gv2gvs gv t) (at level 41).
+(* Notation "$ gv # t $" := (GenericValueHelper.gv2gvs gv t) (at level 41). *)
 
 Definition in_list_gvs (l1 : list GenericValue) (l2 : list GenericValue) : Prop :=
   l1 = l2.
@@ -545,7 +548,7 @@ Definition exCallUpdateLocals TD (rt:typ) (noret:bool) (rid:id)
       | None => None
       | Some Result =>
             match fit_gv TD rt Result with
-            | Some gr => Some (updateAddAL _ lc rid ($ gr # rt $))
+            | Some gr => Some (updateAddAL _ lc rid gr)
             | _ => None
             end
       end
@@ -604,7 +607,7 @@ match (la, lg) with
 | (((t, _), id)::la', nil) =>
   (* FIXME: We should initalize them w.r.t their type size. *)
   match _initializeFrameValues TD la' nil locals, gundef TD t with
-  | Some lc', Some gv => Some (updateAddAL _ lc' id ($ gv # t $))
+  | Some lc', Some gv => Some (updateAddAL _ lc' id gv)
   | _, _ => None
   end
 | _ => Some locals
@@ -797,7 +800,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
   sInsn (mkCfg S TD Ps gl fs)
     (mkState (mkEC F B ((insn_malloc id t v align)::cs) tmn lc als)  (ECS) Mem)
     (mkState (mkEC F B cs tmn
-                (updateAddAL _ lc id ($ (blk2GV TD mb) # (typ_pointer t) $))
+                (updateAddAL _ lc id (blk2GV TD mb))
                 als) (ECS) Mem')
     E0
 
@@ -819,7 +822,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
   sInsn (mkCfg S TD Ps gl fs)
     (mkState (mkEC F B ((insn_alloca id t v align)::cs) tmn lc als) (ECS) Mem)
     (mkState (mkEC F B cs tmn
-                   (updateAddAL _ lc id ($ (blk2GV TD mb) # (typ_pointer t) $))
+                   (updateAddAL _ lc id (blk2GV TD mb))
                    (mb::als)) (ECS) Mem')
     E0
 
@@ -829,7 +832,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
   mload TD Mem mp t align = Some gv ->
   sInsn (mkCfg S TD Ps gl fs)
     (mkState (mkEC F B ((insn_load id t v align)::cs) tmn lc als) (ECS) Mem)
-    (mkState (mkEC F B cs tmn (updateAddAL _ lc id ($ gv # t $)) als) (ECS) Mem)
+    (mkState (mkEC F B cs tmn (updateAddAL _ lc id gv) als) (ECS) Mem)
     E0
 
 | sStore : forall S TD Ps F B lc gl fs sid t align v1 v2 ECS cs tmn Mem als
@@ -1215,7 +1218,7 @@ Inductive bInsn :
   malloc TD Mem tsz gn align = Some (Mem', mb) ->
   bInsn (mkbCfg S TD Ps gl fs F)
     (mkbEC B ((insn_malloc id t v align)::cs) tmn lc als Mem)
-    (mkbEC B cs tmn  (updateAddAL _ lc id ($ (blk2GV TD mb) # (typ_pointer t) $))
+    (mkbEC B cs tmn  (updateAddAL _ lc id (blk2GV TD mb))
           als Mem')
     E0
 
@@ -1236,7 +1239,7 @@ Inductive bInsn :
   malloc TD Mem tsz gn align = Some (Mem', mb) ->
   bInsn (mkbCfg S TD Ps gl fs F)
     (mkbEC B ((insn_alloca id t v align)::cs) tmn lc als Mem)
-    (mkbEC B cs tmn (updateAddAL _ lc id ($ (blk2GV TD mb) # (typ_pointer t) $))
+    (mkbEC B cs tmn (updateAddAL _ lc id (blk2GV TD mb))
                     (mb::als) Mem')
     E0
 
@@ -1246,7 +1249,7 @@ Inductive bInsn :
   mload TD Mem mp t align = Some gv ->
   bInsn (mkbCfg S TD Ps gl fs F)
     (mkbEC B ((insn_load id t v align)::cs) tmn lc als Mem)
-    (mkbEC B cs tmn (updateAddAL _ lc id ($ gv # t $)) als Mem)
+    (mkbEC B cs tmn (updateAddAL _ lc id gv) als Mem)
     E0
 
 | bStore : forall S TD Ps F B lc gl fs sid t v1 v2 align cs tmn Mem als
