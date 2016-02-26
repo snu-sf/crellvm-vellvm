@@ -237,7 +237,7 @@ Ltac dos_rewrite :=
   | [ H : _ = merror |- _ ] => rewrite H; simpl
   end.
 
-Ltac dos_simpl := simpl; repeat dgvs_instantiate_inv; repeat dos_rewrite.
+Ltac dos_simpl := simpl; subst; repeat dos_rewrite.
 
 (* the small-step semantics implies the interpreter. *)
 Lemma dsInsn__implies__interInsn : forall cfg state state' tr,

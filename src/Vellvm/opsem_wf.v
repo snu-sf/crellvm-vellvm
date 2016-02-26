@@ -38,9 +38,6 @@ Import AtomSet.
 
 (* Notations *)
 
-Notation "vidxs @@ vidxss" := (in_list_gvs vidxs vidxss)
-  (at level 43, right associativity).
-
 (* A set of runtime values with type t is well-formed if 
    1) all values in the set are of size t;
    2) the set is not empty;

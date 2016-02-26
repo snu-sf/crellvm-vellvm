@@ -26,20 +26,7 @@ Import LLVMinfra.
 (* This file defines the deterministic instance of Vellvm's operational 
    semantics. *)
 
-Notation "vidxs @@ vidxss" := (Opsem.in_list_gvs vidxs vidxss)
-  (at level 43, right associativity).
-
 (* Properties of deterministic operational semantics. *)
-Lemma dos_in_list_gvs_inv : forall gvs gvss, gvs @@ gvss -> gvs = gvss.
-Proof.
-  induction 1; subst; auto.
-Qed.
-
-Ltac dgvs_instantiate_inv :=
-  match goal with
-  | [ H : _ = _ |- _ ] => subst
-  | [ H : _ @@ _ |- _ ] => apply dos_in_list_gvs_inv in H; subst
-  end.
 
 (*************************************)
 Definition DGVMap := Opsem.GVsMap.

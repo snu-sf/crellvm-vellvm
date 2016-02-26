@@ -93,7 +93,6 @@ Ltac repeat_bsplit :=
   repeat (bsplit; auto using eq_sumbool2bool_true).
 
 Ltac uniq_result :=
-unfold Opsem.in_list_gvs in *;
 subst;
 repeat match goal with
 | H1 : ?f ?a ?b ?c ?d = _,

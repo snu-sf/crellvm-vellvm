@@ -41,12 +41,10 @@ Proof.
   eapply cgv2gv__getTypeSizeInBits; eauto.
 Qed.
 
-Definition cundef_gvs := LLVMgv.cundef_gv.
-
 Lemma cundef_gvs__matches_chunks : forall S los nts gv ty,
   wf_typ S (los,nts) ty ->
   gv_chunks_match_typ (los, nts) gv ty ->
-  gv_chunks_match_typ (los, nts) (cundef_gvs gv ty) ty.
+  gv_chunks_match_typ (los, nts) (LLVMgv.cundef_gv gv ty) ty.
 Proof.
   intros. subst.
   eapply cundef_gv__matches_chunks; eauto.
@@ -286,9 +284,6 @@ Export OpsemAux.
 Section Opsem.
 
 Definition GVsMap := list (id * GenericValue).
-
-Definition in_list_gvs (l1 : list GenericValue) (l2 : list GenericValue) : Prop :=
-  l1 = l2.
 
 (* Compute the semantic value of a constant. *)
 Definition const2GV (TD:TargetData) (gl:GVMap) (c:const) : option GenericValue :=
@@ -1315,7 +1310,6 @@ Combined Scheme b_mutind from bInsn_ind2, bops_ind2, bFdef_ind2.
 
 End Opsem.
 
-Hint Unfold in_list_gvs.
 Hint Constructors bInsn bops bFdef sInsn sop_star sop_diverges sop_plus.
 
 End Opsem.
