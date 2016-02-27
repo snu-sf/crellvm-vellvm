@@ -2,7 +2,7 @@
 Require Import Maps.
 Require Import Metatheory.
 Require Import Coqlib.
-Require Import alist_old.
+Require Import alist.
 Set Implicit Arguments.
 
 Lemma in_fst_map__in_dom: forall A x (E : list (atom * A))
