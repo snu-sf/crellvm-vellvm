@@ -592,6 +592,12 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     (mkState (mkEC F (l, stmts_intro ps' cs' tmn') cs' tmn' lc' als) (ECS) Mem)
     E0 
 
+| sNop: forall S TD Ps F B lc gl fs id ECS cs tmn Mem als,
+  sInsn (mkCfg S TD Ps gl fs)
+    (mkState (mkEC F B ((insn_nop id)::cs) tmn lc als) (ECS) Mem)
+    (mkState (mkEC F B cs tmn lc als) (ECS) Mem)
+    E0
+
 | sBop: forall S TD Ps F B lc gl fs id bop sz v1 v2 gvs3 ECS cs tmn Mem als,
   BOP TD lc gl bop sz v1 v2 = Some gvs3 ->
   sInsn (mkCfg S TD Ps gl fs)
@@ -1317,6 +1323,7 @@ End Opsem.
 Tactic Notation "sInsn_cases" tactic(first) tactic(c) :=
   first;
   [ c "sReturn" | c "sReturnVoid" | c "sBranch" | c "sBranch_uncond" |
+    c "sNop" |
     c "sBop" | c "sFBop" | c "sExtractValue" | c "sInsertValue" |
     c "sMalloc" | c "sFree" |
     c "sAlloca" | c "sLoad" | c "sStore" | c "sGEP" |
@@ -1360,4 +1367,3 @@ Ltac simpl_s_genInitState :=
   | H: ret _ = ret _ |- _ => inv H
   end;
   symmetry_ctx.
-
