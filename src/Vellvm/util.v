@@ -4,8 +4,8 @@ Require Import Coq.Lists.List.
 Require Import CoqListFacts.
 Require Import Metatheory.
 Require Import Coqlib.
+Require Import alist.
 
-Require Import alist_old.
 (* In *)
 
 Lemma In_weakening : forall A (l2 l3 l1:list A) a,
