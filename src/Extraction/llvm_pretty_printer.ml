@@ -33,18 +33,18 @@ let rec string_of_constant m st c =
   | ValueKind.ConstantInt ->
       if (is_i1_type (type_of c))
       then
-        if (Int64.compare (const_int_get_zextvalue c) Int64.zero) == 0 
+        if (Int64.compare (const_int_get_zextvalue c) Int64.zero) == 0
         then "false"
         else "true"
-      else   
+      else
         APInt.to_string (APInt.const_int_get_value c)
   | ValueKind.ConstantFP -> APFloat.to_string (APFloat.const_float_get_value c)
-  | ValueKind.ConstantArray -> 
-      let ops = operands c in 
-      Array.fold_right (fun c cs -> (string_of_constant m st c)^" "^cs) ops ""   
+  | ValueKind.ConstantArray ->
+      let ops = operands c in
+      Array.fold_right (fun c cs -> (string_of_constant m st c)^" "^cs) ops ""
   | ValueKind.ConstantStruct ->
-      let ops = operands c in 
-      Array.fold_right (fun c cs -> (string_of_constant m st c)^" "^cs) ops ""   
+      let ops = operands c in
+      Array.fold_right (fun c cs -> (string_of_constant m st c)^" "^cs) ops ""
   | ValueKind.ConstantVector -> "ConstantVector"
   | ValueKind.ConstantPointerNull -> "null"
   | ValueKind.GlobalVariable ->  llvm_name st c
@@ -59,7 +59,7 @@ and string_of_constant_expr m st c =
       failwith "Br isnt a const expr"
   | Opcode.Switch ->
       failwith "Switch isnt a const expr"
-  | Opcode.Invoke ->      
+  | Opcode.Invoke ->
       failwith "Invoke isnt a const expr"
 (*  | Opcode.Unwind ->
       failwith "Unwind isnt a const expr" *)
@@ -233,7 +233,7 @@ and string_of_constant_expr m st c =
       failwith "Load isnt a const expr"
   | Opcode.Store ->
       failwith "Store isnt a const expr"
-  | Opcode.GetElementPtr ->        
+  | Opcode.GetElementPtr ->
       let n = num_operands c in
       if n < 1
       then failwith "Const GEP must have >=1 operand."
@@ -250,7 +250,7 @@ and string_of_constant_expr m st c =
         string_of_bool (Llvm.GetElementPtrInst.is_in_bounds c)^" "^
         string_of_constant m st (Array.get ops 0)^" "^
         range 1 n ops^")"
-  | Opcode.Trunc ->        
+  | Opcode.Trunc ->
       let ops = operands c in
       let n = num_operands c in
       if n != 1
@@ -259,7 +259,7 @@ and string_of_constant_expr m st c =
         "trunc ("^
         string_of_constant m st (Array.get ops 0)^" "^
         string_type_of m c^")"
-  | Opcode.ZExt ->        
+  | Opcode.ZExt ->
       let ops = operands c in
       let n = num_operands c in
       if n != 1
@@ -268,7 +268,7 @@ and string_of_constant_expr m st c =
         "zext ("^
         string_of_constant m st (Array.get ops 0)^" "^
         string_type_of m c^")"
-  | Opcode.SExt ->        
+  | Opcode.SExt ->
       let ops = operands c in
       let n = num_operands c in
       if n != 1
@@ -382,7 +382,7 @@ and string_of_constant_expr m st c =
       failwith "PHI isnt a const expr"
   | Opcode.Call ->
       failwith "Call isnt a const expr"
-  | Opcode.Select ->      
+  | Opcode.Select ->
       let ops = operands c in
       let n = num_operands c in
       if n != 3
@@ -392,19 +392,19 @@ and string_of_constant_expr m st c =
         string_of_constant m st (Array.get ops 0)^" "^
         string_of_constant m st (Array.get ops 1)^" "^
         string_of_constant m st (Array.get ops 2)^")"
-  | Opcode.UserOp1 ->      
+  | Opcode.UserOp1 ->
       failwith "UserOp1 isnt a const expr"
-  | Opcode.UserOp2 ->      
+  | Opcode.UserOp2 ->
       failwith "UserOp2 isnt a const expr"
-  | Opcode.VAArg ->      
+  | Opcode.VAArg ->
       failwith "VAArg isnt a const expr"
-  | Opcode.ExtractElement ->      
+  | Opcode.ExtractElement ->
       failwith "Const ExtractElement: Not_Supported"
-  | Opcode.InsertElement ->      
+  | Opcode.InsertElement ->
       failwith "Const InsertElement: Not_Supported"
-  | Opcode.ShuffleVector ->      
+  | Opcode.ShuffleVector ->
       failwith "Sont ShuffleVector: Not_Supported"
-  | Opcode.ExtractValue ->      
+  | Opcode.ExtractValue ->
       let ops = operands c in
       let n = num_operands c in
       if n < 2
@@ -419,7 +419,7 @@ and string_of_constant_expr m st c =
         "extractvalue ("^
         string_of_constant m st (Array.get ops 0)^" "^
         (range 1 n ops)^")"
-  | Opcode.InsertValue ->      
+  | Opcode.InsertValue ->
       let ops = operands c in
       let n = num_operands c in
       if n < 3
@@ -436,7 +436,7 @@ and string_of_constant_expr m st c =
         string_of_constant m st (Array.get ops 1)^" "^
         (range 2 n ops)^")"
   | Opcode.LandingPad | Opcode.Resume | Opcode.AtomicRMW | Opcode.AtomicCmpXchg
-  | Opcode.Fence | Opcode.Invalid2 | Opcode.IndirectBr | Opcode.Invalid -> 
+  | Opcode.Fence | Opcode.Invalid2 | Opcode.IndirectBr | Opcode.Invalid ->
       failwith "LandingPad|Resume|AtomicRMW|AtomicCmpXchg|Fence|Invalid2|IndirectBr|Invalid : Not_Supported"
 
 (** See [WriteAsOperandInternal] - used by [string_of_operand], it prints out
@@ -464,11 +464,11 @@ let string_of_operand_internal m st v =
   | ValueKind.BlockAddress -> "BlockAddress"
   | _ -> llvm_name st v                                    (*Instruction*)
 
-(** See [WriteAsOperand] - Write the name of the specified value out to the 
-    specified ostream.  This can be useful when you just want to print int 
+(** See [WriteAsOperand] - Write the name of the specified value out to the
+    specified ostream.  This can be useful when you just want to print int
     %reg126, not the whole instruction that generated it. *)
 (* optional argument must be followed by at least one non-optional argument,*)
-(* at this case, ?(btype = true) cannot be at the end of this argument list. *)  
+(* at this case, ?(btype = true) cannot be at the end of this argument list. *)
 let string_of_operand ?(btype = true) m st v =
   let s =  string_of_operand_internal m st v in
   if btype
@@ -479,22 +479,22 @@ let string_of_operands m st i =
   let ops = operands i in
   let n = num_operands i in
   let rec range b e ops =
-    if b + 1 < e 
+    if b + 1 < e
     then
-      (string_of_operand m st (Array.get ops b))^", "^(range (b+1) e ops) 
+      (string_of_operand m st (Array.get ops b))^", "^(range (b+1) e ops)
     else
       (string_of_operand m st (Array.get ops b)) in
-  if n == 0 
-  then 
+  if n == 0
+  then
     ""
   else
     range 0 n ops
 
 let travel_other_instr m st i =
-  eprintf "  %s = %s %s\n" (llvm_name st i) (string_of_instr_opcode i) 
+  eprintf "  %s = %s %s\n" (llvm_name st i) (string_of_instr_opcode i)
     (string_of_operands m st i);
   flush_all ()
-  
+
 let travel_cast_instr m st i =
   eprintf "  %s = %s %s to %s\n"
     (llvm_name st i)
@@ -507,17 +507,17 @@ let travel_instr m st i =
   match (instr_opcode i) with
   | Opcode.Br ->
       if (BranchInst.is_conditional i)
-      then 
+      then
         begin
           eprintf "  %s = br %s, %s, %s\n"
             (llvm_name st i)
             (string_of_operand m st (BranchInst.get_condition i))
-            (string_of_operand m st (value_of_block 
+            (string_of_operand m st (value_of_block
               (BranchInst.get_successor i 0)))
-            (string_of_operand m st (value_of_block 
+            (string_of_operand m st (value_of_block
               (BranchInst.get_successor i 1)));
           flush_all ()
-        end        
+        end
       else
         travel_other_instr m st i
 (*
@@ -535,31 +535,31 @@ let travel_instr m st i =
         (my_string_of_lltype m (AllocationInst.get_allocated_type i))
         (string_of_operand m st (AllocationInst.get_array_size i))
         (AllocationInst.get_alignment i);
-      flush_all ()    
+      flush_all ()
   | Opcode.Load ->
-      eprintf "  %s = load %s, align %n\n" 
-        (llvm_name st i)  
-        (string_of_operands m st i) 
+      eprintf "  %s = load %s, align %n\n"
+        (llvm_name st i)
+        (string_of_operands m st i)
         (LoadInst.get_alignment i);
-      flush_all ()            
+      flush_all ()
   | Opcode.Store ->
-      eprintf "  %s = store %s, align %n\n" 
-        (llvm_name st i)  
-        (string_of_operands m st i) 
+      eprintf "  %s = store %s, align %n\n"
+        (llvm_name st i)
+        (string_of_operands m st i)
         (StoreInst.get_alignment i);
-      flush_all ()    
+      flush_all ()
   | Opcode.ICmp ->
-      eprintf "  %s = icmp %s %s\n" 
-        (llvm_name st i) 
+      eprintf "  %s = icmp %s %s\n"
+        (llvm_name st i)
         (string_of_icmp (ICmpInst.get_predicate i))
         (string_of_operands m st i);
-      flush_all ()            
+      flush_all ()
   | Opcode.FCmp ->
-      eprintf "  %s = fcmp %s %s\n" 
-        (llvm_name st i)  
+      eprintf "  %s = fcmp %s %s\n"
+        (llvm_name st i)
         (string_of_fcmp (FCmpInst.get_predicate i))
         (string_of_operands m st i);
-      flush_all ()            
+      flush_all ()
   | Opcode.Call ->
       let fv = CallInst.get_called_value i in
       let fname = string_of_operand m st fv in
@@ -568,16 +568,16 @@ let travel_instr m st i =
       let rtyp = return_type ftyp in
       let atyp = " (" ^ (concat2 ", " (
                   Array.map (my_string_of_lltype m) (param_types ftyp)
-                 )) ^ ")" in      
-      eprintf "  %s = call %s with rtyp=%s atyp=%s fid=%s\n" 
-        (llvm_name st i) 
+                 )) ^ ")" in
+      eprintf "  %s = call %s with rtyp=%s atyp=%s fid=%s\n"
+        (llvm_name st i)
         (string_of_operands m st i)
-        (my_string_of_lltype m rtyp) 
+        (my_string_of_lltype m rtyp)
         atyp
         fname;
-      flush_all ()                             
+      flush_all ()
   | _ ->
-      if is_cast_instruction i 
+      if is_cast_instruction i
       then travel_cast_instr m st i
       else travel_other_instr m st i
 
@@ -589,25 +589,25 @@ let travel_block m st b =
 
 let travel_function m st f =
   SlotTracker.incorporate_function st f;
-  prerr_string (if (is_declaration f)  then "declare " else "define "); 
+  prerr_string (if (is_declaration f)  then "declare " else "define ");
   prerr_string "fname: ";
   prerr_string (llvm_name st f);
   prerr_string " with ftyp: ";
   prerr_string (my_string_of_lltype m (type_of f));
   prerr_string " with params: ";
-  Array.iter 
-    (fun param -> 
-      prerr_string (string_of_operand m st param); 
+  Array.iter
+    (fun param ->
+      prerr_string (string_of_operand m st param);
       prerr_string ", "
-    ) 
+    )
     (params f);
   prerr_newline ();
   iter_blocks (travel_block m st) f;
   SlotTracker.purge_function st
-  
+
 let travel_global m st g =
   match (classify_value g) with
-  | ValueKind.GlobalVariable -> 
+  | ValueKind.GlobalVariable ->
     prerr_string (llvm_name st g);
     prerr_string " = ";
     prerr_string (string_of_linkage (linkage g));
@@ -639,10 +639,10 @@ let travel_layout dlt =
       (string_of_int ((Llvm_target.DataLayout.get_pref_align tg i)*8));
     flush_all()
   done
-  
+
 let string_of_namedt m ty =
   match classify_type ty with
-  TypeKind.Integer -> "i" ^ string_of_int (integer_bitwidth ty)
+  | TypeKind.Integer -> "i" ^ string_of_int (integer_bitwidth ty)
   | TypeKind.Pointer -> (my_string_of_lltype m (element_type ty)) ^ "*"
   | TypeKind.Struct ->
       let s = "{ " ^ (concat2 ", " (
@@ -667,15 +667,17 @@ let string_of_namedt m ty =
   | TypeKind.Double -> "double"
   | TypeKind.Float -> "float"
   | TypeKind.Void -> "void"
-  | TypeKind.Metadata -> "metadata"  
-    
+  | TypeKind.Metadata -> "metadata"
+  | TypeKind.Half -> "half"
+  | TypeKind.X86_mmx -> "x86_mmx"
+
 let travel_namedt m nt =
   match type_by_name m nt with
   | Some ty -> eprintf "%s=%s\n" nt (string_of_namedt m ty)
-  | None -> failwith "Cannot find a named type!"    
+  | None -> failwith "Cannot find a named type!"
 
 let travel_module st m =
-  prerr_endline "Travel LLVM module:";  
+  prerr_endline "Travel LLVM module:";
   travel_layout (data_layout m);
   iter_named_types (travel_namedt m) m;
   iter_globals (travel_global m st) m;

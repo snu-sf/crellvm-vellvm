@@ -66,7 +66,7 @@ let z_of_camlint n =
   if n > 0l then Zpos (positive_of_camlint n)
   else Zneg (positive_of_camlint (Int32.neg n))
 
-let coqint_of_camlint (n: int32) : Integers.Int.int = 
+let coqint_of_camlint (n: int32) : Integers.Int.int =
   (* Interpret n as unsigned so that resulting Z is in range *)
   if n = 0l then Z0 else Zpos (positive_of_camlint n)
 
@@ -82,7 +82,7 @@ let z_of_camlint64 n =
   if n > 0L then Zpos (positive_of_camlint64 n)
   else Zneg (positive_of_camlint64 (Int64.neg n))
 
-let coqint_of_camlint64 (n: int64) : Integers.Int.int = 
+let coqint_of_camlint64 (n: int64) : Integers.Int.int =
   (* Interpret n as unsigned so that resulting Z is in range *)
   if n = 0L then Z0 else Zpos (positive_of_camlint64 n)
 
@@ -127,10 +127,10 @@ let coqstring_length s =
   in len 0 s
 
 let camlstring_of_coqstring s =
-  let r = String.create (coqstring_length s) in
+  let r = Bytes.create (coqstring_length s) in
   let rec fill pos = function
   | String0.EmptyString -> r
-  | String0.String(c, s) -> r.[pos] <- char_of_ascii c; fill (pos + 1) s
+  | String0.String(c, s) -> Bytes.set r pos (char_of_ascii c); fill (pos + 1) s
   in fill 0 s
 
 (* Timing facility *)
@@ -172,11 +172,11 @@ let heap_info msg =
 
 (* Generating a fresh atom. *)
 
-let tmp_index = 
-  let idx = ref 0 in 
+let tmp_index =
+  let idx = ref 0 in
   fun () -> idx := !idx + 1 ; !idx
 
-let atom_fresh_for_list a = 
+let atom_fresh_for_list a =
   "%_tmp_" ^ string_of_int (tmp_index ())
 
 (* let atom_fresh_for_list a =  *)
@@ -188,25 +188,25 @@ let atom_fresh_for_list a =
 (*   in loop () *)
 
 (* These conversion functions are very efficient, because the machine represent-
-   ation of nat is not practice. We should figure out if we can remove these 
+   ation of nat is not practice. We should figure out if we can remove these
    functions later... *)
-let llapint2nat i = 
+let llapint2nat i =
   nat_of_camlint (Int32.of_int (Int64.to_int (Llvm.APInt.get_sext_value i)))
-  
+
 let llapint2z i =
   z_of_camlint64 (Llvm.APInt.get_sext_value i)
 
-let z2llapint bit_width v is_signed = 
+let z2llapint bit_width v is_signed =
   let bit_width32 = camlint_of_z bit_width in
   let bit_widthi = Int32.to_int bit_width32 in
   let v64 = camlint64_of_z v in
   Llvm.APInt.of_int64 bit_widthi v64 is_signed
-                                   
+
 let pcubeplus (p: positive) : positive =
   let i = camlint_of_positive p in
   positive_of_camlint (Int32.add (Int32.mul i (Int32.mul i i)) i)
 
-let string_compare (s1: String.t) (s2: String.t) 
+let string_compare (s1: String.t) (s2: String.t)
   : String.t OrderedType.coq_Compare =
   let c = String.compare s1 s2 in
   if c > 0 then OrderedType.GT
