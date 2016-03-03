@@ -99,7 +99,7 @@ let string_of_valuekd op =
   | ValueKind.ConstantDataVector -> "ConstantDataVector"
 
 (* end *)
-                           
+
 let string_of_icmp op =
   match op with
   | Icmp.Eq -> "eq"
@@ -160,10 +160,10 @@ let is_cast_instruction v =
 
 let is_terminator_opcode opcode =
   match opcode with
-  | Opcode.Ret -> true       
-  | Opcode.Br -> true 
-  | Opcode.Switch -> true 
-  | Opcode.IndirectBr -> true 
+  | Opcode.Ret -> true
+  | Opcode.Br -> true
+  | Opcode.Switch -> true
+  | Opcode.IndirectBr -> true
   | Opcode.Invoke -> true
 (*  | Opcode.Unwind -> true *)
   | Opcode.Resume -> true
@@ -178,7 +178,7 @@ let is_terminator v =
 let is_binary_opcode opcode =
   match opcode with
   | Opcode.Add -> true
-  | Opcode.FAdd -> true 
+  | Opcode.FAdd -> true
   | Opcode.Sub -> true
   | Opcode.FSub -> true
   | Opcode.Mul -> true
@@ -188,7 +188,7 @@ let is_binary_opcode opcode =
   | Opcode.FDiv -> true
   | Opcode.URem -> true
   | Opcode.SRem -> true
-  | Opcode.FRem -> true 
+  | Opcode.FRem -> true
   | _ -> false
 
 let is_binary v =
@@ -224,27 +224,27 @@ let is_unary_instuction v =
 let is_i1_type t =
   match (classify_type t) with
   | TypeKind.Integer -> integer_bitwidth t == 1
-  | _ -> false 
+  | _ -> false
 
 let is_i8_type t =
   match (classify_type t) with
   | TypeKind.Integer -> integer_bitwidth t == 8
-  | _ -> false 
+  | _ -> false
 
 let is_i16_type t =
   match (classify_type t) with
   | TypeKind.Integer -> integer_bitwidth t == 16
-  | _ -> false 
+  | _ -> false
 
 let is_i32_type t =
   match (classify_type t) with
   | TypeKind.Integer -> integer_bitwidth t == 32
-  | _ -> false 
+  | _ -> false
 
 let is_i64_type t =
   match (classify_type t) with
   | TypeKind.Integer -> integer_bitwidth t == 64
-  | _ -> false 
+  | _ -> false
 
 let concat2 sep arr =
   let s = ref "" in
@@ -258,8 +258,8 @@ let concat2 sep arr =
 
 let rec my_string_of_lltype m ty =
   match classify_type ty with
-    TypeKind.Integer -> "i" ^ string_of_int (integer_bitwidth ty)
-  | TypeKind.Pointer -> 
+  | TypeKind.Integer -> "i" ^ string_of_int (integer_bitwidth ty)
+  | TypeKind.Pointer ->
     (let ety = element_type ty in
     match classify_type ety with
     | TypeKind.Struct ->
@@ -292,8 +292,10 @@ let rec my_string_of_lltype m ty =
   | TypeKind.Double -> "double"
   | TypeKind.Float -> "float"
   | TypeKind.Void -> "void"
-  | TypeKind.Metadata -> "metadata"  
-	
+  | TypeKind.Metadata -> "metadata"
+  | TypeKind.Half -> "half"
+  | TypeKind.X86_mmx -> "x86_mmx"
+
 let string_type_of m v =
   my_string_of_lltype m (type_of v)
 
@@ -306,7 +308,8 @@ let string_of_endian e =
 
 let string_of_aligntype at =
   match at with
-  | Llvm_target.AlignType.Integer_align -> "i" 
+  | Llvm_target.AlignType.Invalid_align -> failwith "invalid alignment"
+  | Llvm_target.AlignType.Integer_align -> "i"
   | Llvm_target.AlignType.Vector_align -> "v"
   | Llvm_target.AlignType.Float_align -> "f"
   | Llvm_target.AlignType.Aggregate_align -> "a"
@@ -323,6 +326,8 @@ let string_of_valuekd op =
   | ValueKind.BlockAddress -> "BlockAddress"
   | ValueKind.ConstantAggregateZero -> "ConstantAggregateZero"
   | ValueKind.ConstantArray -> "ConstantArray"
+  | ValueKind.ConstantDataArray -> "ConstantDataArray"
+  | ValueKind.ConstantDataVector -> "ConstantDataVetor"
   | ValueKind.ConstantExpr -> "ConstantExpr"
   | ValueKind.ConstantFP -> "ConstantFP"
   | ValueKind.ConstantInt -> "ConstantInt"
@@ -341,6 +346,7 @@ match lk with
   | Linkage.Available_externally -> "available_externally"
   | Linkage.Link_once -> "linkonce"
   | Linkage.Link_once_odr -> "linkonce_odr"
+  | Linkage.Link_once_odr_auto_hide -> failwith "linkonce_odr_auto_hide"
   | Linkage.Weak -> "weak"
   | Linkage.Weak_odr -> "weak_odr"
   | Linkage.Appending -> "appending"
@@ -352,6 +358,7 @@ match lk with
   | Linkage.Ghost -> "ghost"
   | Linkage.Common -> "common"
   | Linkage.Linker_private -> "linker_private"
+  | Linkage.Linker_private_weak -> "linker_private_weak"
 
 let escaped_value_name (v:llvalue) : string =
    Llvm.escaped_value_name v
