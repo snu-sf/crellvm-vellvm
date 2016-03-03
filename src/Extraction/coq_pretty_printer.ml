@@ -275,7 +275,7 @@ let travel_cmd i =
       eprintf "  %s = call %s %s %s %s %s %s\n" id (string_of_bool noret)
         (string_of_bool tailc) (string_of_typ t) (string_of_varg va)
         (string_of_value fv) (string_of_params ps)
-  | LLVMsyntax.Coq_insn_nop _ -> failwith "nop"
+  | LLVMsyntax.Coq_insn_nop _ -> eprintf "\n"
   ;
   flush_all ()
 
