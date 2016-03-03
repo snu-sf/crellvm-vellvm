@@ -22,3 +22,4 @@ Makefile.coq
 !/src/Extraction/llvm_aux.ml
 !/src/Extraction/llvm_pretty_printer.ml
 !/src/Extraction/llvmcaml.ml
+!/src/Extraction/llvm2coq.ml
