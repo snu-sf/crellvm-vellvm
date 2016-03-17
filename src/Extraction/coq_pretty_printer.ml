@@ -275,7 +275,7 @@ let string_of_cmd c =
      sprintf "  %s = call %s %s %s %s %s %s" id (string_of_bool noret)
              (string_of_bool tailc) (string_of_typ t) (string_of_varg va)
              (string_of_value fv) (string_of_params ps)
-  | LLVMsyntax.Coq_insn_nop _ -> sprintf ""
+  | LLVMsyntax.Coq_insn_nop id -> sprintf "%s = nop" id
 
 let travel_cmd i =
   let _ = eprintf "%s\n" (string_of_cmd i) in
