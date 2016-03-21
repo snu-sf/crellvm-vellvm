@@ -219,64 +219,66 @@ let travel_terminator i =
   ;
   flush_all ()
 
-let travel_cmd i =
-  match i with
+let string_of_cmd c =
+  match c with
   | LLVMsyntax.Coq_insn_bop (id, bop, sz, v1, v2) ->
-      eprintf "  %s = %s i%d %s %s\n" id (string_of_bop bop) sz
-        (string_of_value v1) (string_of_value v2)
+     sprintf "  %s = %s i%d %s %s" id (string_of_bop bop) sz
+             (string_of_value v1) (string_of_value v2)
   | LLVMsyntax.Coq_insn_fbop (id, fbop, fp, v1, v2) ->
-      eprintf "  %s = %s %s %s %s\n" id (string_of_fbop fbop)
-        (string_of_floating_point fp) (string_of_value v1) (string_of_value v2)
+     sprintf "  %s = %s %s %s %s" id (string_of_fbop fbop)
+             (string_of_floating_point fp) (string_of_value v1) (string_of_value v2)
   | LLVMsyntax.Coq_insn_extractvalue (id, t, v, cs, t') ->
-      eprintf "  %s = extractvalue %s %s %s %s\n" id (string_of_typ t)
-        (string_of_value v) (string_of_list_constant cs) (string_of_typ t')
+     sprintf "  %s = extractvalue %s %s %s %s" id (string_of_typ t)
+             (string_of_value v) (string_of_list_constant cs) (string_of_typ t')
   | LLVMsyntax.Coq_insn_insertvalue (id, t1, v1, t2, v2, cs) ->
-      eprintf "  %s = insertvalue %s %s %s %s %s\n" id (string_of_typ t1)
-        (string_of_value v1) (string_of_typ t2) (string_of_value v2)
-        (string_of_list_constant cs)
+     sprintf "  %s = insertvalue %s %s %s %s %s" id (string_of_typ t1)
+             (string_of_value v1) (string_of_typ t2) (string_of_value v2)
+             (string_of_list_constant cs)
   | LLVMsyntax.Coq_insn_malloc (id, t, v, align) ->
-      eprintf "  %s = malloc %s %s %d\n" id (string_of_typ t) (string_of_value v)
-        align
+     sprintf "  %s = malloc %s %s %d" id (string_of_typ t) (string_of_value v)
+             align
   | LLVMsyntax.Coq_insn_alloca (id, t, v, align) ->
-      eprintf "  %s = alloca %s %s %d\n" id (string_of_typ t) (string_of_value v)
-        align
+     sprintf "  %s = alloca %s %s %d" id (string_of_typ t) (string_of_value v)
+             align
   | LLVMsyntax.Coq_insn_free (id, t, v) ->
-      eprintf "  %s = free %s %s\n" id (string_of_typ t) (string_of_value v)
+     sprintf "  %s = free %s %s" id (string_of_typ t) (string_of_value v)
   | LLVMsyntax.Coq_insn_load (id, t, v, a) ->
-      eprintf "  %s = load %s* %s %d\n" id (string_of_typ t) (string_of_value v)
-        a
+     sprintf "  %s = load %s* %s %d" id (string_of_typ t) (string_of_value v)
+             a
   | LLVMsyntax.Coq_insn_store (id, t, v1, v2, a) ->
-      eprintf "  %s = store %s %s %s %d\n" id (string_of_typ t)
-        (string_of_value v1) (string_of_value v2) a
+     sprintf "  %s = store %s %s %s %d" id (string_of_typ t)
+             (string_of_value v1) (string_of_value v2) a
   | LLVMsyntax.Coq_insn_gep (id, inbounds, t, v, vs, t') ->
-      eprintf "  %s = gep %s %s %s %s %s\n" id (string_of_bool inbounds)
-       (string_of_typ t) (string_of_value v) (string_of_list_value vs)
-       (string_of_typ t')
+     sprintf "  %s = gep %s %s %s %s %s" id (string_of_bool inbounds)
+             (string_of_typ t) (string_of_value v) (string_of_list_value vs)
+             (string_of_typ t')
   | LLVMsyntax.Coq_insn_trunc (id, truncop, t1, v, t2) ->
-      eprintf "  %s = %s %s %s %s\n" id (string_of_truncop truncop)
-        (string_of_typ t1) (string_of_value v) (string_of_typ t2)
+     sprintf "  %s = %s %s %s %s" id (string_of_truncop truncop)
+             (string_of_typ t1) (string_of_value v) (string_of_typ t2)
   | LLVMsyntax.Coq_insn_ext (id, extop, t1, v, t2) ->
-      eprintf "  %s = %s %s %s %s\n" id (string_of_extop extop)
-        (string_of_typ t1) (string_of_value v) (string_of_typ t2)
+     sprintf "  %s = %s %s %s %s" id (string_of_extop extop)
+             (string_of_typ t1) (string_of_value v) (string_of_typ t2)
   | LLVMsyntax.Coq_insn_cast (id, castop, t1, v, t2) ->
-      eprintf "  %s = %s %s %s %s\n" id (string_of_castop castop)
-        (string_of_typ t1) (string_of_value v) (string_of_typ t2)
+     sprintf "  %s = %s %s %s %s" id (string_of_castop castop)
+             (string_of_typ t1) (string_of_value v) (string_of_typ t2)
   | LLVMsyntax.Coq_insn_icmp (id, cond, t, v1, v2) ->
-      eprintf "  %s = icmp %s %s %s %s\n" id (string_of_cond cond)
-        (string_of_typ t) (string_of_value v1) (string_of_value v2)
+     sprintf "  %s = icmp %s %s %s %s" id (string_of_cond cond)
+             (string_of_typ t) (string_of_value v1) (string_of_value v2)
   | LLVMsyntax.Coq_insn_fcmp (id, fcond, fp, v1, v2) ->
-      eprintf "  %s = fcmp %s %s %s %s\n" id (string_of_fcond fcond)
-        (string_of_floating_point fp) (string_of_value v1) (string_of_value v2)
+     sprintf "  %s = fcmp %s %s %s %s" id (string_of_fcond fcond)
+             (string_of_floating_point fp) (string_of_value v1) (string_of_value v2)
   | LLVMsyntax.Coq_insn_select (id, v, t, v1, v2) ->
-      eprintf "  %s = select %s %s %s %s\n" id (string_of_value v)
-        (string_of_typ t) (string_of_value v1) (string_of_value v2)
+     sprintf "  %s = select %s %s %s %s" id (string_of_value v)
+             (string_of_typ t) (string_of_value v1) (string_of_value v2)
   | LLVMsyntax.Coq_insn_call (id, noret,
-        LLVMsyntax.Coq_clattrs_intro (tailc, cc, ra, ca), t, va, fv, ps) ->
-      eprintf "  %s = call %s %s %s %s %s %s\n" id (string_of_bool noret)
-        (string_of_bool tailc) (string_of_typ t) (string_of_varg va)
-        (string_of_value fv) (string_of_params ps)
-  | LLVMsyntax.Coq_insn_nop _ -> eprintf "\n"
-  ;
+                              LLVMsyntax.Coq_clattrs_intro (tailc, cc, ra, ca), t, va, fv, ps) ->
+     sprintf "  %s = call %s %s %s %s %s %s" id (string_of_bool noret)
+             (string_of_bool tailc) (string_of_typ t) (string_of_varg va)
+             (string_of_value fv) (string_of_params ps)
+  | LLVMsyntax.Coq_insn_nop id -> sprintf "%s = nop" id
+
+let travel_cmd i =
+  let _ = eprintf "%s\n" (string_of_cmd i) in
   flush_all ()
 
 let travel_phi i =
