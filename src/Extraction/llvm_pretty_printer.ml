@@ -49,6 +49,7 @@ let rec string_of_constant m st c =
   | ValueKind.ConstantPointerNull -> "null"
   | ValueKind.GlobalVariable ->  llvm_name st c
   | ValueKind.Function ->  llvm_name st c
+  | ValueKind.ConstantDataArray -> "ConstantDataArray(TODO)"
   | _ ->
     failwith (string_of_valuekd (classify_value c) ^ " isnt Constant")
 and string_of_constant_expr m st c =
@@ -462,6 +463,7 @@ let string_of_operand_internal m st v =
   | ValueKind.MDString -> "MDString"
   | ValueKind.InlineAsm -> "InlineAsm"
   | ValueKind.BlockAddress -> "BlockAddress"
+  | ValueKind.ConstantDataArray -> string_of_constant m st v
   | _ -> llvm_name st v                                    (*Instruction*)
 
 (** See [WriteAsOperand] - Write the name of the specified value out to the

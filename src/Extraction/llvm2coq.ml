@@ -1736,6 +1736,7 @@ let translate_global debug m st g ps  =
             | ValueKind.ConstantStruct -> Llvm_pretty_printer.string_of_constant m st v
             | ValueKind.ConstantVector -> Llvm_pretty_printer.string_of_constant m st v
             | ValueKind.ConstantPointerNull -> Llvm_pretty_printer.string_of_constant m st v
+            | ValueKind.ConstantDataArray -> Llvm_pretty_printer.string_of_constant m st v  (* added in llvm 3.6.2 *)
             | ValueKind.NullValue -> "NullValue"
             | ValueKind.MDNode -> "MDNode"
             | ValueKind.MDString -> "MDString"
