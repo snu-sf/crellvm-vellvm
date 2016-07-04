@@ -17,8 +17,8 @@ COQEXTRACT	:= src/Extraction/extraction_dom.v src/Extraction/extraction_core.v
 all: theories
 
 init:
-	git clone git@github.com:snu-sf/cpdtlib.git
-	git clone git@github.com:snu-sf/metalib.git
+	git clone git@github.com:snu-sf/cpdtlib.git lib/cpdtlib
+	git clone git@github.com:snu-sf/metalib.git lib/metalib
 
 Makefile.coq: Makefile $(COQTHEORIES)
 	(echo "-R src $(COQMODULE)"; \
