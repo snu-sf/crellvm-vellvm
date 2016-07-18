@@ -132,7 +132,7 @@ let rec string_of_constant c =
   | LLVMsyntax.Coq_const_null _ -> "null"
   | LLVMsyntax.Coq_const_arr (_, cs) -> string_of_list_constant cs
   | LLVMsyntax.Coq_const_struct (_, cs) -> string_of_list_constant cs
-  | LLVMsyntax.Coq_const_gid (_,id) -> id
+  | LLVMsyntax.Coq_const_gid (t,id) -> string_of_typ t ^ " " ^ id
   | LLVMsyntax.Coq_const_zeroinitializer _ -> "zeroinitializer"
   | LLVMsyntax.Coq_const_floatpoint (_, f) -> APFloat.to_string f
   | LLVMsyntax.Coq_const_truncop (op, c, t) ->
