@@ -6,6 +6,8 @@ COQMODULE    := compcert
 
 all: theories
 
+quick: theories-quick
+
 Makefile.coq: Makefile $(COQTHEORIES)
 	(echo "-R . $(COQMODULE)"; \
    echo "-R ../metalib metalib"; \
@@ -14,6 +16,9 @@ Makefile.coq: Makefile $(COQTHEORIES)
 
 theories: Makefile.coq
 	$(MAKE) -f Makefile.coq
+
+theories-quick: Makefile.coq
+	$(MAKE) -f Makefile.coq quick
 
 %.vo: Makefile.coq
 	$(MAKE) -f Makefile.coq "$@"

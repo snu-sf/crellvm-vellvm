@@ -16,6 +16,8 @@ COQEXTRACT	:= src/Extraction/extraction_dom.v src/Extraction/extraction_core.v
 
 all: theories
 
+quick: theories-quick
+
 init:
 	git clone git@github.com:snu-sf/cpdtlib.git lib/cpdtlib
 	git clone git@github.com:snu-sf/metalib.git lib/metalib
@@ -31,11 +33,20 @@ Makefile.coq: Makefile $(COQTHEORIES)
 metalib: lib/metalib
 	$(MAKE) -C lib/metalib
 
+metalib-quick: lib/metalib
+	$(MAKE) -C lib/metalib quick
+
 cpdtlib: lib/cpdtlib
 	$(MAKE) -C lib/cpdtlib
 
+cpdtlib-quick: lib/cpdtlib
+	$(MAKE) -C lib/cpdtlib quick
+
 compcert: lib/compcert-2.4 metalib
 	$(MAKE) -C lib/compcert-2.4
+
+compcert-quick: lib/compcert-2.4 metalib-quick
+	$(MAKE) -C lib/compcert-2.4 quick
 
 src/Vellvm/syntax_base.v: src/Vellvm/syntax_base.ott
 	cd src/Vellvm && \
@@ -51,12 +62,22 @@ src/Vellvm/typing_rules.v: src/Vellvm/syntax_base.ott src/Vellvm/typing_rules.ot
 theories: metalib cpdtlib compcert Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
 	$(MAKE) -f Makefile.coq
 
+theories-quick: metalib-quick cpdtlib-quick compcert-quick Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
+	$(MAKE) -f Makefile.coq quick
+
 extract: theories $(COQEXTRACT)
 	$(MAKE) -C src/Extraction
 	cd src/Extraction; ./fixextract.py
 
+extract-quick: theories-quick $(COQEXTRACT)
+	$(MAKE) -C src/Extraction quick
+	cd src/Extraction; ./fixextract.py
+
 %.vo: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
 	$(MAKE) -f Makefile.coq "$@"
+
+%.vio: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
+	$(MAKE) -f Makefile.coq "$@" quick
 
 clean: Makefile.coq
 	rm -f src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v 
