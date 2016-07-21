@@ -84,3 +84,6 @@ clean: Makefile.coq
 	$(MAKE) -f Makefile.coq clean
 	rm -f Makefile.coq
 	$(MAKE) -C src/Extraction clean
+	$(MAKE) -C lib/metalib clean
+	$(MAKE) -C lib/cpdtlib clean
+	$(MAKE) -C lib/compcert-2.4 clean
