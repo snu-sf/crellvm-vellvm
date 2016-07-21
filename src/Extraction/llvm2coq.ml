@@ -205,11 +205,13 @@ let rec translate_constant m st c =
       LLVMsyntax.Coq_const_null (translate_typ (element_type (type_of c)))
   | ValueKind.GlobalVariable ->    (*GlobalValue*)
     (* FIXME: Do we need typ for gid? use typ_void for the time being. *)
-      (LLVMsyntax.Coq_const_gid 
-        (translate_typ (element_type (type_of c)), llvm_name st c))
+      (LLVMsyntax.Coq_const_gid
+        (LLVMsyntax.Coq_typ_pointer(translate_typ (element_type (type_of c))),
+         llvm_name st c))
   | ValueKind.Function ->   (*FunctionVal*)
-      (LLVMsyntax.Coq_const_gid 
-        (translate_typ (element_type (type_of c)), llvm_name st c))
+      (LLVMsyntax.Coq_const_gid
+        (LLVMsyntax.Coq_typ_pointer(translate_typ (element_type (type_of c))),
+         llvm_name st c))
   | ValueKind.ConstantDataArray ->
      LLVMsyntax.Coq_const_arr
        (translate_typ (element_type (type_of c)),
@@ -681,14 +683,16 @@ let translate_operand_to_value m st v =
   | ValueKind.BasicBlock -> LLVMsyntax.Coq_value_id (llvm_name st v)
   | ValueKind.Function ->                    (*FunctionVal*)
       LLVMsyntax.Coq_value_const 
-        (LLVMsyntax.Coq_const_gid 
-          (translate_typ (element_type (type_of v)), llvm_name st v))
+        (LLVMsyntax.Coq_const_gid
+          (LLVMsyntax.Coq_typ_pointer(translate_typ (element_type (type_of v))),
+           llvm_name st v))
   | ValueKind.GlobalAlias -> LLVMsyntax.Coq_value_id (llvm_name st v) 
       (*GlobalValue*)
   | ValueKind.GlobalVariable ->              (*GlobalValue*)
       LLVMsyntax.Coq_value_const 
-        (LLVMsyntax.Coq_const_gid 
-          (translate_typ (element_type (type_of v)), llvm_name st v))
+        (LLVMsyntax.Coq_const_gid
+          (LLVMsyntax.Coq_typ_pointer(translate_typ (element_type (type_of v))),
+           llvm_name st v))
   | ValueKind.UndefValue -> 
       LLVMsyntax.Coq_value_const (translate_constant m st v)
   | ValueKind.ConstantExpr -> 
