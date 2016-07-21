@@ -14,9 +14,9 @@ COQEXTRACT	:= src/Extraction/extraction_dom.v src/Extraction/extraction_core.v
 
 .PHONY: all metalib cpdtlib theories clean
 
-all: theories
+all: theories extract
 
-quick: theories-quick
+quick: theories-quick extract-quick
 
 init:
 	git clone git@github.com:snu-sf/cpdtlib.git lib/cpdtlib
