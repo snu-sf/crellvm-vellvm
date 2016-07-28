@@ -87,7 +87,7 @@ Definition noret_dec : forall x y : noret, {x=y} + {x<>y} := bool_dec.
   | insn_return_void id => id
   | insn_br id v l1 l2 => id
   | insn_br_uncond id l => id
-  (* | insn_switch id t v l _ => id *)
+  | insn_switch id t v l _ => id
   (* | insn_invoke id typ id0 paraml l1 l2 => id *)
   | insn_unreachable id => id
   end.
@@ -337,7 +337,7 @@ match i with
 | insn_return_void _ => typ_void
 | insn_br _ _ _ _ => typ_void
 | insn_br_uncond _ _ => typ_void
-(* | insn_switch _ typ _ _ _ => typ_void *)
+| insn_switch _ typ _ _ _ => typ_void
 (* | insn_invoke _ typ _ _ _ _ => typ *)
 | insn_unreachable _ => typ_void
 end.
@@ -448,6 +448,7 @@ match i with
 | insn_return_void _ => False
 | insn_br _ v _ _ => v = v0
 | insn_br_uncond _ _ => False
+| insn_switch _ _ v _ _ => v = v0
 | insn_unreachable _ => False
 end.
 
@@ -465,7 +466,7 @@ match i with
 | insn_return_void _ => nil
 | insn_br _ v _ _ => getValueIDs v
 | insn_br_uncond _ _ => nil
-(* | insn_switch _ _ value _ _ => getValueIDs value *)
+| insn_switch _ _ value _ _ => getValueIDs value
 (* | insn_invoke _ _ _ lp _ _ => getParamsOperand lp *)
 | insn_unreachable _ => nil
 end.
@@ -513,7 +514,7 @@ match i with
 | insn_return_void _ => nil
 | insn_br _ _ l1 l2 => l1::l2::nil
 | insn_br_uncond _ l => l::nil
-(* | insn_switch _ _ _ l ls => l::list_prj2 _ _ ls *)
+| insn_switch _ _ _ l ls => l::list_prj2 _ _ ls
 (* | insn_invoke _ _ _ _ l1 l2 => l1::l2::nil *)
 | insn_unreachable _ => nil
 end.
@@ -1077,6 +1078,7 @@ lookupTypViaTIDFromModules s id0.
   | insn_return_void _ => nil
   | insn_br _ _ l1 l2 => l1::l2::nil
   | insn_br_uncond _ l1 => l1::nil
+  | insn_switch _ _ _ l ls => l::list_prj2 _ _ ls
   | insn_unreachable _ => nil
   end.
 
@@ -1087,6 +1089,8 @@ lookupTypViaTIDFromModules s id0.
   | insn_br id1 _ l11 l12, insn_br id2 _ l21 l22 => 
       id1 = id2 /\ l11 = l21 /\ l12 = l22
   | insn_br_uncond id1 l1, insn_br_uncond id2 l2 => id1 = id2 /\ l1 = l2
+  | insn_switch id1 _ v1 l1 ls1, insn_switch id2 _ v2 l2 ls2 => id1 = id2 /\ v1 = v2 /\
+                                                                l1 = l2 /\ ls1 = ls2
   | insn_unreachable i1, insn_unreachable i2 => i1 = i2
   | _, _ => False
   end.
@@ -1617,6 +1621,13 @@ Proof.
   destruct const_mutrec_dec; auto.
 Qed.
 
+Lemma list_const_l_dec : forall (l1 l2:list (const * l)), {l1=l2} + {~l1=l2}.
+Proof.
+  decide equality.
+  decide equality.
+  apply const_dec.
+Qed.
+
 Lemma value_dec : forall (v1 v2:value), {v1=v2}+{~v1=v2}.
 Proof.
   decide equality. apply const_dec.
@@ -1674,6 +1685,7 @@ match type of a1 with
 | value => destruct (@value_dec a1 a2)
 | const => destruct (@const_dec a1 a2)
 | list const => destruct (@list_const_dec a1 a2)
+| list (const * l) => destruct (@list_const_l_dec a1 a2)
 | attribute => destruct (@attribute_dec a1 a2)
 | attributes => destruct (@attributes_dec a1 a2)
 | params => destruct (@params_dec a1 a2)
