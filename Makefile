@@ -16,7 +16,7 @@ COQEXTRACT	:= src/Extraction/extraction_dom.v src/Extraction/extraction_core.v
 
 all: theories extract
 
-quick: theories-quick extract-quick
+quick: theories-quick
 
 init:
 	git clone git@github.com:snu-sf/cpdtlib.git lib/cpdtlib
@@ -67,10 +67,6 @@ theories-quick: metalib-quick cpdtlib-quick compcert-quick Makefile.coq src/Vell
 
 extract: theories $(COQEXTRACT)
 	$(MAKE) -C src/Extraction
-	cd src/Extraction; ./fixextract.py
-
-extract-quick: theories-quick $(COQEXTRACT)
-	$(MAKE) -C src/Extraction quick
 	cd src/Extraction; ./fixextract.py
 
 %.vo: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
