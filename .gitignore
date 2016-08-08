@@ -1,8 +1,10 @@
 *.v.d
 *.vo
+*.vio
 *.glob
 *.aux
 
+.dir-locals.el
 _CoqProject
 Makefile.coq
 
