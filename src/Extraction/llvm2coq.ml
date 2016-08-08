@@ -715,6 +715,8 @@ let translate_operand_to_value m st v =
   (* added valuekind in 3.6.2 *)
   | ValueKind.ConstantDataArray ->
      LLVMsyntax.Coq_value_const (translate_constant m st v)
+  | ValueKind.ConstantDataVector ->
+     failwith "ConstantDataVector: Not_Supported"
   | _ -> LLVMsyntax.Coq_value_id (llvm_name st v)   (*Instruction*)
 
 let translate_callsite_param_attrs ci nth =
