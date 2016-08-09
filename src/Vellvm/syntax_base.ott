@@ -349,7 +349,7 @@ terminator {{ tex tmn }} :: 'insn_'			::=  			{{ com termniators }}
       {{ tex \ottkw{br}\, [[value]]\, [[l1]]\, [[l2]] }}
   | id = br l        	    	  			::   :: br_uncond       {{ com unconditional br }}
       {{ tex \ottkw{br}\, [[l]] }}
-  %| id = switch typ value , l </ [ constj , lj ] // j />	::   :: switch		{{ com switch }}
+  | id = switch typ value l </ [ constj , lj ] // j />	::   :: switch		{{ com switch }}
   %| indirectbr
   %| id = invoke typ0 id0 list_param to l1 unwind l2 	::   :: invoke		{{ com invoke }}
   %| unwind

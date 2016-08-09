@@ -449,4 +449,7 @@ let value5 := fresh "value5" in
 let l2 := fresh "l2" in
 let l3 := fresh "l3" in
 let i0 := fresh "i0" in
-destruct tmn as [id5 t value5 | id5 | id5 value5 l2 l3 | i0 l2 | ].
+let typ5 := fresh "typ5" in
+let l5 := fresh "l5" in
+let lcl5 := fresh "lcl5" in
+destruct tmn as [id5 t value5 | id5 | id5 value5 l2 l3 | i0 l2 | id5 typ5 value5 l5 lcl5 | ].

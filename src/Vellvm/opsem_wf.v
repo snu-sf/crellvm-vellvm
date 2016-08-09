@@ -2971,6 +2971,16 @@ Proof.
               als) ecs M).
       exists events.E0. eauto.
 
+    SCase "tmn=switch".
+      right. left.
+      Admitted.
+(*
+      assert (wf_fdef s (module_intro los nts ps) f) as HwfF.
+        eapply wf_system__wf_fdef; eauto.
+      assert (uniqFdef f) as HuniqF.
+        eapply wf_system__uniqFdef; eauto.
+      
+
     SCase "tmn=unreachable".
       undefbehave.
 
@@ -3610,6 +3620,7 @@ Proof.
      right. rewrite J'. rewrite G. right. right. right. right. right.
      rewrite <- HeqHlk. rewrite <- HeqHelk. split; auto.
 Qed.
+*)
 
 End OpsemPP. End OpsemPP.
 

@@ -6,7 +6,7 @@ COQTHEORIES  := $(shell ls \
   src/Vellvm/Dominators/*.v \
   src/Vellvm/ott/*.v) \
   src/Vellvm/analysis.v src/Vellvm/datatype_base.v src/Vellvm/dopsem.v src/Vellvm/events.v src/Vellvm/external_intrinsics.v src/Vellvm/genericvalues_inject.v src/Vellvm/genericvalues_props.v src/Vellvm/genericvalues.v src/Vellvm/infrastructure.v src/Vellvm/infrastructure_props.v \
-	src/Vellvm/interpreter.v src/Vellvm/memory_sim.v src/Vellvm/opsem_props.v src/Vellvm/opsem.v src/Vellvm/opsem_wf.v src/Vellvm/ott_list_core.v src/Vellvm/ott_list_eq_dec.v \
+	src/Vellvm/memory_sim.v src/Vellvm/opsem_props.v src/Vellvm/opsem.v src/Vellvm/opsem_wf.v src/Vellvm/ott_list_core.v src/Vellvm/ott_list_eq_dec.v \
 	src/Vellvm/static.v src/Vellvm/syntax.v src/Vellvm/monad.v src/Vellvm/syntax_base.v src/Vellvm/tactics.v src/Vellvm/targetdata.v src/Vellvm/targetdata_props.v src/Vellvm/trace.v \
 	src/Vellvm/typing_rules.v src/Vellvm/typings_props.v src/Vellvm/typings.v src/Vellvm/vellvm.v src/Vellvm/vellvm_tactics.v src/Vellvm/memory_props.v src/Vellvm/program_sim.v src/Vellvm/util.v src/Vellvm/maps_ext.v
 

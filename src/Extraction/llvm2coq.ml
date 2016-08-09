@@ -829,7 +829,22 @@ let translate_instr debug m st i  =
           llvm_label st (BranchInst.get_successor i 0))
         )
   | Opcode.Switch ->
-      failwith "Switch: Not_Supported"
+     let n = num_operands i in
+     let rec range b e =
+       if b < e
+       then
+         (translate_constant m st (SwitchInst.get_case_value i b),
+          llvm_label st (SwitchInst.get_successor i b))::range (b+1) e
+       else [] in
+     LLVMsyntax.Coq_insn_terminator (
+         LLVMsyntax.Coq_insn_switch (
+             llvm_name st i,
+             translate_typ (type_of (SwitchInst.get_condition i)),
+             translate_operand_to_value m st (SwitchInst.get_condition i),
+             llvm_label st (SwitchInst.get_default_dest i),
+             range 1 (n / 2)
+           )
+       )
   | Opcode.Invoke ->      
       failwith "Invoke: Not_Supported"
   (* | Opcode.Unwind -> *)
