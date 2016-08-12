@@ -543,6 +543,21 @@ end.
 (***************************************************************)
 (* small-step *)
 
+Definition intConst2Z c :=
+  match c with
+  | const_int sz i =>
+    if Size.dec sz Size.ThirtyTwo
+    then ret INTEGER.to_Z i
+    else merror
+  | _ => merror
+  end.
+
+Definition get_or_else {A} (x: option A) (dflt: A) :=
+  match x with
+    | None => dflt
+    | Some _x => _x
+  end.
+
 Inductive sInsn : Config -> State -> State -> trace -> Prop :=
 | sReturn : forall S TD Ps F B rid RetTy Result lc gl fs
                             F' B' c' cs' tmn' lc' ECS
@@ -582,6 +597,33 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     (mkState (mkEC F (if isGVZero TD conds then l2 else l1, 
                        stmts_intro ps' cs' tmn') cs' tmn' lc' als) (ECS) Mem)
     E0 
+
+| sSwitch :
+    forall S TD Ps gl fs
+           ECS Mem
+           F B lc als
+           id Val (dflt: l) cases
+           (ValGV: GenericValue) sz ValZ
+           ps' cs' tmn' lc'
+    ,
+      getOperandValue TD Val lc gl = Some ValGV ->
+      let ty := typ_int sz in
+      (GV2int TD sz ValGV) = Some ValZ ->
+      let tgt_: monad (const * l) :=
+          List.find (fun x =>
+                       match (option_map (fun y => (Zeq_bool y ValZ)) (* not Z.eq, not eq_dec *)
+                                         (intConst2Z (fst x)))
+                       with
+                       | Some true => true
+                       | _ => false
+                       end) cases in
+      let tgt := get_or_else (option_map snd tgt_) dflt in
+      Some (stmts_intro ps' cs' tmn') = lookupBlockViaLabelFromFdef F tgt ->
+      switchToNewBasicBlock TD (tgt, stmts_intro ps' cs' tmn') B gl lc = Some lc'->
+      sInsn (mkCfg S TD Ps gl fs)
+            (mkState (mkEC F B nil (insn_switch id ty Val dflt cases) lc als) (ECS) Mem)
+            (mkState (mkEC F (tgt, stmts_intro ps' cs' tmn') cs' tmn' lc' als) (ECS) Mem)
+            E0
 
 | sBranch_uncond : forall S TD Ps F B lc gl fs bid l
                            ps' cs' tmn' lc' ECS Mem als,
@@ -948,7 +990,7 @@ End Opsem.
 
 Tactic Notation "sInsn_cases" tactic(first) tactic(c) :=
   first;
-  [ c "sReturn" | c "sReturnVoid" | c "sBranch" | c "sBranch_uncond" |
+  [ c "sReturn" | c "sReturnVoid" | c "sBranch" | c "sSwitch" | c "sBranch_uncond" |
     c "sNop" |
     c "sBop" | c "sFBop" | c "sExtractValue" | c "sInsertValue" |
     c "sMalloc" | c "sFree" |

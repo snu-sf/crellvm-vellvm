@@ -710,6 +710,39 @@ Proof.
   destruct R; eapply inscope_of_tmn_br_aux; eauto; simpl; auto.
 Qed.
 
+Lemma inscope_of_tmn_switch : forall F l0 ps cs id ids0 ps' cs' tmn'
+                                     ty Val dflt cases tgt
+  los nts Ps gl lc s lc'
+(Hreach: isReachableFromEntry F (tgt, stmts_intro ps' cs' tmn')),
+wf_global (los, nts) s gl ->
+wf_lc (los,nts) F lc ->
+wf_fdef s (module_intro los nts Ps) F ->
+uniqFdef F ->
+blockInFdefB (l0, stmts_intro ps cs (insn_switch id ty Val dflt cases)) F = true ->
+Some ids0 = inscope_of_tmn F (l0, stmts_intro ps cs (insn_switch id ty Val dflt cases))
+                           (insn_switch id ty Val dflt cases) ->
+Some (stmts_intro ps' cs' tmn') = lookupBlockViaLabelFromFdef F tgt ->
+switchToNewBasicBlock (los,nts)
+  (tgt, stmts_intro ps' cs' tmn')
+  (l0, stmts_intro ps cs (insn_switch id ty Val dflt cases)) gl lc = Some lc' ->
+dflt = tgt \/ In tgt (list_prj2 const l cases) ->
+wf_defs (los,nts) F lc ids0 ->
+exists ids0',
+  match cs' with
+  | nil =>
+      Some ids0' =
+        inscope_of_tmn F (tgt, stmts_intro ps' cs' tmn') tmn'
+  | c'::_ =>
+      Some ids0' =
+        inscope_of_cmd F (tgt, stmts_intro ps' cs' tmn') c'
+  end /\
+  incl (ListSet.set_diff eq_atom_dec ids0' (getPhiNodesIDs ps')) ids0 /\
+  wf_defs (los,nts) F lc' ids0'.
+Proof.
+  intros.
+  eapply inscope_of_tmn_br_aux; eauto; simpl; auto.
+Qed.
+
 (* Properties of wf_lc *)
 Lemma updateValuesForNewBlock_spec3 : forall TD f lc,
   wf_lc TD f lc ->
@@ -1932,6 +1965,79 @@ Case "sBranch".
       exists ps'. exists nil. simpl_env. auto.
 
 Focus.
+Case "sSwitch".
+  destruct_wfCfgState HwfCfg HwfS1.
+  remember (inscope_of_tmn F (l3, stmts_intro ps3 (cs3' ++ nil) (insn_switch id0 ty Val dflt cases))
+                  (insn_switch id0 ty Val dflt cases)) as R1.
+  destruct R1; try solve [inversion Hinscope1].
+  split; auto.
+
+  assert (HwfF := HwfSystem).
+  eapply wf_system__wf_fdef with (f:=F) in HwfF; eauto.
+  assert (HuniqF := HwfSystem).
+  eapply wf_system__uniqFdef with (f:=F) in HuniqF; eauto.
+  assert (isReachableFromEntry F (tgt, stmts_intro ps' cs' tmn')) as Hreach'.
+  clear - H2 Hreach1 H0 HBinF1 HFinPs1 HmInS HwfSystem HuniqF HwfF.
+  unfold isReachableFromEntry in *.
+  assert(HReachTgat : reachable F tgt).
+  {
+    eapply reachable_successors; eauto.
+    simpl.
+    destruct tgt_ eqn:T; simpl in *.
+    -
+      exploit find_some.
+      rewrite <- T.
+      subst. eauto.
+      intros.
+      destruct H.
+      right.
+      apply In_map with (f:= snd) in H.
+      idtac.
+      Lemma list_prj2_list_map_snd : forall A B l,
+          (List.map snd l) = (list_prj2 A B l).
+      Proof.
+        induction l0; eauto.
+        simpl in *. rewrite IHl0.
+        destruct a. auto.
+      Qed.
+      rewrite <- list_prj2_list_map_snd.
+      auto.
+    - left. auto.
+  }
+  auto.
+
+  repeat split; eauto.
+  apply lookupBlockViaLabelFromFdef_inv; auto.
+  eapply wf_lc_br_aux in H1; eauto.
+  clear - H2 HeqR1 H0 Hinscope1 H1 HwfSystem HBinF1 HwfF HuniqF Hwflc1 Hwfg
+                Hwftd Hreach'.
+  assert(dflt = tgt \/ In tgt (list_prj2 const l cases)).
+  {
+    destruct tgt_ eqn:T.
+    - exploit find_some.
+      rewrite <- T.
+      unfold tgt_.
+      eauto.
+      intros.
+      destruct H.
+      right.
+      apply In_map with (f:= snd) in H.
+      idtac.
+      rewrite <- list_prj2_list_map_snd.
+      auto.
+    - left. auto.
+  }
+
+  idtac.
+  rewrite app_nil_r in *.
+  exploit inscope_of_tmn_switch; eauto.
+  intros.
+  destruct H3 as [ids0' [H3 [J1 J2]]].
+  destruct cs'; rewrite <- H3; auto.
+
+  exists tgt.
+  exists ps'. exists nil. simpl_env. auto.
+Focus.
 Case "sBranch_uncond".
   destruct_wfCfgState HwfCfg HwfS1.
   remember (inscope_of_tmn F
@@ -2974,7 +3080,6 @@ Proof.
     SCase "tmn=switch".
       right. left.
       Admitted.
-(*
       assert (wf_fdef s (module_intro los nts ps) f) as HwfF.
         eapply wf_system__wf_fdef; eauto.
       assert (uniqFdef f) as HuniqF.
@@ -3620,7 +3725,6 @@ Proof.
      right. rewrite J'. rewrite G. right. right. right. right. right.
      rewrite <- HeqHlk. rewrite <- HeqHelk. split; auto.
 Qed.
-*)
 
 End OpsemPP. End OpsemPP.
 
