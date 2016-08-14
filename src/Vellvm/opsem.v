@@ -558,6 +558,17 @@ Definition get_or_else {A} (x: option A) (dflt: A) :=
     | Some _x => _x
   end.
 
+Definition get_tgt_branch ValZ cases dflt :=
+  let tgt_: monad (const * l) :=
+      List.find (fun x =>
+                   match (option_map (fun y => (Zeq_bool y ValZ)) (* not Z.eq, not eq_dec *)
+                                     (intConst2Z (fst x)))
+                   with
+                   | Some true => true
+                   | _ => false
+                   end) cases in
+  get_or_else (option_map snd tgt_) dflt.
+
 Inductive sInsn : Config -> State -> State -> trace -> Prop :=
 | sReturn : forall S TD Ps F B rid RetTy Result lc gl fs
                             F' B' c' cs' tmn' lc' ECS
@@ -609,15 +620,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
       getOperandValue TD Val lc gl = Some ValGV ->
       let ty := typ_int sz in
       (GV2int TD sz ValGV) = Some ValZ ->
-      let tgt_: monad (const * l) :=
-          List.find (fun x =>
-                       match (option_map (fun y => (Zeq_bool y ValZ)) (* not Z.eq, not eq_dec *)
-                                         (intConst2Z (fst x)))
-                       with
-                       | Some true => true
-                       | _ => false
-                       end) cases in
-      let tgt := get_or_else (option_map snd tgt_) dflt in
+      let tgt := get_tgt_branch ValZ cases dflt in
       Some (stmts_intro ps' cs' tmn') = lookupBlockViaLabelFromFdef F tgt ->
       switchToNewBasicBlock TD (tgt, stmts_intro ps' cs' tmn') B gl lc = Some lc'->
       sInsn (mkCfg S TD Ps gl fs)
