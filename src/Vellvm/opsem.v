@@ -558,16 +558,59 @@ Definition get_or_else {A} (x: option A) (dflt: A) :=
     | Some _x => _x
   end.
 
-Definition get_tgt_branch ValZ cases dflt :=
-  let tgt_: monad (const * l) :=
-      List.find (fun x =>
-                   match (option_map (fun y => (Zeq_bool y ValZ)) (* not Z.eq, not eq_dec *)
-                                     (intConst2Z (fst x)))
-                   with
-                   | Some true => true
-                   | _ => false
-                   end) cases in
-  get_or_else (option_map snd tgt_) dflt.
+Definition get_tgt_branch TD ty ValGV cases dflt :=
+  match ty with
+  | typ_int sz =>
+    match (GV2int TD sz ValGV) with
+    | Some ValZ =>
+      let tgt_: monad (const * l) :=
+          List.find (fun x =>
+                       match (option_map (fun y => (Zeq_bool y ValZ))
+                                         (intConst2Z (fst x)))
+                       with
+                       | Some true => true
+                       | _ => false
+                       end) cases in
+      get_or_else (option_map snd tgt_) dflt
+    | None => dflt
+    end
+  | _ => dflt
+  end.
+
+Lemma tgt_branch_in_successors : forall id TD typ val ValGV cases dflt,
+    In (get_tgt_branch TD typ ValGV cases dflt)
+       (successors_terminator (insn_switch id typ val dflt cases)).
+Proof.
+  intros.
+  simpl.
+  unfold get_tgt_branch.
+  destruct typ0; try (left; eauto; fail).
+  destruct (GV2int TD sz5 ValGV); try (left; eauto; fail).
+  destruct (find
+              (fun x : const * l =>
+                 match option_map (fun y : Z => Zeq_bool y z) (intConst2Z (fst x)) with
+                 | ret true => true
+                 | ret false => false
+                 | merror => false
+                 end) cases) eqn:T; try (left; eauto; fail).
+  destruct p; simpl.
+  right.
+  induction cases; intros; simpl in *.
+  - inv T.
+  - destruct a. simpl in *.
+    destruct (match option_map (fun y : Z => Zeq_bool y z) (intConst2Z c0) with
+              | ret true => true
+              | ret false => false
+              | merror => false
+              end); simpl in *.
+    +
+      inv T.
+      left.
+      eauto.
+    +
+      exploit IHcases; eauto.
+Qed.
+
 
 Inductive sInsn : Config -> State -> State -> trace -> Prop :=
 | sReturn : forall S TD Ps F B rid RetTy Result lc gl fs
@@ -613,14 +656,12 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     forall S TD Ps gl fs
            ECS Mem
            F B lc als
-           id Val (dflt: l) cases
-           (ValGV: GenericValue) sz ValZ
+           id ty Val (dflt: l) cases
+           (ValGV: GenericValue)
            ps' cs' tmn' lc'
     ,
       getOperandValue TD Val lc gl = Some ValGV ->
-      let ty := typ_int sz in
-      (GV2int TD sz ValGV) = Some ValZ ->
-      let tgt := get_tgt_branch ValZ cases dflt in
+      let tgt := get_tgt_branch TD ty ValGV cases dflt in
       Some (stmts_intro ps' cs' tmn') = lookupBlockViaLabelFromFdef F tgt ->
       switchToNewBasicBlock TD (tgt, stmts_intro ps' cs' tmn') B gl lc = Some lc'->
       sInsn (mkCfg S TD Ps gl fs)
