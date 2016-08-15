@@ -741,6 +741,14 @@ exists ids0',
 Proof.
   intros.
   eapply inscope_of_tmn_br_aux; eauto; simpl; auto.
+  destruct (in_dec eq_atom_dec dflt (list_prj2 const l cases)).
+  -
+    apply nodup_In; eauto.
+    destruct H7; subst; eauto.
+  -
+    destruct H7; subst; eauto.
+    left; eauto.
+    right. apply nodup_In. eauto.
 Qed.
 
 (* Properties of wf_lc *)
@@ -1999,7 +2007,15 @@ Case "sSwitch".
     (* IDK why it should be instantiated separately... *)
     (* Also exploit without any explicit instantiating, and then callig instantiate does not work here.. *)
     intros.
-    destruct H; auto.
+    simpl in *.
+    fold tgt in H.
+    destruct (in_dec eq_atom_dec dflt (list_prj2 const l cases)).
+    -
+      apply nodup_In in H; right; auto.
+    -
+      destruct H.
+      + left; auto.
+      + apply nodup_In in H; right; auto.
   }
 
   idtac.

@@ -584,31 +584,57 @@ Proof.
   intros.
   simpl.
   unfold get_tgt_branch.
-  destruct typ0; try (left; eauto; fail).
-  destruct (GV2int TD sz5 ValGV); try (left; eauto; fail).
+  assert(In dflt (if in_dec eq_atom_dec dflt (list_prj2 const l cases)
+                  then nodup eq_atom_dec (list_prj2 const l cases)
+                  else dflt :: nodup eq_atom_dec (list_prj2 const l cases))). {
+    destruct (in_dec eq_atom_dec dflt (list_prj2 const l cases)).
+    apply nodup_In; eauto.
+    econstructor; eauto.
+  }
+  destruct typ0; try (eauto; fail).
+  destruct (GV2int TD sz5 ValGV); try (eauto; fail).
   destruct (find
               (fun x : const * l =>
                  match option_map (fun y : Z => Zeq_bool y z) (intConst2Z (fst x)) with
                  | ret true => true
                  | ret false => false
                  | merror => false
-                 end) cases) eqn:T; try (left; eauto; fail).
-  destruct p; simpl.
-  right.
+                 end) cases) eqn:T; try (eauto; fail).
+  destruct p; simpl in *.
+
+  clear - T.
   induction cases; intros; simpl in *.
   - inv T.
-  - destruct a. simpl in *.
-    destruct (match option_map (fun y : Z => Zeq_bool y z) (intConst2Z c0) with
+  - destruct a.
+    destruct (match option_map (fun y : Z => Zeq_bool y z) (intConst2Z (fst (c0, l1))) with
               | ret true => true
               | ret false => false
               | merror => false
-              end); simpl in *.
-    +
-      inv T.
-      left.
-      eauto.
-    +
-      exploit IHcases; eauto.
+              end).
+    + inv T.
+      destruct (in_dec eq_atom_dec dflt (l0 :: list_prj2 const l cases)).
+      * apply nodup_In.
+        econstructor; eauto.
+      * simpl. right.
+        destruct (in_dec eq_atom_dec l0 (list_prj2 const l cases)).
+        apply nodup_In; eauto.
+        simpl; left; eauto.
+    + exploit IHcases; eauto. intros; eauto.
+      destruct (in_dec eq_atom_dec dflt (list_prj2 const l cases));
+        try apply nodup_In in H;
+        destruct (in_dec eq_atom_dec dflt (l1 :: list_prj2 const l cases));
+        try apply nodup_In.
+      * right; eauto.
+      * right; apply nodup_In; right; eauto.
+      * inv H; eauto.
+        apply nodup_In in H0; right; eauto.
+      * inv H; eauto.
+        left. eauto.
+        right.
+        apply nodup_In.
+        apply nodup_In in H0.
+        right.
+        eauto.
 Qed.
 
 
