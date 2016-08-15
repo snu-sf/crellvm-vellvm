@@ -875,9 +875,7 @@ Jwf_insn :: '' ::=
       % Check labels
       </ lookupBlockViaLabelFromFdef fdef lj = stmtsj // j />
       lookupBlockViaLabelFromFdef fdef l = stmts
-      % Uniqueness, needed for typings_props#successors_codom__uniq
-      % {{ NoDup ([[l]] :: List.map (compose snd fst) [[ls]]) }} --> it creates a new label list, not from const_l_stmts_list
-      {{ NoDup ([[l]] :: (List.map (compose snd fst) const_l_stmts_list)) }}
+      % Check invariance for instructions
       fdef , block |-i id = switch typ value l </ [ constj , lj ] // j />
       -------------------------------------------------------------------------------------- :: wf_insn_switch
       system , module , fdef , block |- id = switch typ value l </ [ constj , lj ] // j />
