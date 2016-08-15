@@ -99,16 +99,61 @@ Lemma wf_tmn__in_successors: forall s m f l0 cs ps tmn l1
   (HuniqF : uniqFdef f)
   (Hwftmn : wf_insn s m f (l0, stmts_intro cs ps tmn) (insn_terminator tmn))
   (Hin : In l1 (successors_terminator tmn)),
-  exists s1, blockInFdefB (l1, s1) f.
+    exists s1, blockInFdefB (l1, s1) f.
 Proof.
   intros.
   inv Hwftmn; simpl in Hin; tinv Hin.
+  -
     destruct Hin as [Hin | [Hin | Hin]]; tinv Hin; subst.
-      apply lookupBlockViaLabelFromFdef_inv in H2; eauto.
-      apply lookupBlockViaLabelFromFdef_inv in H3; eauto.
+    apply lookupBlockViaLabelFromFdef_inv in H2; eauto.
+    apply lookupBlockViaLabelFromFdef_inv in H3; eauto.
+  -
+    destruct Hin.
+    +
+      subst.
+      eexists.
+      apply lookupBlockViaLabelFromFdef_inv; eauto.
+    +
+      assert(
+          In l1
+             (list_prj2 const l
+                (List.map
+                   (fun pat_ : const * l * stmts =>
+                      let (p, _) := pat_ in
+                      let (const_, l_) := p in (const_, l_))
+                   const_l_stmts_list))
+          ->
+          exists s1,
+            In (l1, s1)
+               (List.map (fun pat_ : const * l * stmts =>
+                            let (p, stmts_) := pat_ in
+                            let (_, l_) := p in (l_, stmts_))
+                         const_l_stmts_list)).
+      {
+        intros.
+        clear - H1.
+        induction const_l_stmts_list; intros; simpl in *; eauto.
+        inv H1.
+        destruct a, p.
+        simpl in *.
+        destruct H1.
+        -
+          eexists. left. subst. eauto.
+        -
+          exploit IHconst_l_stmts_list; eauto.
+          intros.
+          inv H0.
+          eexists. right. eauto.
+      }
 
+      exploit H1; eauto.
+      intros.
+      inv H5.
+      exists x.
+      apply lookupBlockViaLabelFromFdef_inv; eauto.
+  -
     destruct Hin as [Hin | Hin]; tinv Hin; subst.
-      apply lookupBlockViaLabelFromFdef_inv in H0; eauto.
+    apply lookupBlockViaLabelFromFdef_inv in H0; eauto.
 Qed.
 
 (* Properties of wf_blocks *)
@@ -3455,9 +3500,49 @@ Proof.
   destruct HeqR as [ps0 [cs0 [tmn0 [HBinF Heq]]]]; subst.
   eapply wf_fdef__wf_tmn in HBinF; eauto.
   inv HBinF; simpl; auto.
+  -
     constructor; auto.
-      simpl. intro J.
-      destruct J as [J | J]; try solve [auto | congruence].
+    simpl. intro J.
+    destruct J as [J | J]; try solve [auto | congruence].
+  -
+    clear - H4.
+    generalize dependent const_l_stmts_list.
+    induction const_l_stmts_list; intros; simpl in *; eauto.
+    inv H4.
+    inv H2.
+    exploit IHconst_l_stmts_list; eauto.
+    {
+      apply NoDup_cons; eauto.
+      apply not_in_cons in H1.
+      destruct H1; eauto.
+    }
+    intros.
+    remember
+      (list_prj2 const l
+                 (List.map
+                    (fun pat_ : const * l * stmts =>
+                       let (p, _) := pat_ in
+                       let (const_, l_) := p in (const_, l_))
+                    const_l_stmts_list)) as labels.
+    destruct a, p.
+    unfold compose in *.
+    simpl in *.
+    destruct (eq_dec l_5 l0).
+    subst l_5.
+    exfalso.
+    apply H1. auto.
+    eapply NoDup_Add with (a:=l0) (l:=(l_5 :: labels)); eauto.
+    econstructor; econstructor.
+    split; eauto.
+    replace (List.map (fun x : const * l * stmts => snd (fst x)) const_l_stmts_list) with labels in *.
+    apply not_in_cons; eauto.
+    rewrite Heqlabels.
+    clear.
+    induction const_l_stmts_list; simpl in *; intros; auto.
+    destruct a, p.
+    rewrite IHconst_l_stmts_list.
+    simpl in *.
+    auto.
 Qed.
 
 Lemma predecessors_dom__uniq: forall s m f l0 pds
