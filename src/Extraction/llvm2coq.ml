@@ -221,6 +221,8 @@ let rec translate_constant m st c =
             make_array c (n - 1) (e::l)
         in
         make_array c num_elmts [])
+  | ValueKind.BlockAddress ->
+     failwith "BlockAddress: Not_Supported." 
   | _ -> failwith (string_of_valuekd (classify_value c) ^ " isnt Constant")
 and translate_constant_expr m st c =
   let oc = constexpr_opcode c in
