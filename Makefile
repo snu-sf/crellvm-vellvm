@@ -73,7 +73,7 @@ extract: theories $(COQEXTRACT)
 	$(MAKE) -f Makefile.coq "$@"
 
 %.vio: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
-	$(MAKE) -f Makefile.coq "$@" quick
+	$(MAKE) -f Makefile.coq "$@"
 
 clean: Makefile.coq
 	rm -f src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v 
