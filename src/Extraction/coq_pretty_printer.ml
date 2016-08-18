@@ -210,6 +210,9 @@ let travel_terminator i =
       eprintf "  %s = br %s %s %s\n" id (string_of_value v) l1 l2
   | LLVMsyntax.Coq_insn_br_uncond (id, l) ->
       eprintf "  %s = br %s \n" id l
+  | LLVMsyntax.Coq_insn_switch (id, ty, v, dflt, cases) ->
+      eprintf "  %s = switch %s %s, %s %s\n" id (string_of_typ ty) (string_of_value v) dflt
+              (List.fold_left (fun s (c, l) -> s ^ "[" ^ (string_of_constant c) ^ ", " ^ l ^ "] ") "" cases)
   | LLVMsyntax.Coq_insn_return (id, t, v) ->
       eprintf "  %s = ret %s %s\n" id (string_of_typ t) (string_of_value v)
   | LLVMsyntax.Coq_insn_return_void id ->
