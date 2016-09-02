@@ -12,7 +12,7 @@ COQTHEORIES  := $(shell ls \
 
 COQEXTRACT	:= src/Extraction/extraction_dom.v src/Extraction/extraction_core.v 
 
-.PHONY: all metalib cpdtlib theories clean
+.PHONY: all sflib metalib cpdtlib theories clean
 
 all: theories extract
 
@@ -21,14 +21,22 @@ quick: theories-quick
 init:
 	git clone git@github.com:snu-sf/cpdtlib.git lib/cpdtlib
 	git clone git@github.com:snu-sf/metalib.git lib/metalib
+	git clone git@github.com:snu-sf/sflib.git lib/sflib
 
 Makefile.coq: Makefile $(COQTHEORIES)
 	(echo "-R src $(COQMODULE)"; \
+   echo "-R lib/sflib sflib";\
    echo "-R lib/metalib metalib"; \
    echo "-R lib/cpdtlib Cpdt"; \
    echo "-R lib/compcert-2.4 compcert"; \
    echo $(COQTHEORIES)) > _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq
+
+sflib: lib/sflib
+	$(MAKE) -C lib/sflib
+
+sflib-quick: lib/sflib
+	$(MAKE) -C lib/sflib quick
 
 metalib: lib/metalib
 	$(MAKE) -C lib/metalib
@@ -59,10 +67,10 @@ src/Vellvm/typing_rules.v: src/Vellvm/syntax_base.ott src/Vellvm/typing_rules.ot
 	    -i typing_rules.ott -o typing_rules.v && \
 	rm _tmp_syntax_base.v
 
-theories: metalib cpdtlib compcert Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
+theories: sflib metalib cpdtlib compcert Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
 	$(MAKE) -f Makefile.coq
 
-theories-quick: metalib-quick cpdtlib-quick compcert-quick Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
+theories-quick: sflib-quick metalib-quick cpdtlib-quick compcert-quick Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
 	$(MAKE) -f Makefile.coq quick
 
 extract: theories $(COQEXTRACT)
@@ -80,6 +88,7 @@ clean: Makefile.coq
 	$(MAKE) -f Makefile.coq clean
 	rm -f Makefile.coq
 	$(MAKE) -C src/Extraction clean
+	$(MAKE) -C lib/sflib clean
 	$(MAKE) -C lib/metalib clean
 	$(MAKE) -C lib/cpdtlib clean
 	$(MAKE) -C lib/compcert-2.4 clean
