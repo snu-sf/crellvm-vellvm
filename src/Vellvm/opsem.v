@@ -605,7 +605,7 @@ Proof.
   { i. destruct (in_dec eq_atom_dec dflt (list_prj2 const l cases)); ss.
     right. ss.
   }
-  apply nodup_In. revert x0. clear. induction cases as [|[]]; ss.
+  apply nodup_In. revert H. clear. induction cases as [|[]]; ss.
   i. des; subst; eauto.
 Qed.
 

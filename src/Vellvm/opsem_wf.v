@@ -3104,11 +3104,11 @@ Proof.
                 const_l_stmts_list)) eqn:T.
         - exploit find_some. rewrite T; eauto. s. i. des.
           destruct p; s.
-          clear - x0 H10.
+          clear - H H10.
 
           generalize dependent const_l_stmts_list.
           induction const_l_stmts_list; i; ss.
-          destruct a, p; ss. des; eauto. inv x0.
+          destruct a, p; ss. des; eauto. inv H.
           erewrite H10; eauto.
         - eexists. simpl. eauto.
       }
