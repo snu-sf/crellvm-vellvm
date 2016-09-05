@@ -1,3 +1,4 @@
+Require Import sflib.
 Require Import Ensembles.
 Require Import syntax.
 Require Import infrastructure.
@@ -548,15 +549,10 @@ Inductive decide_nonzero (TD:TargetData) (gv:GenericValue) (decision:bool): Prop
     (DECISION: decision = negb (zeq z 0))
 .
 
-(***************************************************************)
-(* small-step *)
-
 Definition intConst2Z c :=
   match c with
   | const_int sz i =>
-    if Size.dec sz Size.ThirtyTwo
-    then ret INTEGER.to_Z i
-    else merror
+    ret INTEGER.to_Z i
   | _ => merror
   end.
 
@@ -566,85 +562,55 @@ Definition get_or_else {A} (x: option A) (dflt: A) :=
     | Some _x => _x
   end.
 
-Definition get_tgt_branch TD ty ValGV cases dflt :=
+Definition get_switch_branch TD ty ValGV cases :=
   match ty with
   | typ_int sz =>
-    match (GV2int TD sz ValGV) with
+    match GV2int TD sz ValGV with
     | Some ValZ =>
       let tgt_: monad (const * l) :=
           List.find (fun x =>
-                       match (option_map (fun y => (Zeq_bool y ValZ))
-                                         (intConst2Z (fst x)))
-                       with
-                       | Some true => true
-                       | _ => false
+                       match intConst2Z (fst x) with
+                       | Some y => Zeq_bool y ValZ
+                       | None => false
                        end) cases in
-      get_or_else (option_map snd tgt_) dflt
-    | None => dflt
+      option_map snd tgt_
+    | None => None
     end
-  | _ => dflt
+  | _ => None
   end.
 
-Lemma tgt_branch_in_successors : forall id TD typ val ValGV cases dflt,
-    In (get_tgt_branch TD typ ValGV cases dflt)
-       (successors_terminator (insn_switch id typ val dflt cases)).
+Definition get_tgt_branch TD ty ValGV cases dflt :=
+  get_or_else (get_switch_branch TD ty ValGV cases) dflt.
+
+Lemma tgt_branch_in_successors id TD typ val ValGV cases dflt:
+  In (get_tgt_branch TD typ ValGV cases dflt)
+     (successors_terminator (insn_switch id typ val dflt cases)).
 Proof.
-  intros.
-  simpl.
-  unfold get_tgt_branch.
-  assert(In dflt (if in_dec eq_atom_dec dflt (list_prj2 const l cases)
-                  then nodup eq_atom_dec (list_prj2 const l cases)
-                  else dflt :: nodup eq_atom_dec (list_prj2 const l cases))). {
-    destruct (in_dec eq_atom_dec dflt (list_prj2 const l cases)).
+  s. unfold get_tgt_branch.
+  destruct (get_switch_branch TD typ ValGV cases) eqn:X; ss; cycle 1.
+  { destruct (in_dec eq_atom_dec dflt (list_prj2 const l cases)).
     apply nodup_In; eauto.
     econstructor; eauto.
   }
-  destruct typ0; try (eauto; fail).
-  destruct (GV2int TD sz5 ValGV); try (eauto; fail).
+  unfold get_switch_branch in X. destruct typ; ss.
+  destruct (GV2int TD sz5 ValGV) eqn:Y; ss.
   destruct (find
               (fun x : const * l =>
-                 match option_map (fun y : Z => Zeq_bool y z) (intConst2Z (fst x)) with
-                 | ret true => true
-                 | ret false => false
+                 match intConst2Z (fst x) with
+                 | ret y => Zeq_bool y z
                  | merror => false
-                 end) cases) eqn:T; try (eauto; fail).
-  destruct p; simpl in *.
-
-  clear - T.
-  induction cases; intros; simpl in *.
-  - inv T.
-  - destruct a.
-    destruct (match option_map (fun y : Z => Zeq_bool y z) (intConst2Z (fst (c0, l1))) with
-              | ret true => true
-              | ret false => false
-              | merror => false
-              end).
-    + inv T.
-      destruct (in_dec eq_atom_dec dflt (l0 :: list_prj2 const l cases)).
-      * apply nodup_In.
-        econstructor; eauto.
-      * simpl. right.
-        destruct (in_dec eq_atom_dec l0 (list_prj2 const l cases)).
-        apply nodup_In; eauto.
-        simpl; left; eauto.
-    + exploit IHcases; eauto. intros; eauto.
-      destruct (in_dec eq_atom_dec dflt (list_prj2 const l cases));
-        try apply nodup_In in H;
-        destruct (in_dec eq_atom_dec dflt (l1 :: list_prj2 const l cases));
-        try apply nodup_In.
-      * right; eauto.
-      * right; apply nodup_In; right; eauto.
-      * inv H; eauto.
-        apply nodup_In in H0; right; eauto.
-      * inv H; eauto.
-        left. eauto.
-        right.
-        apply nodup_In.
-        apply nodup_In in H0.
-        right.
-        eauto.
+                 end) cases) eqn:Z; inv X.
+  exploit find_some; eauto. i. des.
+  cut (In (snd p) (nodup eq_atom_dec (list_prj2 const l cases))).
+  { i. destruct (in_dec eq_atom_dec dflt (list_prj2 const l cases)); ss.
+    right. ss.
+  }
+  apply nodup_In. revert x0. clear. induction cases as [|[]]; ss.
+  i. des; subst; eauto.
 Qed.
 
+(***************************************************************)
+(* small-step *)
 
 Inductive sInsn : Config -> State -> State -> trace -> Prop :=
 | sReturn : forall S TD Ps F B rid RetTy Result lc gl fs
@@ -692,10 +658,10 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
            F B lc als
            id ty Val (dflt: l) cases
            (ValGV: GenericValue)
-           ps' cs' tmn' lc'
+           ps' cs' tmn' lc' tgt
     ,
       getOperandValue TD Val lc gl = Some ValGV ->
-      let tgt := get_tgt_branch TD ty ValGV cases dflt in
+      get_tgt_branch TD ty ValGV cases dflt = tgt ->
       Some (stmts_intro ps' cs' tmn') = lookupBlockViaLabelFromFdef F tgt ->
       switchToNewBasicBlock TD (tgt, stmts_intro ps' cs' tmn') B gl lc = Some lc'->
       sInsn (mkCfg S TD Ps gl fs)

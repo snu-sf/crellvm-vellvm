@@ -1,3 +1,4 @@
+Require Import sflib.
 Require Import Ensembles.
 Require Import infrastructure.
 Require Import infrastructure_props.
@@ -1976,6 +1977,7 @@ Case "sBranch".
 Focus.
 Case "sSwitch".
   destruct_wfCfgState HwfCfg HwfS1.
+  set (get_tgt_branch (los, nts) ty ValGV cases dflt) as tgt.
   remember (inscope_of_tmn F (l3, stmts_intro ps3 (cs3' ++ nil) (insn_switch id0 ty Val dflt cases))
                   (insn_switch id0 ty Val dflt cases)) as R1.
   destruct R1; try solve [inversion Hinscope1].
@@ -1986,7 +1988,7 @@ Case "sSwitch".
   assert (HuniqF := HwfSystem).
   eapply wf_system__uniqFdef with (f:=F) in HuniqF; eauto.
   assert (isReachableFromEntry F (tgt, stmts_intro ps' cs' tmn')) as Hreach'.
-  clear - Hreach1 H0 HBinF1 HFinPs1 HmInS HwfSystem HuniqF HwfF.
+  clear - Hreach1 H1 H2 HBinF1 HFinPs1 HmInS HwfSystem HuniqF HwfF.
   unfold isReachableFromEntry in *.
   assert(HReachTgat : reachable F tgt).
   {
@@ -1999,7 +2001,7 @@ Case "sSwitch".
   repeat split; eauto.
   apply lookupBlockViaLabelFromFdef_inv; auto.
   eapply wf_lc_br_aux in H1; eauto.
-  clear - HeqR1 H0 Hinscope1 H1 HwfSystem HBinF1 HwfF HuniqF Hwflc1 Hwfg
+  clear - HeqR1 H2 Hinscope1 H1 HwfSystem HBinF1 HwfF HuniqF Hwflc1 Hwfg
                 Hwftd Hreach'.
   assert(dflt = tgt \/ In tgt (list_prj2 const l cases)).
   {
@@ -2023,7 +2025,7 @@ Case "sSwitch".
   rewrite app_nil_r in *.
   exploit inscope_of_tmn_switch; eauto.
   intros.
-  destruct H2 as [ids0' [H3 [J1 J2]]].
+  destruct H0 as [ids0' [H3 [J1 J2]]].
   destruct cs'; rewrite <- H3; auto.
 
   exists tgt.
@@ -3088,35 +3090,27 @@ Proof.
       rename l5 into dflt.
       remember (get_tgt_branch (los, nts) typ5 ValGV cases dflt) as tgt.
       assert(exists sts', Some sts' = lookupBlockViaLabelFromFdef f tgt) as HlkB.
-      {
-        inv Hwfc.
-        unfold get_tgt_branch.
-        destruct (GV2int (los, nts) sz5 ValGV); simpl; try (rewrite H11; eauto; fail).
+      { inv Hwfc.
+        unfold get_tgt_branch, get_switch_branch.
+        destruct (GV2int (los, nts) sz5 ValGV); s; try by (rewrite H11; eauto).
         destruct (find
              (fun x : const * l =>
-              match option_map (fun y : Z => Zeq_bool y z) (intConst2Z (fst x)) with
-              | ret true => true
-              | ret false => false
+              match (intConst2Z (fst x)) with
+              | ret y => Zeq_bool y z
               | merror => false
               end)
              (List.map
                 (fun pat_ : const * l * stmts => let (p, _) := pat_ in let (const_, l_) := p in (const_, l_))
                 const_l_stmts_list)) eqn:T.
-        -
-          exploit find_some. rewrite T; eauto.
-          intros. destruct H.
-          simpl.
-          destruct p; simpl.
-          clear - H H10.
+        - exploit find_some. rewrite T; eauto. s. i. des.
+          destruct p; s.
+          clear - x0 H10.
 
           generalize dependent const_l_stmts_list.
-          induction const_l_stmts_list; intros; simpl in *. inv H.
-          destruct H.
-          destruct a, p. inv H.
+          induction const_l_stmts_list; i; ss.
+          destruct a, p; ss. des; eauto. inv x0.
           erewrite H10; eauto.
-          exploit IHconst_l_stmts_list; eauto.
-        -
-          eexists. simpl. eauto.
+        - eexists. simpl. eauto.
       }
       destruct HlkB as [[ps' cs' tmn'] HlkB].
       assert (exists RVs,
@@ -3666,37 +3660,38 @@ Proof.
      exists events.E0. eauto.
 
   SCase "select".
-    assert (exists gv, getOperandValue (los, nts) v lc gl = Some gv)
-      as J.
-      eapply getOperandValue_inCmdOps_isnt_stuck; eauto.
-        simpl; auto.
-    destruct J as [c J].
-    assert (exists gv0, getOperandValue (los, nts) v0 lc gl = Some gv0)
-      as J0.
-      eapply getOperandValue_inCmdOps_isnt_stuck; eauto.
-        simpl; auto.
-    destruct J0 as [gv0 J0].
-    assert (exists gv1, getOperandValue (los, nts) v1 lc gl = Some gv1)
-      as J1.
-      eapply getOperandValue_inCmdOps_isnt_stuck; eauto.
-        simpl; auto.
-    destruct J1 as [gv1 J1].
-    left.
-    exists
-         {|
-         EC := {|
-                CurFunction := f;
-                CurBB := (l1, stmts_intro ps1
-                           (cs1 ++ insn_select i0 v t v0 v1 :: cs) tmn);
-                CurCmds := cs;
-                Terminator := tmn;
-                Locals := (if isGVZero (los, nts) c
-                           then updateAddAL _ lc i0 gv1
-                           else updateAddAL _ lc i0 gv0);
-                Allocas := als |};
-         ECS := ecs;
-         Mem := M |}.
-     exists events.E0. eauto.
+    admit.
+    (* assert (exists gv, getOperandValue (los, nts) v lc gl = Some gv) *)
+    (*   as J. *)
+    (*   eapply getOperandValue_inCmdOps_isnt_stuck; eauto. *)
+    (*     simpl; auto. *)
+    (* destruct J as [c J]. *)
+    (* assert (exists gv0, getOperandValue (los, nts) v0 lc gl = Some gv0) *)
+    (*   as J0. *)
+    (*   eapply getOperandValue_inCmdOps_isnt_stuck; eauto. *)
+    (*     simpl; auto. *)
+    (* destruct J0 as [gv0 J0]. *)
+    (* assert (exists gv1, getOperandValue (los, nts) v1 lc gl = Some gv1) *)
+    (*   as J1. *)
+    (*   eapply getOperandValue_inCmdOps_isnt_stuck; eauto. *)
+    (*     simpl; auto. *)
+    (* destruct J1 as [gv1 J1]. *)
+    (* left. *)
+    (* exists *)
+    (*      {| *)
+    (*      EC := {| *)
+    (*             CurFunction := f; *)
+    (*             CurBB := (l1, stmts_intro ps1 *)
+    (*                        (cs1 ++ insn_select i0 v t v0 v1 :: cs) tmn); *)
+    (*             CurCmds := cs; *)
+    (*             Terminator := tmn; *)
+    (*             Locals := (if isGVZero (los, nts) c *)
+    (*                        then updateAddAL _ lc i0 gv1 *)
+    (*                        else updateAddAL _ lc i0 gv0); *)
+    (*             Allocas := als |}; *)
+    (*      ECS := ecs; *)
+    (*      Mem := M |}. *)
+    (*  exists events.E0. eauto. *)
 
   SCase "call".
     assert (exists gvs, params2GVs (los, nts) p lc gl = Some gvs) as G.
@@ -3783,7 +3778,7 @@ Proof.
      unfold undefined_state.
      right. rewrite J'. rewrite G. right. right. right. right. right.
      rewrite <- HeqHlk. rewrite <- HeqHelk. split; auto.
-Qed.
+Admitted.
 
 End OpsemPP. End OpsemPP.
 
