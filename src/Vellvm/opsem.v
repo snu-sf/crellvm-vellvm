@@ -540,6 +540,14 @@ match (intConsts2Nats TD cidxs) with
   end
 end.
 
+(* TODO: position *)
+Inductive decide_nonzero (TD:TargetData) (gv:GenericValue) (decision:bool): Prop :=
+| decide_nonzero_intro
+    z 
+    (INT: GV2int TD Size.One gv = Some z)
+    (DECISION: decision = negb (zeq z 0))
+.
+
 (***************************************************************)
 (* small-step *)
 
@@ -569,17 +577,17 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     (mkState (mkEC F' B' cs' tmn' lc' als') (ECS) Mem')
     E0 
 
-| sBranch : forall S TD Ps F B lc gl fs bid Cond l1 l2 conds
+| sBranch : forall S TD Ps F B lc gl fs bid Cond l1 l2 conds decision
                               ps' cs' tmn' lc' ECS Mem als,
   getOperandValue TD Cond lc gl = Some conds ->
-  Some (stmts_intro ps' cs' tmn') = (if isGVZero TD conds
-               then lookupBlockViaLabelFromFdef F l2
-               else lookupBlockViaLabelFromFdef F l1) ->
-  switchToNewBasicBlock TD (if isGVZero TD conds then l2 else l1, 
+  decide_nonzero TD conds decision ->
+  Some (stmts_intro ps' cs' tmn') =
+  (lookupBlockViaLabelFromFdef F (if decision then l1 else l2)) ->
+  switchToNewBasicBlock TD (if decision then l1 else l2, 
                             stmts_intro ps' cs' tmn') B gl lc = Some lc'->
   sInsn (mkCfg S TD Ps gl fs)
     (mkState (mkEC F B nil (insn_br bid Cond l1 l2) lc als) (ECS) Mem)
-    (mkState (mkEC F (if isGVZero TD conds then l2 else l1, 
+    (mkState (mkEC F (if decision then l1 else l2, 
                        stmts_intro ps' cs' tmn') cs' tmn' lc' als) (ECS) Mem)
     E0 
 
@@ -736,16 +744,15 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     (mkState (mkEC F B cs tmn (updateAddAL _ lc id gvs3) als) (ECS) Mem)
     E0
 
-| sSelect : forall S TD Ps F B lc gl fs id v0 t v1 v2 c ECS cs tmn Mem als
+| sSelect : forall S TD Ps F B lc gl fs id v0 t v1 v2 c ECS cs tmn Mem als decision
                     gvs1 gvs2,
   getOperandValue TD v0 lc gl = Some c ->
   getOperandValue TD v1 lc gl = Some gvs1 ->
   getOperandValue TD v2 lc gl = Some gvs2 ->
+  decide_nonzero TD c decision ->
   sInsn (mkCfg S TD Ps gl fs)
     (mkState (mkEC F B ((insn_select id v0 t v1 v2)::cs) tmn lc als) (ECS) Mem)
-    (mkState (mkEC F B cs tmn (if isGVZero TD c
-                                then updateAddAL _ lc id gvs2
-                                else updateAddAL _ lc id gvs1) als) (ECS) Mem)
+    (mkState (mkEC F B cs tmn (updateAddAL _ lc id (if decision then gvs1 else gvs2)) als) (ECS) Mem)
     E0
 
 | sCall : forall S TD Ps F B lc gl fs rid noret ca fid fv lp cs tmn fptr
