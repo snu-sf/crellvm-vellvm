@@ -1078,7 +1078,7 @@ lookupTypViaTIDFromModules s id0.
   | insn_return_void _ => nil
   | insn_br _ _ l1 l2 => l1::l2::nil
   | insn_br_uncond _ l1 => l1::nil
-  | insn_switch _ _ _ l ls => l::list_prj2 _ _ ls
+  | insn_switch _ _ _ l ls => nodup eq_atom_dec (l::list_prj2 _ _ ls)
   | insn_unreachable _ => nil
   end.
 

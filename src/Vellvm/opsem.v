@@ -551,6 +551,101 @@ Inductive decide_nonzero (TD:TargetData) (gv:GenericValue) (decision:bool): Prop
 (***************************************************************)
 (* small-step *)
 
+Definition intConst2Z c :=
+  match c with
+  | const_int sz i =>
+    if Size.dec sz Size.ThirtyTwo
+    then ret INTEGER.to_Z i
+    else merror
+  | _ => merror
+  end.
+
+Definition get_or_else {A} (x: option A) (dflt: A) :=
+  match x with
+    | None => dflt
+    | Some _x => _x
+  end.
+
+Definition get_tgt_branch TD ty ValGV cases dflt :=
+  match ty with
+  | typ_int sz =>
+    match (GV2int TD sz ValGV) with
+    | Some ValZ =>
+      let tgt_: monad (const * l) :=
+          List.find (fun x =>
+                       match (option_map (fun y => (Zeq_bool y ValZ))
+                                         (intConst2Z (fst x)))
+                       with
+                       | Some true => true
+                       | _ => false
+                       end) cases in
+      get_or_else (option_map snd tgt_) dflt
+    | None => dflt
+    end
+  | _ => dflt
+  end.
+
+Lemma tgt_branch_in_successors : forall id TD typ val ValGV cases dflt,
+    In (get_tgt_branch TD typ ValGV cases dflt)
+       (successors_terminator (insn_switch id typ val dflt cases)).
+Proof.
+  intros.
+  simpl.
+  unfold get_tgt_branch.
+  assert(In dflt (if in_dec eq_atom_dec dflt (list_prj2 const l cases)
+                  then nodup eq_atom_dec (list_prj2 const l cases)
+                  else dflt :: nodup eq_atom_dec (list_prj2 const l cases))). {
+    destruct (in_dec eq_atom_dec dflt (list_prj2 const l cases)).
+    apply nodup_In; eauto.
+    econstructor; eauto.
+  }
+  destruct typ0; try (eauto; fail).
+  destruct (GV2int TD sz5 ValGV); try (eauto; fail).
+  destruct (find
+              (fun x : const * l =>
+                 match option_map (fun y : Z => Zeq_bool y z) (intConst2Z (fst x)) with
+                 | ret true => true
+                 | ret false => false
+                 | merror => false
+                 end) cases) eqn:T; try (eauto; fail).
+  destruct p; simpl in *.
+
+  clear - T.
+  induction cases; intros; simpl in *.
+  - inv T.
+  - destruct a.
+    destruct (match option_map (fun y : Z => Zeq_bool y z) (intConst2Z (fst (c0, l1))) with
+              | ret true => true
+              | ret false => false
+              | merror => false
+              end).
+    + inv T.
+      destruct (in_dec eq_atom_dec dflt (l0 :: list_prj2 const l cases)).
+      * apply nodup_In.
+        econstructor; eauto.
+      * simpl. right.
+        destruct (in_dec eq_atom_dec l0 (list_prj2 const l cases)).
+        apply nodup_In; eauto.
+        simpl; left; eauto.
+    + exploit IHcases; eauto. intros; eauto.
+      destruct (in_dec eq_atom_dec dflt (list_prj2 const l cases));
+        try apply nodup_In in H;
+        destruct (in_dec eq_atom_dec dflt (l1 :: list_prj2 const l cases));
+        try apply nodup_In.
+      * right; eauto.
+      * right; apply nodup_In; right; eauto.
+      * inv H; eauto.
+        apply nodup_In in H0; right; eauto.
+      * inv H; eauto.
+        left. eauto.
+        right.
+        apply nodup_In.
+        apply nodup_In in H0.
+        right.
+        eauto.
+Qed.
+
+
 Inductive sInsn : Config -> State -> State -> trace -> Prop :=
 | sReturn : forall S TD Ps F B rid RetTy Result lc gl fs
                             F' B' c' cs' tmn' lc' ECS
@@ -590,6 +685,23 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     (mkState (mkEC F (if decision then l1 else l2, 
                        stmts_intro ps' cs' tmn') cs' tmn' lc' als) (ECS) Mem)
     E0 
+
+| sSwitch :
+    forall S TD Ps gl fs
+           ECS Mem
+           F B lc als
+           id ty Val (dflt: l) cases
+           (ValGV: GenericValue)
+           ps' cs' tmn' lc'
+    ,
+      getOperandValue TD Val lc gl = Some ValGV ->
+      let tgt := get_tgt_branch TD ty ValGV cases dflt in
+      Some (stmts_intro ps' cs' tmn') = lookupBlockViaLabelFromFdef F tgt ->
+      switchToNewBasicBlock TD (tgt, stmts_intro ps' cs' tmn') B gl lc = Some lc'->
+      sInsn (mkCfg S TD Ps gl fs)
+            (mkState (mkEC F B nil (insn_switch id ty Val dflt cases) lc als) (ECS) Mem)
+            (mkState (mkEC F (tgt, stmts_intro ps' cs' tmn') cs' tmn' lc' als) (ECS) Mem)
+            E0
 
 | sBranch_uncond : forall S TD Ps F B lc gl fs bid l
                            ps' cs' tmn' lc' ECS Mem als,
@@ -955,7 +1067,7 @@ End Opsem.
 
 Tactic Notation "sInsn_cases" tactic(first) tactic(c) :=
   first;
-  [ c "sReturn" | c "sReturnVoid" | c "sBranch" | c "sBranch_uncond" |
+  [ c "sReturn" | c "sReturnVoid" | c "sBranch" | c "sSwitch" | c "sBranch_uncond" |
     c "sNop" |
     c "sBop" | c "sFBop" | c "sExtractValue" | c "sInsertValue" |
     c "sMalloc" | c "sFree" |
