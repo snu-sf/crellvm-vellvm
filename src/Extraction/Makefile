@@ -9,6 +9,7 @@ extraction: Makefile.coq
 Makefile.coq: Makefile $(COQTHEORIES)
 	(echo "-install none"; \
    echo "-R ../../src Vellvm"; \
+   echo "-R ../../lib/sflib sflib"; \
    echo "-R ../../lib/metalib metalib"; \
    echo "-R ../../lib/cpdtlib Cpdt"; \
    echo "-R ../../lib/compcert-2.4 compcert"; \

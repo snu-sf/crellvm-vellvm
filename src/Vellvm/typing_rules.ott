@@ -869,6 +869,17 @@ Jwf_insn :: '' ::=
       -------------------------------------------------------------------------------------- :: wf_insn_br
       system , module , fdef , block |- id = br value l1 l2
 
+      % Check typs
+      system , module , fdef |- value : typ
+      typ = int sz
+      % Check labels
+      </ lookupBlockViaLabelFromFdef fdef lj = stmtsj // j />
+      lookupBlockViaLabelFromFdef fdef l = stmts
+      % Check invariance for instructions
+      fdef , block |-i id = switch typ value l </ [ constj , lj ] // j />
+      -------------------------------------------------------------------------------------- :: wf_insn_switch
+      system , module , fdef , block |- id = switch typ value l </ [ constj , lj ] // j />
+
       % Check labels
       lookupBlockViaLabelFromFdef fdef l0 = stmts0
       % Check invariance for instructions

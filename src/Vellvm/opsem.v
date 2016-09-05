@@ -1,3 +1,4 @@
+Require Import sflib.
 Require Import Ensembles.
 Require Import syntax.
 Require Import infrastructure.
@@ -548,6 +549,66 @@ Inductive decide_nonzero (TD:TargetData) (gv:GenericValue) (decision:bool): Prop
     (DECISION: decision = negb (zeq z 0))
 .
 
+Definition intConst2Z c :=
+  match c with
+  | const_int sz i =>
+    ret INTEGER.to_Z i
+  | _ => merror
+  end.
+
+Definition get_or_else {A} (x: option A) (dflt: A) :=
+  match x with
+    | None => dflt
+    | Some _x => _x
+  end.
+
+Definition get_switch_branch TD ty ValGV cases :=
+  match ty with
+  | typ_int sz =>
+    match GV2int TD sz ValGV with
+    | Some ValZ =>
+      let tgt_: monad (const * l) :=
+          List.find (fun x =>
+                       match intConst2Z (fst x) with
+                       | Some y => Zeq_bool y ValZ
+                       | None => false
+                       end) cases in
+      option_map snd tgt_
+    | None => None
+    end
+  | _ => None
+  end.
+
+Definition get_tgt_branch TD ty ValGV cases dflt :=
+  get_or_else (get_switch_branch TD ty ValGV cases) dflt.
+
+Lemma tgt_branch_in_successors id TD typ val ValGV cases dflt:
+  In (get_tgt_branch TD typ ValGV cases dflt)
+     (successors_terminator (insn_switch id typ val dflt cases)).
+Proof.
+  s. unfold get_tgt_branch.
+  destruct (get_switch_branch TD typ ValGV cases) eqn:X; ss; cycle 1.
+  { destruct (in_dec eq_atom_dec dflt (list_prj2 const l cases)).
+    apply nodup_In; eauto.
+    econstructor; eauto.
+  }
+  unfold get_switch_branch in X. destruct typ; ss.
+  destruct (GV2int TD sz5 ValGV) eqn:Y; ss.
+  destruct (find
+              (fun x : const * l =>
+                 match intConst2Z (fst x) with
+                 | ret y => Zeq_bool y z
+                 | merror => false
+                 end) cases) eqn:Z; inv X.
+  exploit find_some; eauto. i. des.
+  cut (In (snd p) (nodup eq_atom_dec (list_prj2 const l cases))).
+  { i. destruct (in_dec eq_atom_dec dflt (list_prj2 const l cases)); ss.
+    right. ss.
+  }
+  apply nodup_In. revert H. clear. induction cases as [|[]]; ss.
+  i. des; subst; eauto.
+Qed.
+
 (***************************************************************)
 (* small-step *)
 
@@ -590,6 +651,23 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     (mkState (mkEC F (if decision then l1 else l2, 
                        stmts_intro ps' cs' tmn') cs' tmn' lc' als) (ECS) Mem)
     E0 
+
+| sSwitch :
+    forall S TD Ps gl fs
+           ECS Mem
+           F B lc als
+           id ty Val (dflt: l) cases
+           (ValGV: GenericValue)
+           ps' cs' tmn' lc' tgt
+    ,
+      getOperandValue TD Val lc gl = Some ValGV ->
+      get_tgt_branch TD ty ValGV cases dflt = tgt ->
+      Some (stmts_intro ps' cs' tmn') = lookupBlockViaLabelFromFdef F tgt ->
+      switchToNewBasicBlock TD (tgt, stmts_intro ps' cs' tmn') B gl lc = Some lc'->
+      sInsn (mkCfg S TD Ps gl fs)
+            (mkState (mkEC F B nil (insn_switch id ty Val dflt cases) lc als) (ECS) Mem)
+            (mkState (mkEC F (tgt, stmts_intro ps' cs' tmn') cs' tmn' lc' als) (ECS) Mem)
+            E0
 
 | sBranch_uncond : forall S TD Ps F B lc gl fs bid l
                            ps' cs' tmn' lc' ECS Mem als,
@@ -955,7 +1033,7 @@ End Opsem.
 
 Tactic Notation "sInsn_cases" tactic(first) tactic(c) :=
   first;
-  [ c "sReturn" | c "sReturnVoid" | c "sBranch" | c "sBranch_uncond" |
+  [ c "sReturn" | c "sReturnVoid" | c "sBranch" | c "sSwitch" | c "sBranch_uncond" |
     c "sNop" |
     c "sBop" | c "sFBop" | c "sExtractValue" | c "sInsertValue" |
     c "sMalloc" | c "sFree" |
