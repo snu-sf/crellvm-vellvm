@@ -556,57 +556,61 @@ Definition intConst2Z c :=
   | _ => merror
   end.
 
-Definition get_or_else {A} (x: option A) (dflt: A) :=
-  match x with
-    | None => dflt
-    | Some _x => _x
+Definition get_switch_branch_aux ValZ cases dflt :=
+  let tgt_: monad (const * l) :=
+      List.find (fun x =>
+                   match intConst2Z (fst x) with
+                   | Some y => Zeq_bool y ValZ
+                   | None => false
+                   end) cases
+  in
+  match tgt_ with
+  | Some (_, tgt) => tgt
+  | None => dflt
   end.
 
-Definition get_switch_branch TD ty ValGV cases :=
+Definition get_switch_branch TD ty ValGV cases dflt :=
   match ty with
   | typ_int sz =>
     match GV2int TD sz ValGV with
-    | Some ValZ =>
-      let tgt_: monad (const * l) :=
-          List.find (fun x =>
-                       match intConst2Z (fst x) with
-                       | Some y => Zeq_bool y ValZ
-                       | None => false
-                       end) cases in
-      option_map snd tgt_
+    | Some ValZ => Some (get_switch_branch_aux ValZ cases dflt)
     | None => None
     end
   | _ => None
   end.
 
-Definition get_tgt_branch TD ty ValGV cases dflt :=
-  get_or_else (get_switch_branch TD ty ValGV cases) dflt.
-
-Lemma tgt_branch_in_successors id TD typ val ValGV cases dflt:
-  In (get_tgt_branch TD typ ValGV cases dflt)
+Lemma get_switch_branch_aux_in_successors
+      id typ val ValGV cases dflt:
+  In (get_switch_branch_aux ValGV cases dflt)
      (successors_terminator (insn_switch id typ val dflt cases)).
 Proof.
-  s. unfold get_tgt_branch.
-  destruct (get_switch_branch TD typ ValGV cases) eqn:X; ss; cycle 1.
-  { destruct (in_dec eq_atom_dec dflt (list_prj2 const l cases)).
+  s. unfold get_switch_branch_aux.
+  match goal with
+  | [|- context[match ?f with | Some _ => _ | None => _ end]] =>
+    destruct f as [[]|] eqn:X
+  end; cycle 1.
+  { destruct (in_dec eq_atom_dec dflt (list_prj2 const l cases)); [|by left].
     apply nodup_In; eauto.
-    econstructor; eauto.
   }
-  unfold get_switch_branch in X. destruct typ; ss.
-  destruct (GV2int TD sz5 ValGV) eqn:Y; ss.
-  destruct (find
-              (fun x : const * l =>
-                 match intConst2Z (fst x) with
-                 | ret y => Zeq_bool y z
-                 | merror => false
-                 end) cases) eqn:Z; inv X.
-  exploit find_some; eauto. i. des.
-  cut (In (snd p) (nodup eq_atom_dec (list_prj2 const l cases))).
+  cut (In l0 (list_prj2 const l cases)).
   { i. destruct (in_dec eq_atom_dec dflt (list_prj2 const l cases)); ss.
-    right. ss.
+    - apply nodup_In. ss.
+    - right. apply nodup_In. ss.
   }
-  apply nodup_In. revert H. clear. induction cases as [|[]]; ss.
-  i. des; subst; eauto.
+  exploit find_some; eauto. i. des.
+  revert H. clear. induction cases as [|[]]; ss.
+  i. des.
+  - inv H. left. ss.
+  - right. eauto.
+Qed.
+
+Lemma get_switch_branch_in_successors
+      id TD typ val ValGV cases dflt l
+      (SWITCH: get_switch_branch TD typ ValGV cases dflt = Some l):
+  In l (successors_terminator (insn_switch id typ val dflt cases)).
+Proof.
+  destruct typ; ss. destruct (GV2int TD sz5 ValGV); ss. inv SWITCH.
+  apply get_switch_branch_aux_in_successors; ss. exact (typ_int (sz5)).
 Qed.
 
 (***************************************************************)
@@ -661,7 +665,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
            ps' cs' tmn' lc' tgt
     ,
       getOperandValue TD Val lc gl = Some ValGV ->
-      get_tgt_branch TD ty ValGV cases dflt = tgt ->
+      get_switch_branch TD ty ValGV cases dflt = Some tgt ->
       Some (stmts_intro ps' cs' tmn') = lookupBlockViaLabelFromFdef F tgt ->
       switchToNewBasicBlock TD (tgt, stmts_intro ps' cs' tmn') B gl lc = Some lc'->
       sInsn (mkCfg S TD Ps gl fs)

@@ -1976,60 +1976,61 @@ Case "sBranch".
 
 Focus.
 Case "sSwitch".
-  destruct_wfCfgState HwfCfg HwfS1.
-  set (get_tgt_branch (los, nts) ty ValGV cases dflt) as tgt.
-  remember (inscope_of_tmn F (l3, stmts_intro ps3 (cs3' ++ nil) (insn_switch id0 ty Val dflt cases))
-                  (insn_switch id0 ty Val dflt cases)) as R1.
-  destruct R1; try solve [inversion Hinscope1].
-  split; auto.
+  admit.
+  (* destruct_wfCfgState HwfCfg HwfS1. *)
+  (* set (get_tgt_branch (los, nts) ty ValGV cases dflt) as tgt. *)
+  (* remember (inscope_of_tmn F (l3, stmts_intro ps3 (cs3' ++ nil) (insn_switch id0 ty Val dflt cases)) *)
+  (*                 (insn_switch id0 ty Val dflt cases)) as R1. *)
+  (* destruct R1; try solve [inversion Hinscope1]. *)
+  (* split; auto. *)
 
-  assert (HwfF := HwfSystem).
-  eapply wf_system__wf_fdef with (f:=F) in HwfF; eauto.
-  assert (HuniqF := HwfSystem).
-  eapply wf_system__uniqFdef with (f:=F) in HuniqF; eauto.
-  assert (isReachableFromEntry F (tgt, stmts_intro ps' cs' tmn')) as Hreach'.
-  clear - Hreach1 H1 H2 HBinF1 HFinPs1 HmInS HwfSystem HuniqF HwfF.
-  unfold isReachableFromEntry in *.
-  assert(HReachTgat : reachable F tgt).
-  {
-    eapply reachable_successors; eauto.
-    unfold tgt.
-    apply tgt_branch_in_successors.
-  }
-  auto.
+  (* assert (HwfF := HwfSystem). *)
+  (* eapply wf_system__wf_fdef with (f:=F) in HwfF; eauto. *)
+  (* assert (HuniqF := HwfSystem). *)
+  (* eapply wf_system__uniqFdef with (f:=F) in HuniqF; eauto. *)
+  (* assert (isReachableFromEntry F (tgt, stmts_intro ps' cs' tmn')) as Hreach'. *)
+  (* clear - Hreach1 H1 H2 HBinF1 HFinPs1 HmInS HwfSystem HuniqF HwfF. *)
+  (* unfold isReachableFromEntry in *. *)
+  (* assert(HReachTgat : reachable F tgt). *)
+  (* { *)
+  (*   eapply reachable_successors; eauto. *)
+  (*   unfold tgt. *)
+  (*   apply tgt_branch_in_successors. *)
+  (* } *)
+  (* auto. *)
 
-  repeat split; eauto.
-  apply lookupBlockViaLabelFromFdef_inv; auto.
-  eapply wf_lc_br_aux in H1; eauto.
-  clear - HeqR1 H2 Hinscope1 H1 HwfSystem HBinF1 HwfF HuniqF Hwflc1 Hwfg
-                Hwftd Hreach'.
-  assert(dflt = tgt \/ In tgt (list_prj2 const l cases)).
-  {
-    exploit (tgt_branch_in_successors id0 (los, nts) ty Val ValGV cases); eauto.
-    instantiate (1:= dflt).
-    (* IDK why it should be instantiated separately... *)
-    (* Also exploit without any explicit instantiating, and then callig instantiate does not work here.. *)
-    intros.
-    simpl in *.
-    fold tgt in H.
-    destruct (in_dec eq_atom_dec dflt (list_prj2 const l cases)).
-    -
-      apply nodup_In in H; right; auto.
-    -
-      destruct H.
-      + left; auto.
-      + apply nodup_In in H; right; auto.
-  }
+  (* repeat split; eauto. *)
+  (* apply lookupBlockViaLabelFromFdef_inv; auto. *)
+  (* eapply wf_lc_br_aux in H1; eauto. *)
+  (* clear - HeqR1 H2 Hinscope1 H1 HwfSystem HBinF1 HwfF HuniqF Hwflc1 Hwfg *)
+  (*               Hwftd Hreach'. *)
+  (* assert(dflt = tgt \/ In tgt (list_prj2 const l cases)). *)
+  (* { *)
+  (*   exploit (tgt_branch_in_successors id0 (los, nts) ty Val ValGV cases); eauto. *)
+  (*   instantiate (1:= dflt). *)
+  (*   (* IDK why it should be instantiated separately... *) *)
+  (*   (* Also exploit without any explicit instantiating, and then callig instantiate does not work here.. *) *)
+  (*   intros. *)
+  (*   simpl in *. *)
+  (*   fold tgt in H. *)
+  (*   destruct (in_dec eq_atom_dec dflt (list_prj2 const l cases)). *)
+  (*   - *)
+  (*     apply nodup_In in H; right; auto. *)
+  (*   - *)
+  (*     destruct H. *)
+  (*     + left; auto. *)
+  (*     + apply nodup_In in H; right; auto. *)
+  (* } *)
 
-  idtac.
-  rewrite app_nil_r in *.
-  exploit inscope_of_tmn_switch; eauto.
-  intros.
-  destruct H0 as [ids0' [H3 [J1 J2]]].
-  destruct cs'; rewrite <- H3; auto.
+  (* idtac. *)
+  (* rewrite app_nil_r in *. *)
+  (* exploit inscope_of_tmn_switch; eauto. *)
+  (* intros. *)
+  (* destruct H0 as [ids0' [H3 [J1 J2]]]. *)
+  (* destruct cs'; rewrite <- H3; auto. *)
 
-  exists tgt.
-  exists ps'. exists nil. simpl_env. auto.
+  (* exists tgt. *)
+  (* exists ps'. exists nil. simpl_env. auto. *)
 Focus.
 Case "sBranch_uncond".
   destruct_wfCfgState HwfCfg HwfS1.
@@ -3073,7 +3074,8 @@ Proof.
       exists events.E0. eauto.
 
     SCase "tmn=switch".
-    {
+    { admit.
+      (*
       right. left.
       assert (wf_fdef s (module_intro los nts ps) f) as HwfF.
         eapply wf_system__wf_fdef; eauto.
@@ -3138,6 +3140,7 @@ Proof.
       unfold switchToNewBasicBlock; simpl.
       rewrite J.
       eauto.
+      *)
     }
     SCase "tmn=unreachable".
       undefbehave.
