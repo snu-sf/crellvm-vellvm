@@ -860,14 +860,17 @@ let translate_instr debug m st i  =
       if n != 2
       then failwith "Add must have 2 operand."
       else
-        LLVMsyntax.Coq_insn_cmd
-        (LLVMsyntax.Coq_insn_bop
-          (llvm_name st i,
-          LLVMsyntax.Coq_bop_add,
-          integer_bitwidth (type_of i),
-          translate_operand_to_value m st (Array.get ops 0),
-          translate_operand_to_value m st (Array.get ops 1))
-        )
+	if (classify_type (type_of i)) != TypeKind.Integer
+        then failwith "Vector: Not_Supported."
+	else	      
+          LLVMsyntax.Coq_insn_cmd
+          (LLVMsyntax.Coq_insn_bop
+             (llvm_name st i,
+	      LLVMsyntax.Coq_bop_add,
+	      integer_bitwidth (type_of i),
+	      translate_operand_to_value m st (Array.get ops 0),
+	      translate_operand_to_value m st (Array.get ops 1))
+          )
   | Opcode.FAdd ->
       let ops = operands i in
       let n = num_operands i in
@@ -888,14 +891,17 @@ let translate_instr debug m st i  =
       if n != 2
       then failwith "Sub must have 2 operand."
       else
-        LLVMsyntax.Coq_insn_cmd
-        (LLVMsyntax.Coq_insn_bop
-          (llvm_name st i,
-          LLVMsyntax.Coq_bop_sub,
-          integer_bitwidth (type_of i),
-          translate_operand_to_value m st (Array.get ops 0),
-          translate_operand_to_value m st (Array.get ops 1))
-        )
+	if (classify_type (type_of i)) != TypeKind.Integer
+        then failwith "Vector: Not_Supported."
+	else
+          LLVMsyntax.Coq_insn_cmd
+          (LLVMsyntax.Coq_insn_bop
+             (llvm_name st i,
+	      LLVMsyntax.Coq_bop_sub,
+	      integer_bitwidth (type_of i),
+	      translate_operand_to_value m st (Array.get ops 0),
+	      translate_operand_to_value m st (Array.get ops 1))
+          )
   | Opcode.FSub ->
       let ops = operands i in
       let n = num_operands i in
@@ -916,14 +922,17 @@ let translate_instr debug m st i  =
       if n != 2
       then failwith "Mul must have 2 operand."
       else
-        LLVMsyntax.Coq_insn_cmd
-        (LLVMsyntax.Coq_insn_bop
-          (llvm_name st i,
-          LLVMsyntax.Coq_bop_mul,
-          integer_bitwidth (type_of i),
-          translate_operand_to_value m st (Array.get ops 0),
-          translate_operand_to_value m st (Array.get ops 1))
-        )
+	if (classify_type (type_of i)) != TypeKind.Integer
+        then failwith "Vector: Not_Supported."
+	else
+          LLVMsyntax.Coq_insn_cmd
+          (LLVMsyntax.Coq_insn_bop
+             (llvm_name st i,
+	      LLVMsyntax.Coq_bop_mul,
+	      integer_bitwidth (type_of i),
+	      translate_operand_to_value m st (Array.get ops 0),
+	      translate_operand_to_value m st (Array.get ops 1))
+          )
   | Opcode.FMul ->
       let ops = operands i in
       let n = num_operands i in
@@ -944,28 +953,34 @@ let translate_instr debug m st i  =
       if n != 2
       then failwith "UDiv must have 2 operand."
       else
-        LLVMsyntax.Coq_insn_cmd
-        (LLVMsyntax.Coq_insn_bop
-          (llvm_name st i,
-          LLVMsyntax.Coq_bop_udiv,
-          integer_bitwidth (type_of i),
-          translate_operand_to_value m st (Array.get ops 0),
-          translate_operand_to_value m st (Array.get ops 1))
-        )
+	if (classify_type (type_of i)) != TypeKind.Integer
+        then failwith "Vector: Not_Supported."
+	else
+          LLVMsyntax.Coq_insn_cmd
+          (LLVMsyntax.Coq_insn_bop
+             (llvm_name st i,
+	      LLVMsyntax.Coq_bop_udiv,
+	      integer_bitwidth (type_of i),
+	      translate_operand_to_value m st (Array.get ops 0),
+	      translate_operand_to_value m st (Array.get ops 1))
+          )
   | Opcode.SDiv ->
       let ops = operands i in
       let n = num_operands i in
       if n != 2
       then failwith "SDiv must have 2 operand."
       else
-        LLVMsyntax.Coq_insn_cmd
-        (LLVMsyntax.Coq_insn_bop
-          (llvm_name st i,
-          LLVMsyntax.Coq_bop_sdiv,
-          integer_bitwidth (type_of i),
-          translate_operand_to_value m st (Array.get ops 0),
-          translate_operand_to_value m st (Array.get ops 1))
-        )
+	if (classify_type (type_of i)) != TypeKind.Integer
+        then failwith "Vector: Not_Supported."
+	else
+          LLVMsyntax.Coq_insn_cmd
+          (LLVMsyntax.Coq_insn_bop
+             (llvm_name st i,
+	      LLVMsyntax.Coq_bop_sdiv,
+	      integer_bitwidth (type_of i),
+	      translate_operand_to_value m st (Array.get ops 0),
+	      translate_operand_to_value m st (Array.get ops 1))
+          )
   | Opcode.FDiv ->
       let ops = operands i in
       let n = num_operands i in
@@ -986,28 +1001,34 @@ let translate_instr debug m st i  =
       if n != 2
       then failwith "URem must have 2 operand."
       else
-        LLVMsyntax.Coq_insn_cmd
-        (LLVMsyntax.Coq_insn_bop
-          (llvm_name st i,
-          LLVMsyntax.Coq_bop_urem,
-          integer_bitwidth (type_of i),
-          translate_operand_to_value m st (Array.get ops 0),
-          translate_operand_to_value m st (Array.get ops 1))
-        )
+	if (classify_type (type_of i)) != TypeKind.Integer
+        then failwith "Vector: Not_Supported."
+	else
+          LLVMsyntax.Coq_insn_cmd
+          (LLVMsyntax.Coq_insn_bop
+             (llvm_name st i,
+	      LLVMsyntax.Coq_bop_urem,
+	      integer_bitwidth (type_of i),
+	      translate_operand_to_value m st (Array.get ops 0),
+	      translate_operand_to_value m st (Array.get ops 1))
+          )
   | Opcode.SRem ->
       let ops = operands i in
       let n = num_operands i in
       if n != 2
       then failwith "SRem must have 2 operand."
       else
-        LLVMsyntax.Coq_insn_cmd
-        (LLVMsyntax.Coq_insn_bop
-          (llvm_name st i,
-          LLVMsyntax.Coq_bop_srem,
-          integer_bitwidth (type_of i),
-          translate_operand_to_value m st (Array.get ops 0),
-          translate_operand_to_value m st (Array.get ops 1))
-        )
+	if (classify_type (type_of i)) != TypeKind.Integer
+        then failwith "Vector: Not_Supported."
+	else
+          LLVMsyntax.Coq_insn_cmd
+          (LLVMsyntax.Coq_insn_bop
+             (llvm_name st i,
+	      LLVMsyntax.Coq_bop_srem,
+	      integer_bitwidth (type_of i),
+	      translate_operand_to_value m st (Array.get ops 0),
+	      translate_operand_to_value m st (Array.get ops 1))
+          )
   | Opcode.FRem ->
       let ops = operands i in
       let n = num_operands i in
@@ -1028,84 +1049,102 @@ let translate_instr debug m st i  =
       if n != 2
       then failwith "Shl must have 2 operand."
       else
-        LLVMsyntax.Coq_insn_cmd
-        (LLVMsyntax.Coq_insn_bop
-          (llvm_name st i,
-          LLVMsyntax.Coq_bop_shl,
-          integer_bitwidth (type_of i),
-          translate_operand_to_value m st (Array.get ops 0),
-          translate_operand_to_value m st (Array.get ops 1))
-        )
+	if (classify_type (type_of i)) != TypeKind.Integer
+        then failwith "Vector: Not_Supported."
+	else
+          LLVMsyntax.Coq_insn_cmd
+          (LLVMsyntax.Coq_insn_bop
+             (llvm_name st i,
+	      LLVMsyntax.Coq_bop_shl,
+	      integer_bitwidth (type_of i),
+	      translate_operand_to_value m st (Array.get ops 0),
+	      translate_operand_to_value m st (Array.get ops 1))
+          )
   | Opcode.LShr ->
       let ops = operands i in
       let n = num_operands i in
       if n != 2
       then failwith "LShr must have 2 operand."
       else
-        LLVMsyntax.Coq_insn_cmd
-        (LLVMsyntax.Coq_insn_bop
-          (llvm_name st i,
-          LLVMsyntax.Coq_bop_lshr,
-          integer_bitwidth (type_of i),
-          translate_operand_to_value m st (Array.get ops 0),
-          translate_operand_to_value m st (Array.get ops 1))
-        )
+	if (classify_type (type_of i)) != TypeKind.Integer
+        then failwith "Vector: Not_Supported."
+	else
+          LLVMsyntax.Coq_insn_cmd
+          (LLVMsyntax.Coq_insn_bop
+             (llvm_name st i,
+	      LLVMsyntax.Coq_bop_lshr,
+	      integer_bitwidth (type_of i),
+	      translate_operand_to_value m st (Array.get ops 0),
+	      translate_operand_to_value m st (Array.get ops 1))
+          )
   | Opcode.AShr ->
       let ops = operands i in
       let n = num_operands i in
       if n != 2
       then failwith "AShr must have 2 operand."
       else
-        LLVMsyntax.Coq_insn_cmd
-        (LLVMsyntax.Coq_insn_bop
-          (llvm_name st i,
-          LLVMsyntax.Coq_bop_ashr,
-          integer_bitwidth (type_of i),
-          translate_operand_to_value m st (Array.get ops 0),
-          translate_operand_to_value m st (Array.get ops 1))
-        )
+	if (classify_type (type_of i)) != TypeKind.Integer
+        then failwith "Vector: Not_Supported."
+	else
+          LLVMsyntax.Coq_insn_cmd
+          (LLVMsyntax.Coq_insn_bop
+             (llvm_name st i,
+	      LLVMsyntax.Coq_bop_ashr,
+	      integer_bitwidth (type_of i),
+	      translate_operand_to_value m st (Array.get ops 0),
+	      translate_operand_to_value m st (Array.get ops 1))
+          )
   | Opcode.And ->
       let ops = operands i in
       let n = num_operands i in
       if n != 2
       then failwith "And must have 2 operand."
       else
-        LLVMsyntax.Coq_insn_cmd
-        (LLVMsyntax.Coq_insn_bop
-          (llvm_name st i,
-          LLVMsyntax.Coq_bop_and,
-          integer_bitwidth (type_of i),
-          translate_operand_to_value m st (Array.get ops 0),
-          translate_operand_to_value m st (Array.get ops 1))
-        )
+	if (classify_type (type_of i)) != TypeKind.Integer
+        then failwith "Vector: Not_Supported."
+	else
+          LLVMsyntax.Coq_insn_cmd
+          (LLVMsyntax.Coq_insn_bop
+             (llvm_name st i,
+	      LLVMsyntax.Coq_bop_and,
+	      integer_bitwidth (type_of i),
+	      translate_operand_to_value m st (Array.get ops 0),
+	      translate_operand_to_value m st (Array.get ops 1))
+          )
   | Opcode.Or ->
       let ops = operands i in
       let n = num_operands i in
       if n != 2
       then failwith "Or must have 2 operand."
       else
-        LLVMsyntax.Coq_insn_cmd
-        (LLVMsyntax.Coq_insn_bop
-          (llvm_name st i,
-          LLVMsyntax.Coq_bop_or,
-          integer_bitwidth (type_of i),
-          translate_operand_to_value m st (Array.get ops 0),
-          translate_operand_to_value m st (Array.get ops 1))
-        )
+	if (classify_type (type_of i)) != TypeKind.Integer
+        then failwith "Vector: Not_Supported."
+	else
+          LLVMsyntax.Coq_insn_cmd
+          (LLVMsyntax.Coq_insn_bop
+             (llvm_name st i,
+	      LLVMsyntax.Coq_bop_or,
+	      integer_bitwidth (type_of i),
+	      translate_operand_to_value m st (Array.get ops 0),
+	      translate_operand_to_value m st (Array.get ops 1))
+          )
   | Opcode.Xor ->
       let ops = operands i in
       let n = num_operands i in
       if n != 2
       then failwith "Xor must have 2 operand."
       else
-        LLVMsyntax.Coq_insn_cmd
-        (LLVMsyntax.Coq_insn_bop
-          (llvm_name st i,
-          LLVMsyntax.Coq_bop_xor,
-          integer_bitwidth (type_of i),
-          translate_operand_to_value m st (Array.get ops 0),
-          translate_operand_to_value m st (Array.get ops 1))
-        )
+	if (classify_type (type_of i)) != TypeKind.Integer
+        then failwith "Vector: Not_Supported."
+	else
+          LLVMsyntax.Coq_insn_cmd
+          (LLVMsyntax.Coq_insn_bop
+             (llvm_name st i,
+	      LLVMsyntax.Coq_bop_xor,
+	      integer_bitwidth (type_of i),
+	      translate_operand_to_value m st (Array.get ops 0),
+	      translate_operand_to_value m st (Array.get ops 1))
+          )
 (*
   | Opcode.Malloc ->
       LLVMsyntax.Coq_insn_cmd
