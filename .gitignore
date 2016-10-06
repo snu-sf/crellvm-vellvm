@@ -35,3 +35,4 @@ Makefile.coq
 
 /lib/cpdtlib
 /lib/metalib
+/lib/sflib
