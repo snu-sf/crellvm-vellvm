@@ -33,8 +33,7 @@ Definition GVMap := list (id*GenericValue).
 
 Definition mblock := Values.block.
 Definition mptr := GenericValue.
-Definition null : GenericValue :=
-  (Vptr Mem.nullptr (Int.repr 31 0), Mint 31)::nil.
+Definition null : GenericValue := (Vint 31 (Int.repr 31 0), Mint 31):: nil.
 
 (******************************************************************************)
 (* Predicate of generic values. *)
@@ -861,8 +860,7 @@ match c with
          | None => None
          end
 | const_null t =>
-         Some (val2GV TD (Vptr Mem.nullptr (Int.repr 31 0)) (Mint 31),
-               typ_pointer t)
+         Some (null, typ_pointer t)
 | const_arr t lc =>
          match _list_const_arr2GV_ _const2GV TD gl t lc with
          | Some gv =>
