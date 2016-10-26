@@ -47,7 +47,6 @@ end.
 (* The well-formedness of memory injection. *)
 Record wf_sb_mi maxb mi Mem1 Mem2 := mk_wf_sb_mi {
   Hno_overlap : MoreMem.meminj_no_overlap mi;
-  Hnull : mi Mem.nullptr = Some (Mem.nullptr, 0);
   Hmap1 : forall b, (b >= Mem.nextblock Mem1)%positive -> mi b = None;
   Hmap2 : forall b1 b2 delta2, 
     mi b1 = Some (b2, delta2) -> (b2 < Mem.nextblock Mem2)%positive;
@@ -1338,10 +1337,7 @@ Case "wfconst_undef".
   inv_mbind.  split; eauto using gv_inject_gundef.
 Case "wfconst_null".
   split; auto.
-    unfold val2GV; simpl; auto.
-    apply gv_inject_cons; auto.
-    apply MoreMem.val_inject_ptr with (delta:=0); auto.
-    destruct H0. auto.
+  unfold null. auto.
 Case "wfconst_array". Focus.
   inv_mbind.
   simpl_split lsdc lt.

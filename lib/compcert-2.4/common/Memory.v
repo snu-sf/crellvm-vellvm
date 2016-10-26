@@ -434,8 +434,6 @@ Next Obligation.
   rewrite PMap.gi. auto.
 Qed.
 
-Definition nullptr: block := xH.
-
 (** Allocation of a fresh block with the given bounds.  Return an updated
   memory state and the address of the fresh block, which initially contains
   undefined cells.  Note that allocation never fails: we model an

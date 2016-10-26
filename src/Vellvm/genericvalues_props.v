@@ -2573,6 +2573,10 @@ Case "wf_styp_int".
   constructor; auto; unfold Size.to_nat, vm_matches_typ; simpl.
   split; auto; split; auto; split; solve [omega | apply Z.gt_lt; apply Int.modulus_pos].
 
+Case "wf_styp_function".
+  constructor; auto. constructor; auto. simpl. split; auto.
+  split; [omega| apply Z.gt_lt; apply Int.modulus_pos].
+
 Case "wf_styp_structure".
   simpl_split lsd lt.
   assert (lt = typ_list) as EQ1. 
@@ -2612,6 +2616,10 @@ Case "wf_styp_array".
         apply uninits_match_uninitMCs.
     apply match_chunks_app; auto.
     apply match_chunks_repeat; auto.
+
+Case "wf_styp_pointer".
+  constructor; auto. constructor; auto. constructor; auto. simpl.
+  split; [omega| apply Z.gt_lt; apply Int.modulus_pos].
 
 Case "wf_styp_namedt".
   inv_mbind. 
@@ -3058,7 +3066,8 @@ Case "wfconst_null".
   split; auto.
     unfold gv_chunks_match_typ, val2GV, vm_matches_typ. simpl.
     constructor; auto.
-      split; auto. split; auto.
+      split; auto. split; auto. simpl.
+      split; [omega| apply Z.gt_lt; apply Int.modulus_pos].
 
 Case "wfconst_array". Focus.
   inv_mbind.
@@ -3475,7 +3484,8 @@ Proof.
       constructor; auto; split; auto; simpl; auto.
 
     inv HeqR. unfold null. constructor; auto.
-    split; auto. simpl. auto.
+    split; auto. simpl. split; auto.
+    split; [omega| apply Z.gt_lt; apply Int.modulus_pos].
 Qed.
 
 Lemma cgv2gv__matches_chunks : forall S TD gv t,

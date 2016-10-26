@@ -697,8 +697,7 @@ Qed.
 Lemma null_disjoint_with_ptr: forall mb ofs m,
   (mb > xH)%positive -> no_alias null [(Vptr mb ofs, m)].
 Proof.
-  intros. simpl. unfold Mem.nullptr.
-  repeat split; auto. intro. subst. inv H.
+  intros. simpl. auto.
 Qed.
 
 Lemma uninits_disjoint_with_ptr: forall n mb ofs m,
@@ -731,9 +730,6 @@ Proof.
   unfold cundef_gv.
   destruct_typ t0; auto.
     destruct f; auto.
-
-    simpl. split; auto. split; auto. unfold Mem.nullptr. intro J. subst.
-    inv H0; destruct maxb; inv H2.
 Qed.
 
 Lemma no_alias_GV2ptr__neq_blk: forall TD sz0 ptr1 ptr2 b1 i1 b2 i2
@@ -808,8 +804,7 @@ Qed.
 (* Properties of valid_ptrs. *)
 Lemma null_valid_ptrs: forall mb, (mb > xH)%positive -> valid_ptrs mb null.
 Proof.
-  intros. unfold null, Mem.nullptr. simpl.
-  split; auto. apply Pos.gt_lt; auto.
+  intros. unfold null. simpl. auto.
 Qed.
 
 Lemma uninits_valid_ptrs: forall bd n, valid_ptrs bd (uninits n).
@@ -1137,8 +1132,6 @@ Proof.
   unfold cundef_gv.
   destruct_typ t0; auto.
     destruct f; auto.
-
-    apply null_valid_ptrs; auto.
 Qed.
 
 (*****************************************************************)
@@ -2500,14 +2493,6 @@ Proof.
            zeroconsts2GV_aux_disjoint_with_runtime_ptr_prop) Case);
     intros; subst; try (simpl in Hc2g; uniq_result); try solve [simpl; auto].
 
-Case "wf_styp_function".
-  split.
-    apply null_disjoint_with_ptr. destruct Hwfg.
-      apply Pos.lt_gt.
-      eapply Pos.le_lt_trans; eauto.
-    apply null_valid_ptrs. destruct Hwfg.
-      apply Pos.lt_gt. rewrite <- Pplus_one_succ_r; apply Pos.lt_1_succ.
-
 Case "wf_styp_structure".
   simpl_split lsd lt.
   assert (lt = typ_list) as EQ1. 
@@ -2543,13 +2528,6 @@ Case "wf_styp_array".
 
       apply valid_ptrs_app; auto.
       apply valid_ptrs_repeatGV; auto.
-
-Case "wf_styp_pointer".
-  split.
-    apply null_disjoint_with_ptr. destruct Hwfg.
-      apply Pos.lt_gt; eapply Pos.le_lt_trans; eauto.
-    apply null_valid_ptrs. destruct Hwfg.
-      apply Pos.lt_gt; rewrite <- Pplus_one_succ_r; eapply Pos.lt_1_succ.
 
 Case "wf_styp_namedt".
   inv_mbind. eauto.
