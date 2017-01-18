@@ -167,7 +167,6 @@ Proof.
   exists sz.
   rewrite J1.
   split; auto.
-    eapply cgv2gvs__getTypeSizeInBits; eauto using wf_const__wf_typ.
 Qed.
 
 (* Properties of matching chunks *)

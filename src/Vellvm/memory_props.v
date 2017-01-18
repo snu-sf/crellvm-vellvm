@@ -724,12 +724,6 @@ Proof.
   intros.
   unfold cgv2gv. simpl.
   destruct g0 as [|[]]; auto.
-  destruct v; auto.
-  destruct g0 as [|]; auto.
-
-  unfold cundef_gv.
-  destruct_typ t0; auto.
-    destruct f; auto.
 Qed.
 
 Lemma no_alias_GV2ptr__neq_blk: forall TD sz0 ptr1 ptr2 b1 i1 b2 i2
@@ -1127,11 +1121,6 @@ Proof.
   intros.
   unfold cgv2gv.
   destruct g0 as [|[]]; auto.
-  destruct v; auto.
-  destruct g0 as [|]; auto.
-  unfold cundef_gv.
-  destruct_typ t0; auto.
-    destruct f; auto.
 Qed.
 
 (*****************************************************************)
