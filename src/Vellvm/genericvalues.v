@@ -1028,11 +1028,7 @@ match t with
 | _ => gv
 end.
 
-Definition cgv2gv (gv:GenericValue) (t:typ) : GenericValue :=
-match gv with
-| (Vundef, _)::nil => cundef_gv gv t
-| _ => gv
-end.
+Definition cgv2gv (gv:GenericValue) (t:typ) : GenericValue := gv.
 
 Notation "? gv # t ?" := (cgv2gv gv t) (at level 41).
 
