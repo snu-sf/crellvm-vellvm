@@ -58,9 +58,6 @@ Lemma cgv2gvs__matches_chunks : forall S los nts gv t,
 Proof.
   intros. subst. unfold LLVMgv.cgv2gv.
   destruct gv; auto.
-  destruct p as [[]]; auto. 
-  destruct gv; auto.
-  eapply cundef_gvs__matches_chunks; eauto.
 Qed.
 
 Module OpsemAux.

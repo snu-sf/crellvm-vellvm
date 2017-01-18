@@ -1595,12 +1595,6 @@ Lemma sb_mem_inj__cgv2gv : forall mi g t maxb Mem Mem',
 Proof.
   intros.  
   destruct g; auto.
-  destruct p; auto.
-  destruct v; auto.
-  destruct g; auto.
-  inv H. 
-  destruct_typ t; simpl; unfold null; eauto.
-  destruct f; simpl; auto.
 Qed.
 
 Lemma sb_mem_inj__const2GV : forall maxb mi Mem Mem' TD gl c gv S t
@@ -2143,8 +2137,7 @@ Lemma simulation___cgv2gv : forall maxb mi t Mem Mem2 gv1 gv2,
 Proof.
   intros maxb mi t Mem Mem2 gv1 gv2 Hwfmi Hinj.
   induction Hinj; auto.
-    inv H; simpl; eauto.
-    destruct gv1; inv Hinj; eauto.
-      eapply simulation___cundef_gv; eauto.
+  inv H; simpl; eauto;
+    constructor; eauto.
 Qed.
 

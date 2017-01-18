@@ -2339,10 +2339,6 @@ Lemma cgv2gv__getTypeSizeInBits : forall S los nts gv t sz al,
 Proof.
   intros.
   destruct gv; auto.
-  destruct p.
-  destruct v; auto.
-  destruct gv; auto.
-  simpl. eapply cundef_gv__getTypeSizeInBits; eauto.
 Qed.
 
 Lemma const2GV__getTypeSizeInBits : forall S los nts c t gl gv
@@ -2364,8 +2360,6 @@ Proof.
   exists sz. 
   rewrite J1.
   split; auto.
-    apply wf_const__wf_typ in H1.
-    eapply cgv2gv__getTypeSizeInBits; eauto.
 Qed.
 
 Lemma fit_gv__getTypeSizeInBits : forall TD gv s t gv'
@@ -3495,9 +3489,6 @@ Lemma cgv2gv__matches_chunks : forall S TD gv t,
 Proof.
   intros. destruct TD. 
   destruct gv as [|[]]; auto.
-  destruct v; auto.
-  destruct gv; auto.
-  simpl. eapply cundef_gv__matches_chunks; eauto.
 Qed.
 
 Lemma const2GV__matches_chunks : forall S TD c t gl gv
