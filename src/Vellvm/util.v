@@ -309,7 +309,7 @@ Lemma rev_non_nil: forall A (ls1:list A),
 Proof.
   induction ls1; simpl.
     split; auto.  
-    split; intro J; auto with datatypes v62.      
+    split; intro J; auto with datatypes.      
 Qed.
 
 Lemma cons_last: forall A (hd:A) tl, 
@@ -1078,10 +1078,10 @@ Lemma length_le__length_lt: forall A
 Proof.
   intros.
   assert (incl l1 (List.remove eq_dec a l2)) as Hinc'.
-    apply remove_notin_incl; eauto with datatypes v62.
+    apply remove_notin_incl; eauto with datatypes.
   apply incl__length_le in Hinc'; auto.
   assert (length (List.remove eq_dec a l2) < length l2)%nat as Hle.
-    apply remove_in_length; auto with datatypes v62.
+    apply remove_in_length; auto with datatypes.
   omega.
 Qed.
 
@@ -1714,7 +1714,7 @@ Module Dominators <: SEMILATTICE_WITH_TOP0.
   Lemma ge_trans: forall x y z, ge x y -> ge y z -> ge x z.
   Proof.
     unfold ge. 
-    destruct x, y, z; simpl; eauto 2 with datatypes v62.
+    destruct x, y, z; simpl; eauto 2 with datatypes.
       tauto.
   Qed.
 
@@ -1748,7 +1748,7 @@ Module Dominators <: SEMILATTICE_WITH_TOP0.
 
   Lemma ge_lub_left: forall x y, ge (lub x y) x.
   Proof.
-    unfold lub, ge, sub. destruct x, y; simpl; auto with datatypes v62.
+    unfold lub, ge, sub. destruct x, y; simpl; auto with datatypes.
     intros a J.
     apply set_inter_elim in J. destruct J. auto.
   Qed.

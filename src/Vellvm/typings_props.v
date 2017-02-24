@@ -1930,7 +1930,7 @@ Proof.
     eapply wf_fdef__wf_insn_base; eauto.
   destruct HwfI as [b1 HwfI].
   inv HwfI.
-  assert (exists n, nth_error id_list n = Some i0) as Hnth.
+  assert (exists n, nth_error (getInsnOperands (insn_cmd c1)) n = Some i0) as Hnth.
     eapply getCmdOperands__nth_list_id; eauto.
   destruct Hnth as [n Hnth].
   apply (wf_operand_list__wf_operand _ F b1 (insn_cmd c1)) in Hnth.
@@ -1969,6 +1969,7 @@ Proof.
   Case "wf_operand".
     unfold wf_operand_list.
     remove_irrelevant wf_operand.
+    remember (getInsnOperands (insn_cmd c1)). clear Heqi0. unfold ids in *.
     solve_forall_like_ind.
 Qed.
 
@@ -2424,7 +2425,7 @@ Proof.
     assert (J':=Hlkvb).
     apply lookupBlockViaIDFromFdef__blockInFdefB in Hlkvb.
     apply lookupBlockViaLabelFromFdef_inv in Hlkb1; auto.
-    eapply blockInFdefB_uniq in Hlkb1; eauto.
+    eapply blockInFdefB_uniq in Hlkvb; eauto.
     subst.
     apply lookupBlockViaIDFromFdef__InGetBlockIDs in J'.
     simpl in J'.

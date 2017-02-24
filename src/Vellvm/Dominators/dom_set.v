@@ -195,7 +195,7 @@ Proof.
   unfold wf_dom.
   intros.
   destruct dt1; destruct dt2; tinv Heq; auto.
-    elim Heq. intros. eauto with datatypes v62.
+    elim Heq. intros. eauto with datatypes.
 Qed.
 
 Lemma propagate_succ_wf_doms: forall st n out,
@@ -381,7 +381,7 @@ Proof.
       destruct (dm1 !! x) as [x1|]; simpl in *.
         destruct (dm3 !! x) as [x3|]; simpl in *; try tauto.
           split; auto.
-             destruct Hinx. eauto with datatypes v62.
+             destruct Hinx. eauto with datatypes.
         destruct (dm3 !! x) as [x3|]; simpl in *; try tauto.
 
     intros x Hinx.
@@ -393,7 +393,7 @@ Proof.
       destruct (dm1 !! x) as [x1|]; simpl in *.
         destruct (dm2 !! x) as [x2|]; simpl in *; try tauto.
           split; auto.
-             destruct Hinx. eauto with datatypes v62.
+             destruct Hinx. eauto with datatypes.
         destruct (dm2 !! x) as [x2|]; simpl in *; try tauto.
 Qed.
 
@@ -409,8 +409,8 @@ Proof.
     eapply DomMap_eq_incr_incr__eq_eq in H; eauto.
     destruct H.
     transitivity (DomDS.st_wrk (DomDS.propagate_succ st out a)).
-      eapply propagate_succ_records_unchanges; eauto with datatypes v62.
-      apply IHscs; eauto with datatypes v62.
+      eapply propagate_succ_records_unchanges; eauto with datatypes.
+      apply IHscs; eauto with datatypes.
 Qed.
 
 Lemma stable_step_decreases_wrk: forall st st' (*same*)
@@ -1275,7 +1275,7 @@ Proof.
     destruct R.
       symmetry in HeqR.
       remember (t !! l5) as R.
-      destruct R; try rewrite <- HeqR0; simpl; auto with datatypes v62.
+      destruct R; try rewrite <- HeqR0; simpl; auto with datatypes.
         eapply dom_in_bound_blocks; eauto.
 
       rewrite AMap.gi. simpl. intros x Hin. inv Hin.
@@ -1311,15 +1311,15 @@ Proof.
       remember (t !! l3) as R3.
       destruct R2 as [els2|]; destruct R3 as [els3|];
       try rewrite <- HeqR2; try rewrite <- HeqR3;
-        simpl; try solve [auto with datatypes v62 | tauto].
+        simpl; try solve [auto with datatypes | tauto].
         symmetry in HeqR2.
-        apply Hinbd in HeqR2. auto with datatypes v62.
+        apply Hinbd in HeqR2. auto with datatypes.
 
     SCase "analysis fails".
-      repeat rewrite AMap.gi. simpl. auto with datatypes v62.
+      repeat rewrite AMap.gi. simpl. auto with datatypes.
 
   Case "entry is wrong".
-    subst. repeat rewrite AMap.gi. simpl. auto with datatypes v62.
+    subst. repeat rewrite AMap.gi. simpl. auto with datatypes.
 Qed.
 
 (* The completeness of the analysis. *)

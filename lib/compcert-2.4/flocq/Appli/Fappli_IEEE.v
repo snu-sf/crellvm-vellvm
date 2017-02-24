@@ -414,7 +414,6 @@ Theorem is_finite_Bopp :
   is_finite (Bopp opp_nan x) = is_finite x.
 Proof.
 intros opp_nan [| | |] ; try easy.
-intros s pl.
 simpl.
 now case opp_nan.
 Qed.

@@ -396,7 +396,7 @@ Proof.
   unfold type_def; intros. destruct (te_typ e) ? x as [[lo hi s1]|] eqn:E.
 - destruct (T.sub_dec ty hi); try discriminate.
   destruct (T.eq lo (T.lub lo ty)); monadInv H.
-  subst e'; auto.
+  auto.
   destruct H0 as [P Q]; split; auto; intros.
   destruct (peq x x0). 
   + subst x0. rewrite E in H; inv H.
@@ -416,7 +416,7 @@ Proof.
   destruct (te_typ e) ? x as [[lo hi s1]|] eqn:E.
 - destruct (T.sub_dec ty hi); try discriminate.
   destruct (T.eq lo (T.lub lo ty)); monadInv H.
-  + subst e'. apply T.sub_trans with lo. 
+  + apply T.sub_trans with lo. 
     rewrite e0. eapply T.lub_right; eauto. eapply P; eauto.
   + apply T.sub_trans with (T.lub lo ty). 
     eapply T.lub_right; eauto. 
@@ -446,7 +446,7 @@ Proof.
   unfold type_use; intros. destruct (te_typ e) ? x as [[lo hi s1]|] eqn:E.
 - destruct (T.sub_dec lo ty); try discriminate.
   destruct (T.eq hi (T.glb hi ty)); monadInv H.
-  subst e'; auto.
+  auto.
   destruct H0 as [P Q]; split; auto; intros.
   destruct (peq x x0). 
   + subst x0. rewrite E in H; inv H.
@@ -466,7 +466,7 @@ Proof.
   destruct (te_typ e) ? x as [[lo hi s1]|] eqn:E.
 - destruct (T.sub_dec lo ty); try discriminate.
   destruct (T.eq hi (T.glb hi ty)); monadInv H.
-  + subst e'. apply T.sub_trans with hi. 
+  + apply T.sub_trans with hi. 
     eapply P; eauto. rewrite e0. eapply T.glb_right; eauto. 
   + apply T.sub_trans with (T.glb hi ty). 
     eapply (P x). simpl. rewrite PTree.gss; eauto. 

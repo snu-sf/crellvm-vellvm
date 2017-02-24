@@ -62,11 +62,11 @@ Lemma in_atolist_ptolist__incl: forall a a2p ps init1 init2
   In a (fold_left (atolist_ptolist_fun a2p) ps init2).
 Proof.
   induction ps as [|p ps]; simpl; intros.
-    eauto with datatypes v62.
+    eauto with datatypes.
 
     eapply IHps; eauto.
       unfold atolist_ptolist_fun. 
-      destruct (a2p ! p); simpl; auto with datatypes v62.
+      destruct (a2p ! p); simpl; auto with datatypes.
 Qed.
 
 Lemma in_atolist__in_ptolist_aux: forall (a2p : ATree.t positive) a p 
@@ -1283,11 +1283,11 @@ Lemma in_ps2as__incl: forall a p2a ps init1 init2 (Hinc: incl init1 init2)
   In a (fold_left (ps2as_fun p2a) ps init2).
 Proof.
   induction ps as [|p ps]; simpl; intros.
-    eauto with datatypes v62.
+    eauto with datatypes.
 
     eapply IHps; eauto.
       unfold ps2as_fun. 
-      destruct (p2a ? p); simpl; auto with datatypes v62.
+      destruct (p2a ? p); simpl; auto with datatypes.
 Qed.
 
 Lemma in_ps2as__in_ps_aux: forall (a : atom) (a2p : ATree.t positive) 
@@ -1585,19 +1585,19 @@ Proof.
           eapply DomsInParents.dom_fix_in_bound in Heq; eauto.
           eapply in_pparents__in_aparents; eauto.
         SSSCase "1.1.1.2".
-          intros Hget. auto with datatypes v62.
+          intros Hget. auto with datatypes.
       SSCase "1.1.2".
         intros Heq.
         unfold bound_dom.
         rewrite PMap.gi. unfold ps2as. simpl.
         intros x Hinx. tauto.
     SCase "1.2".
-      intros Hnone. auto with datatypes v62.
+      intros Hnone. auto with datatypes.
   Case "2".
     intros Hnone.
     simpl_sdom.
 
-    rewrite ATree.gempty. auto with datatypes v62.
+    rewrite ATree.gempty. auto with datatypes.
 Qed.
 
 Lemma sdom_in_bound: forall fh bs l5, 
@@ -1687,7 +1687,7 @@ Proof.
         SSSCase "1.2".
           simpl. right. eapply in_ps__in_ps2as; eauto using Injective.dfs_inj.
       SSCase "2".
-        left. eapply PDomProps.pdom_in_bound; eauto.
+        left. eapply PDomProps.pdom_in_bound; try apply Hin; eauto.
       SSCase "3".
         unfold strict_adomination. simpl.
         rewrite Hget'a. simpl. auto.
@@ -1695,11 +1695,11 @@ Proof.
     SCase "l3 isnt reachable".
       intros Hget3.
       rewrite Hget3 in *.
-      subst contents3. auto with datatypes v62.
+      subst contents3. auto with datatypes.
   Case "entry is wrong".
     inversion Hdoma; subst a2p.
     rewrite ATree.gempty in *.
-    subst contents3. auto with datatypes v62.
+    subst contents3. auto with datatypes.
 Qed.
 
 Section sdom_is_complete.
