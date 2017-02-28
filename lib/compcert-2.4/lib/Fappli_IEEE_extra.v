@@ -237,7 +237,6 @@ Theorem is_finite_Babs :
   is_finite _ _ (Babs abs_nan x) = is_finite _ _ x.
 Proof.
   intros abs_nan [| | |] ; try easy.
-  intros s pl.
   simpl.
   now case abs_nan.
 Qed.

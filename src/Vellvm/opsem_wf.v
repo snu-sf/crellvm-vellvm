@@ -2316,7 +2316,9 @@ Proof.
     HwfDefs HwfF HuniqF HinOps.
   apply wf_insn__wf_insn_base in HwfInstr;
     try solve [unfold isPhiNode; simpl; auto].
-  inv HwfInstr. find_wf_operand_list. subst. find_wf_operand_by_id.
+  inv HwfInstr.
+  remember (getInsnOperands (insn_terminator tmn1)). revert Heqi0. unfold ids in *.
+  find_wf_operand_list. intro. subst. find_wf_operand_by_id.
 
   eapply wf_defs_elim; eauto.
     eapply terminator_operands__in_scope; eauto.
@@ -2339,8 +2341,9 @@ Proof.
   apply wf_insn__wf_insn_base in HwfInstr;
     try solve [unfold isPhiNode; simpl; auto].
   inv HwfInstr.
+  remember (getInsnOperands (insn_cmd c)). revert Heqi0. unfold ids in *.
 
-  find_wf_operand_list. subst. find_wf_operand_by_id.
+  find_wf_operand_list. intro. subst. find_wf_operand_by_id.
   eapply wf_defs_elim; eauto.
     eapply cmd_operands__in_scope; eauto.
 Qed.

@@ -1547,7 +1547,7 @@ Proof.
   intros.
   destruct l1 as [|x l1]; auto.
   destruct (Heq x) as [_ J1].
-  assert (In x (x::l1)) as J. auto with datatypes v62.
+  assert (In x (x::l1)) as J. auto with datatypes.
   apply J1 in J. inv J.
 Qed.
 (* End of Vellvm Context *)
@@ -1670,7 +1670,7 @@ Proof.
     apply list_equiv_nil in Heq. subst. auto.
 
     destruct (Heq hd) as [J1 _].
-    assert (In hd (hd::tl)) as J2. auto with datatypes v62.
+    assert (In hd (hd::tl)) as J2. auto with datatypes.
     apply J1 in J2.
     apply in_split in J2.
     destruct_conjs; subst.
@@ -1690,18 +1690,18 @@ Proof.
       intro x.
       destruct (Heq x) as [J1' J2'].
       split; intro J.
-        assert (Hin: In x (hd::tl)). auto with datatypes v62.
+        assert (Hin: In x (hd::tl)). auto with datatypes.
         apply J1' in Hin.
-        destruct_in Hin; auto with datatypes v62.
-        destruct_in Hin; auto with datatypes v62.
+        destruct_in Hin; auto with datatypes.
+        destruct_in Hin; auto with datatypes.
 
         assert (Hin: In x (J2 ++ hd :: H0)). 
-          destruct_in J; auto with datatypes v62.
+          destruct_in J; auto with datatypes.
         apply J2' in Hin.
-        destruct_in Hin; auto with datatypes v62.
+        destruct_in Hin; auto with datatypes.
         inv Huniq2.
         elimtype False. apply H3.
-        destruct_in J; auto with datatypes v62.
+        destruct_in J; auto with datatypes.
 Qed.
 
 Lemma norepet_equiv__length_cons_eq: forall A l1 l2 (a:A)
@@ -1720,13 +1720,13 @@ Lemma incl__length_le: forall A (eq_dec : forall x y : A, {x = y}+{x <> y})
   (length l1 <= length l2)%nat.
 Proof.
   induction 2 as [|hd tl Hnotin Huniq IH]; simpl; intros.
-    auto with datatypes v62.
+    lia.
 
     assert (incl tl (List.remove eq_dec hd l2)) as Hinc'.
-      apply remove_notin_incl; eauto with datatypes v62.
+      apply remove_notin_incl; eauto with datatypes.
     apply IH in Hinc'.
     assert (length (List.remove eq_dec hd l2) < length l2)%nat as Hle.
-      apply remove_in_length; auto with datatypes v62.
+      apply remove_in_length; auto with datatypes.
     omega.
 Qed.
 
@@ -2261,7 +2261,7 @@ Proof.
       exists (x1::l1'). exists l2'.
       repeat (split; try solve [constructor; auto | auto]).
 
-    destruct IHsublist as [l1' [l2' [EQ [Hsub1 Hsub2]]]]; subst; auto.
+    edestruct IHsublist as [l1' [l2' [EQ [Hsub1 Hsub2]]]]; subst; auto.
     exists (x::l1'). exists l2'.
     repeat (split; try solve [constructor; auto | auto]).
 Qed.
@@ -2520,10 +2520,10 @@ Proof.
 
     assert (incl ls1 (List.remove Hdec a1 ls2)) as Hinc.
       apply remove_notin_incl; auto.
-        eauto with datatypes v62.
+        eauto with datatypes.
     apply IHHnp1 in Hinc; auto.
       assert (In a1 ls2) as Hin. 
-        eauto with datatypes v62.
+        eauto with datatypes.
       apply remove_in_length with (Hdec:=Hdec) in Hin.
       omega. 
 
@@ -3044,7 +3044,7 @@ Module AtomSet. Section AtomSet.
     intros x Hin.
     apply set_inter_elim in Hin. 
     destruct Hin.
-    eauto with datatypes v62.
+    eauto with datatypes.
   Qed.
 
   Lemma set_union_eq_right: forall x y z (Heq: set_eq y z),
@@ -3197,7 +3197,7 @@ Module AtomSet. Section AtomSet.
     split; intros x Hin;
       apply set_union_elim in Hin;
       apply set_union_intro;
-      destruct Hin as [Hin | Hin]; auto with datatypes v62.
+      destruct Hin as [Hin | Hin]; auto with datatypes.
   Qed.
           
   Lemma set_union_empty_eq_empty1: forall l1,
@@ -3311,7 +3311,7 @@ Module AtomSet. Section AtomSet.
         
         assert (~ In a l1 \/ ~ incl l2 l1) as G.
           destruct (In_dec Hdec a l1); auto.
-            right. intro K. apply J. auto with datatypes v62.
+            right. intro K. apply J. auto with datatypes.
         destruct G as [G | G].
           exists a. simpl. auto.
   
@@ -3663,7 +3663,7 @@ Proof.
 
     inv Hst.
     destruct Hin1 as [Hin1 | Hin1]; subst; eauto.
-      eapply Forall_forall in H2; eauto with datatypes v62.
+      eapply Forall_forall in H2; eauto with datatypes.
 Qed.
 
 Lemma StronglySorted_rev_cons: forall A (R:A->A->Prop) n ls1 

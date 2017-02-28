@@ -708,7 +708,7 @@ Module PTree <: TREE.
   Proof.
     unfold elements. intros A m i v H.
     change i with (prev_append 1 i) in H.
-    destruct (xelements_complete _ _ _ _ _ H) as [K|()]. exact K.
+    destruct (xelements_complete _ _ _ _ _ H) as [K|[]]. exact K.
   Qed.
 
   Definition xkeys (A: Type) (m: t A) (i: positive) (l: list (positive * A)) :=

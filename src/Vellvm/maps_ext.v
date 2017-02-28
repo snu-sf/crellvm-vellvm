@@ -1193,10 +1193,10 @@ Proof.
       apply T.elements_complete in H. 
       rewrite T.gsspec in H.
       destruct_if.
-        auto with datatypes v62.
+        auto with datatypes.
 
         apply in_tree__in_parents_of_tree in H2.
-        auto with datatypes v62.
+        auto with datatypes.
 
       apply parents_of_tree_spec.
       destruct_in Hin.
@@ -1400,7 +1400,7 @@ Proof.
   intros x Hin.
   apply remove_redundancy_in; auto.
     apply children_in_children_of_tree in Hin.
-    auto with datatypes v62.
+    auto with datatypes.
 Qed.
 
 End ElementsOfCfg.
