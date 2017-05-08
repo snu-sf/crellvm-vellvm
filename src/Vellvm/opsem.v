@@ -744,7 +744,7 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
                     Mem' tsz mb,
   getTypeAllocSize TD t = Some tsz ->
   getOperandValue TD v lc gl = Some gn ->
-  malloc TD Mem tsz gn align = Some (Mem', mb) ->
+  alloca TD Mem tsz gn align = Some (Mem', mb) ->
   sInsn (mkCfg S TD Ps gl fs)
     (mkState (mkEC F B ((insn_alloca id t v align)::cs) tmn lc als) (ECS) Mem)
     (mkState (mkEC F B cs tmn

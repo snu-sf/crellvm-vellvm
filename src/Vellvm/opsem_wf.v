@@ -2868,6 +2868,27 @@ Ltac undefbehave := unfold undefined_state; simpl;
     right; right; right; right; right; right; right; right; auto
   ].
 
+Lemma alloca_no_fail
+      TD m0 s gv al
+  :
+    exists m1 nb,
+      <<ALLOCA: alloca TD m0 s gv al = Some (m1, nb)>>
+.
+Proof.
+  unfold alloca.
+  remember (match GV2int TD Size.ThirtyTwo gv with
+            | ret n => Size.to_Z s * n
+            | merror => 0
+            end) as hi. clear Heqhi.
+  des_ifs.
+  unfold flip.
+  unfold Datatypes.option_map.
+  hexploit Mem.range_perm_drop_2; eauto; revgoals.
+  { i; des. inv X. rewrite H. esplits; eauto. }
+  ii.
+  eapply Mem.perm_alloc_2; eauto.
+Qed.
+
 Lemma progress : forall cfg S1 (HwfCfg: wf_Config cfg),
   wf_State cfg S1 ->
   s_isFinialState cfg S1 <> None \/
@@ -3385,7 +3406,7 @@ Proof.
       eapply getOperandValue_inCmdOps_isnt_stuck; eauto.
         simpl; auto.
     destruct J as [gn J].
-    remember (malloc (los, nts) M asz gn a) as R.
+    remember (alloca (los, nts) M asz gn a) as R.
     destruct R as [[M' mb] |].
       left.
       exists
@@ -3404,7 +3425,8 @@ Proof.
       exists events.E0.
       eauto.
 
-      inv HeqR0.
+      exfalso.
+      exploit alloca_no_fail; eauto; []; i; des. rewrite ALLOCA in *. clarify.
       (* right. *)
       (* unfold undefined_state. *)
       (* right. rewrite J. rewrite J2. right. right. left. exists gn. *)

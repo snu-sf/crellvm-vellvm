@@ -1249,63 +1249,63 @@ Proof.
     eapply free_preserves_mload_inv in H; eauto.
 Qed.
 
-Lemma free_allocas_preserves_mload_inv: forall TD gptr ty al gvsa als Mem' Mem
-  (H1 : mload TD Mem' gptr ty al = ret gvsa)
-  (H2 : free_allocas TD Mem als = ret Mem'),
-  mload TD Mem gptr ty al = ret gvsa.
-Proof.
-  induction als; simpl; intros.
-    inv H2. auto.
+(* Lemma free_allocas_preserves_mload_inv: forall TD gptr ty al gvsa als Mem' Mem *)
+(*   (H1 : mload TD Mem' gptr ty al = ret gvsa) *)
+(*   (H2 : free_allocas TD Mem als = ret Mem'), *)
+(*   mload TD Mem gptr ty al = ret gvsa. *)
+(* Proof. *)
+(*   induction als; simpl; intros. *)
+(*     inv H2. auto. *)
 
-    inv_mbind'.
-    eapply free_preserves_mload_inv with (Mem':=m); eauto.
-Qed.
+(*     inv_mbind'. *)
+(*     eapply free_preserves_mload_inv with (Mem':=m); eauto. *)
+(* Qed. *)
 
-Lemma nextblock_free_allocas: forall TD als M M',
-  free_allocas TD M als = ret M' -> Mem.nextblock M = Mem.nextblock M'.
-Proof.
-  induction als; simpl; intros.
-    inv H. auto.
+(* Lemma nextblock_free_allocas: forall TD als M M', *)
+(*   free_allocas TD M als = ret M' -> Mem.nextblock M = Mem.nextblock M'. *)
+(* Proof. *)
+(*   induction als; simpl; intros. *)
+(*     inv H. auto. *)
 
-    inv_mbind'. symmetry in HeqR.
-    apply nextblock_free in HeqR; auto.
-    rewrite HeqR. auto.
-Qed.
+(*     inv_mbind'. symmetry in HeqR. *)
+(*     apply nextblock_free in HeqR; auto. *)
+(*     rewrite HeqR. auto. *)
+(* Qed. *)
 
-Lemma free_allocas_preserves_wf_lc: forall td lc als Mem Mem',
-  free_allocas td Mem als = ret Mem' -> wf_lc Mem lc -> wf_lc Mem' lc.
-Proof.
-  induction als; simpl; intros.
-    inv H. auto.
+(* Lemma free_allocas_preserves_wf_lc: forall td lc als Mem Mem', *)
+(*   free_allocas td Mem als = ret Mem' -> wf_lc Mem lc -> wf_lc Mem' lc. *)
+(* Proof. *)
+(*   induction als; simpl; intros. *)
+(*     inv H. auto. *)
 
-    inv_mbind'. symmetry in HeqR.
-    eapply free_preserves_wf_lc in HeqR; eauto.
-Qed.
+(*     inv_mbind'. symmetry in HeqR. *)
+(*     eapply free_preserves_wf_lc in HeqR; eauto. *)
+(* Qed. *)
 
-Lemma free_allocas_preserves_wf_Mem: forall maxb td als Mem Mem',
-  wf_Mem maxb td Mem -> free_allocas td Mem als = ret Mem' ->
-  wf_Mem maxb td Mem'.
-Proof.
-  induction als; simpl; intros.
-    inv H0. auto.
+(* Lemma free_allocas_preserves_wf_Mem: forall maxb td als Mem Mem', *)
+(*   wf_Mem maxb td Mem -> free_allocas td Mem als = ret Mem' -> *)
+(*   wf_Mem maxb td Mem'. *)
+(* Proof. *)
+(*   induction als; simpl; intros. *)
+(*     inv H0. auto. *)
 
-    inv_mbind'.
-    symmetry in HeqR.
-    eapply free_preserves_wf_Mem in HeqR; eauto.
-Qed.
+(*     inv_mbind'. *)
+(*     symmetry in HeqR. *)
+(*     eapply free_preserves_wf_Mem in HeqR; eauto. *)
+(* Qed. *)
 
-Lemma free_allocas_preserves_wf_als : forall maxb TD als als0 M M'
-  (Hfree: free_allocas TD M als0 = ret M')
-  (Hwf: wf_als maxb M als),
-  wf_als maxb M' als.
-Proof.
-  induction als0; simpl; intros.
-    inv Hfree. auto.
+(* Lemma free_allocas_preserves_wf_als : forall maxb TD als als0 M M' *)
+(*   (Hfree: free_allocas TD M als0 = ret M') *)
+(*   (Hwf: wf_als maxb M als), *)
+(*   wf_als maxb M' als. *)
+(* Proof. *)
+(*   induction als0; simpl; intros. *)
+(*     inv Hfree. auto. *)
 
-    inv_mbind'.
-    symmetry in HeqR.
-    eapply free_preserves_wf_als in HeqR; eauto.
-Qed.
+(*     inv_mbind'. *)
+(*     symmetry in HeqR. *)
+(*     eapply free_preserves_wf_als in HeqR; eauto. *)
+(* Qed. *)
 
 Lemma perm_mfree_1: forall TD M1 M2 ptr b ofs k p 
   (Hfree : free TD M1 ptr = ret M2) (Hnoalias: MemProps.no_alias_with_blk ptr b)
@@ -3084,106 +3084,106 @@ Qed.
 
 (**************************************************)
 (* Properties of free_allocas *)
-Lemma perm_mfree_alloca_3: forall TD b ofs k p als M1 M2 
-  (Hfree : free_allocas TD M1 als = ret M2),
-  Mem.perm M2 b ofs k p -> Mem.perm M1 b ofs k p.
-Proof.
-  induction als; simpl; intros.
-    congruence.
+(* Lemma perm_mfree_alloca_3: forall TD b ofs k p als M1 M2  *)
+(*   (Hfree : free_allocas TD M1 als = ret M2), *)
+(*   Mem.perm M2 b ofs k p -> Mem.perm M1 b ofs k p. *)
+(* Proof. *)
+(*   induction als; simpl; intros. *)
+(*     congruence. *)
 
-    inv_mbind.
-    eapply IHals in H1; eauto using perm_mfree_3.
-Qed.
+(*     inv_mbind. *)
+(*     eapply IHals in H1; eauto using perm_mfree_3. *)
+(* Qed. *)
 
-Lemma perm_mfree_alloca_2: forall TD als M1 M2 
-  (Hfree : free_allocas TD M1 als = ret M2),
-  forall b lo hi, 
-    In b als -> Mem.bounds M1 b = (lo, hi) ->
-    forall ofs k p, lo <= ofs < hi -> ~Mem.perm M2 b ofs k p.
-Proof.
-  induction als; simpl; intros.
-    congruence.
+(* Lemma perm_mfree_alloca_2: forall TD als M1 M2  *)
+(*   (Hfree : free_allocas TD M1 als = ret M2), *)
+(*   forall b lo hi,  *)
+(*     In b als -> Mem.bounds M1 b = (lo, hi) -> *)
+(*     forall ofs k p, lo <= ofs < hi -> ~Mem.perm M2 b ofs k p. *)
+(* Proof. *)
+(*   induction als; simpl; intros. *)
+(*     congruence. *)
 
-    inv_mbind. symmetry_ctx.
-    destruct H as [H | H]; subst.
-      destruct TD. unfold free in HeqR. simpl in HeqR.
-      rewrite H0 in HeqR.
-      eapply Mem.perm_free_2 with (p:=p) in HeqR; eauto.
-      intro J.
-      eapply perm_mfree_alloca_3 in H3; eauto.
+(*     inv_mbind. symmetry_ctx. *)
+(*     destruct H as [H | H]; subst. *)
+(*       destruct TD. unfold free in HeqR. simpl in HeqR. *)
+(*       rewrite H0 in HeqR. *)
+(*       eapply Mem.perm_free_2 with (p:=p) in HeqR; eauto. *)
+(*       intro J. *)
+(*       eapply perm_mfree_alloca_3 in H3; eauto. *)
 
-      apply bounds_mfree with (b:=b) in HeqR; auto.
-      eapply IHals; eauto. congruence.
-Qed.
+(*       apply bounds_mfree with (b:=b) in HeqR; auto. *)
+(*       eapply IHals; eauto. congruence. *)
+(* Qed. *)
 
-Lemma perm_mfree_alloca_1: forall TD als M1 M2 
-  (Hfree : free_allocas TD M1 als = ret M2),
-  forall b ofs k p, 
-    ~ In b als ->
-    Mem.perm M1 b ofs k p ->
-    Mem.perm M2 b ofs k p.
-Proof.
-  induction als; simpl; intros.
-    congruence.
+(* Lemma perm_mfree_alloca_1: forall TD als M1 M2  *)
+(*   (Hfree : free_allocas TD M1 als = ret M2), *)
+(*   forall b ofs k p,  *)
+(*     ~ In b als -> *)
+(*     Mem.perm M1 b ofs k p -> *)
+(*     Mem.perm M2 b ofs k p. *)
+(* Proof. *)
+(*   induction als; simpl; intros. *)
+(*     congruence. *)
 
-    inv_mbind. symmetry_ctx.
-    eapply IHals; eauto.
-    eapply perm_mfree_1; eauto.
-    unfold blk2GV, ptr2GV, val2GV. simpl. eauto.
-Qed.
+(*     inv_mbind. symmetry_ctx. *)
+(*     eapply IHals; eauto. *)
+(*     eapply perm_mfree_1; eauto. *)
+(*     unfold blk2GV, ptr2GV, val2GV. simpl. eauto. *)
+(* Qed. *)
 
-Lemma range_perm_mfree_alloca_1: forall TD M1 M2 als b lo hi k p 
-  (Hfree : free_allocas TD M1 als = ret M2) (Hnotin: ~ In b als)
-  (Hperm: Mem.range_perm M1 b lo hi k p),
-  Mem.range_perm M2 b lo hi k p.
-Proof.
-  unfold Mem.range_perm.
-  intros.
-  apply Hperm in H.
-  eapply perm_mfree_alloca_1; eauto.
-Qed.
+(* Lemma range_perm_mfree_alloca_1: forall TD M1 M2 als b lo hi k p  *)
+(*   (Hfree : free_allocas TD M1 als = ret M2) (Hnotin: ~ In b als) *)
+(*   (Hperm: Mem.range_perm M1 b lo hi k p), *)
+(*   Mem.range_perm M2 b lo hi k p. *)
+(* Proof. *)
+(*   unfold Mem.range_perm. *)
+(*   intros. *)
+(*   apply Hperm in H. *)
+(*   eapply perm_mfree_alloca_1; eauto. *)
+(* Qed. *)
   
-Lemma bounds_free_alloca: forall TD als M1 M2,
-  free_allocas TD M1 als = ret M2 ->
-  forall b, Mem.bounds M2 b = Mem.bounds M1 b.
-Proof.
-  induction als; simpl; intros.
-    congruence.
+(* Lemma bounds_free_alloca: forall TD als M1 M2, *)
+(*   free_allocas TD M1 als = ret M2 -> *)
+(*   forall b, Mem.bounds M2 b = Mem.bounds M1 b. *)
+(* Proof. *)
+(*   induction als; simpl; intros. *)
+(*     congruence. *)
 
-    inv_mbind. symmetry_ctx.
-    apply IHals with (b:=b) in H1.
-    apply bounds_mfree with (b:=b) in HeqR.
-    congruence.
-Qed.
+(*     inv_mbind. symmetry_ctx. *)
+(*     apply IHals with (b:=b) in H1. *)
+(*     apply bounds_mfree with (b:=b) in HeqR. *)
+(*     congruence. *)
+(* Qed. *)
 
-Lemma free_allocas_preserves_mload: forall TD al t mb gv als Mem' Mem
-  (H0 : ~ In mb als)
-  (H1 : free_allocas TD Mem als = ret Mem')
-  (H2 : mload TD Mem (blk2GV TD mb) t al = ret gv),
-  mload TD Mem' (blk2GV TD mb) t al = ret gv.
-Proof.
-  induction als; simpl; intros.
-    inv H1. auto.
+(* Lemma free_allocas_preserves_mload: forall TD al t mb gv als Mem' Mem *)
+(*   (H0 : ~ In mb als) *)
+(*   (H1 : free_allocas TD Mem als = ret Mem') *)
+(*   (H2 : mload TD Mem (blk2GV TD mb) t al = ret gv), *)
+(*   mload TD Mem' (blk2GV TD mb) t al = ret gv. *)
+(* Proof. *)
+(*   induction als; simpl; intros. *)
+(*     inv H1. auto. *)
 
-    inv_mbind'.
-    apply IHals in H3; auto.
-    eapply free_preserves_mload; eauto.
-    rewrite simpl_blk2GV. simpl. tauto.
-Qed.
+(*     inv_mbind'. *)
+(*     apply IHals in H3; auto. *)
+(*     eapply free_preserves_mload; eauto. *)
+(*     rewrite simpl_blk2GV. simpl. tauto. *)
+(* Qed. *)
 
-Lemma free_allocas_preserves_encode_decode_ident: forall TD mb ty al als M M'
-  (Hnoalias: ~ In mb als)
-  (Hid: encode_decode_ident TD M (blk2GV TD mb) ty al)
-  (Hfrees: free_allocas TD M als = Some M'),
-  encode_decode_ident TD M' (blk2GV TD mb) ty al.
-Proof.
-  induction als; simpl; intros.
-    inv Hfrees. auto.
+(* Lemma free_allocas_preserves_encode_decode_ident: forall TD mb ty al als M M' *)
+(*   (Hnoalias: ~ In mb als) *)
+(*   (Hid: encode_decode_ident TD M (blk2GV TD mb) ty al) *)
+(*   (Hfrees: free_allocas TD M als = Some M'), *)
+(*   encode_decode_ident TD M' (blk2GV TD mb) ty al. *)
+(* Proof. *)
+(*   induction als; simpl; intros. *)
+(*     inv Hfrees. auto. *)
 
-    inv_mbind.
-    apply IHals in H0; auto.
-    eapply free_preserves_encode_decode_ident; eauto.
-    rewrite simpl_blk2GV. simpl. tauto.
-Qed.
+(*     inv_mbind. *)
+(*     apply IHals in H0; auto. *)
+(*     eapply free_preserves_encode_decode_ident; eauto. *)
+(*     rewrite simpl_blk2GV. simpl. tauto. *)
+(* Qed. *)
 
 End MemProps.

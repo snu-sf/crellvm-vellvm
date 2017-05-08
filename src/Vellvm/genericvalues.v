@@ -1232,6 +1232,18 @@ Definition malloc (TD:TargetData) (M:mem) (bsz:sz) (gn:GenericValue) (al:align)
             | None => 0
           end).
 
+Definition alloca (TD:TargetData) (M:mem) (bsz:sz) (gn:GenericValue) (al:align)
+  : option (mem * mblock)%type :=
+  let hi :=
+      (match GV2int TD Size.ThirtyTwo gn with
+       | Some n => (Size.to_Z bsz) * n
+       | None => 0
+       end)%Z
+  in
+  let (M', nb) := (Mem.alloc M 0 hi) in
+  option_map ((flip pair) nb) (Mem.drop_perm M' nb 0 hi Writable)
+.
+
 Definition malloc_one (TD:TargetData) (M:mem) (bsz:sz) (al:align)
   : option (mem * mblock)%type :=
   Some (Mem.alloc M 0 (Size.to_Z bsz)).
@@ -1253,10 +1265,12 @@ Fixpoint free_allocas (TD:TargetData) (Mem:mem) (allocas:list mblock)
 match allocas with
 | nil => Some Mem
 | alloca::allocas' =>
-  match (free TD Mem (blk2GV TD alloca)) with
-  | Some Mem' => free_allocas TD Mem' allocas'
-  | None => None
-  end
+  let (lo, hi) := Mem.bounds Mem alloca in
+  Some (Mem.unchecked_free Mem alloca lo hi)
+  (* match (free TD Mem (blk2GV TD alloca)) with *)
+  (* | Some Mem' => free_allocas TD Mem' allocas' *)
+  (* | None => None *)
+  (* end *)
 end.
 
 Fixpoint mload_aux M (mc:list memory_chunk) b ofs : option GenericValue :=
