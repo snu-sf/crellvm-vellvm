@@ -2723,6 +2723,18 @@ Proof.
   eapply initializeFrameValues__total_aux with (la1:=nil); eauto.
 Qed.
 
+Lemma free_allocas_not_stuck
+      TD m0 als
+  :
+    exists m1, free_allocas TD m0 als = Some m1
+.
+Proof.
+  destruct TD.
+  ginduction als; ii; ss.
+  - esplits; eauto.
+  - des_ifs; esplits; eauto.
+Qed.
+
 Definition undefined_state (cfg: Config) (S : State): Prop :=
 match cfg with
 | {| CurTargetData := td; CurProducts := ps; Globals := gl; FunTable := fs |} =>

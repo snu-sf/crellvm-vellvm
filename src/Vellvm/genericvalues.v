@@ -1266,7 +1266,7 @@ match allocas with
 | nil => Some Mem
 | alloca::allocas' =>
   let (lo, hi) := Mem.bounds Mem alloca in
-  Some (Mem.unchecked_free Mem alloca lo hi)
+  free_allocas TD (Mem.unchecked_free Mem alloca lo hi) allocas'
   (* match (free TD Mem (blk2GV TD alloca)) with *)
   (* | Some Mem' => free_allocas TD Mem' allocas' *)
   (* | None => None *)
