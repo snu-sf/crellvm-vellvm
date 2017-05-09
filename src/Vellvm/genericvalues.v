@@ -2284,6 +2284,20 @@ Proof.
   intros. inv H. auto.
 Qed.
 
+Lemma alloca_inv : forall TD Mem0 tsz gn align0 Mem' mb,
+  alloca TD Mem0 tsz gn align0 = ret (Mem', mb) ->
+  let hi :=
+  match GV2int TD Size.ThirtyTwo gn with
+  | ret n => (Size.to_Z tsz * n)%Z
+  | merror => 0%Z
+  end in
+  let (M', nb) := Mem.alloc Mem0 0 hi in
+  option_map (flip pair nb) (Mem.drop_perm M' nb 0 hi Writable) = ret (Mem', mb)
+.
+Proof.
+  intros. unfold alloca in *. eauto.
+Qed.
+
 Lemma store_inv : forall TD Mem0 gvp t gv align Mem',
   mstore TD Mem0 gvp t gv align = Some Mem' ->
   exists b, exists ofs, exists mc,
