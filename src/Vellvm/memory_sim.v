@@ -5,6 +5,7 @@ Require Import Integers.
 Require Import AST.
 Require Import Znumtheory.
 Require Import vellvm_tactics.
+Require Import Classical.
 
 Module MoreMem.
 
@@ -742,6 +743,172 @@ Proof.
       assert (W1:=H2). apply J' in W1. subst.
       assert (W2:=H3). apply J' in W2. subst.
       eapply perm_free_3 in H4; eauto.
+Qed.
+
+Require Import sflib.
+(* IDK why, but importing this on top breaks existing proof *)
+
+Lemma no_perm_uncheked_free
+      m1 b0 lo hi ofs k p
+      (PERM: perm (unchecked_free m1 b0 lo hi) b0 ofs k p)
+      (INRANGE: zle lo ofs && zlt ofs hi = true)
+  :
+    False
+.
+Proof.
+  unfold unchecked_free in *. unfold perm in *. ss.
+  rewrite Maps.PMap.gsspec in *. des_ifs.
+Qed.
+
+Lemma no_valid_access_uncheked_free
+      m1 b0 lo hi ofs p chunk
+      (VALID: valid_access (unchecked_free m1 b0 lo hi) chunk b0 ofs p)
+      target
+      (TARGET0: ofs <= target < ofs + (size_chunk chunk))
+      (TARGET1: lo <= target < hi)
+      (* (INRANGE: zle lo (ofs + size_chunk chunk) && zlt ofs hi = true) *)
+      (* (INRANGE: zle lo ofs && zlt ofs hi = true) *)
+  :
+    False
+.
+Proof.
+  unfold valid_access in *.
+  des.
+  unfold proj_sumbool in *. des_ifs.
+  exploit VALID; eauto.
+  i.
+  unfold perm, unchecked_free in *. ss.
+  rewrite Maps.PMap.gsspec in *. des_ifs.
+  unfold proj_sumbool in *. des_ifs.
+Qed.
+
+Lemma valid_access_unchecked_free_before
+      m1 lo hi ofs p b0 chunk b1
+      (VALID: valid_access (unchecked_free m1 b1 lo hi) chunk b0 ofs p)
+  :
+    <<VALID: valid_access m1 chunk b0 ofs p>>
+.
+Proof.
+  unfold valid_access in *. des.
+  split; ss.
+  - clear VALID0.
+    unfold range_perm in *. ii.
+    exploit VALID; eauto; []; intro NEW; des. clear VALID.
+    unfold unchecked_free, perm in *. ss.
+    rewrite Maps.PMap.gsspec in *. des_ifs.
+Qed.
+
+Lemma valid_access_diffblock_free_after
+      m0 b0 lo hi ofs p b1 chunk
+      (DIFFBLOCK: b0 <> b1)
+      (VALID: valid_access m0 chunk b1 ofs p)
+  :
+    <<VALID: valid_access (unchecked_free m0 b0 lo hi) chunk b1 ofs p>>
+.
+Proof.
+  unfold valid_access in *.
+  des. split; ss. clear VALID0.
+  ii.
+  exploit VALID; eauto; []; intro NEW; des. clear VALID.
+  unfold unchecked_free, perm in *. ss.
+  rewrite Maps.PMap.gsspec in *. des_ifs.
+Qed.
+
+Lemma valid_access_noalias_free_after
+      m0 b0 lo hi ofs p chunk
+      (NOALIAS: (zle lo (ofs + size_chunk chunk) && zlt ofs hi) = false)
+      (VALID: valid_access m0 chunk b0 ofs p)
+  :
+    <<VALID: valid_access (unchecked_free m0 b0 lo hi) chunk b0 ofs p>>
+.
+Proof.
+  unfold valid_access in *.
+  des. split; ss. clear VALID0.
+  ii.
+  exploit VALID; eauto; []; intro NEW; des. clear VALID.
+  unfold unchecked_free, perm in *. ss.
+  rewrite Maps.PMap.gsspec in *. des_ifs.
+  ss.
+  apply andb_true_iff in Heq. des.
+  apply andb_false_iff in NOALIAS.
+  des.
+  - unfold proj_sumbool in *. des_ifs.
+    omega.
+  - unfold proj_sumbool in *. des_ifs.
+    omega.
+Qed.
+
+Lemma unchecked_free_inj:
+  forall f m1 m2 b1 b2 delta lo hi m1' m2',
+  meminj_no_overlap f ->
+  meminj_zero_delta f ->
+  mem_inj f m1 m2 ->
+  Mem.unchecked_free m1 b1 lo hi = m1' ->
+  Mem.unchecked_free m2 b2 (lo+delta) (hi+delta) = m2' ->
+  f b1 = Some (b2, delta) ->
+  mem_inj f m1' m2'.
+Proof.
+  ii.
+  clarify.
+  exploit H0; eauto; []; i; des. clarify. repeat rewrite Z.add_0_r in *.
+  inv H1.
+  econs.
+  - clear mi_memval0. ii.
+    exploit H0; eauto; []; i; des. clarify. repeat rewrite Z.add_0_r in *.
+    destruct (peq b1 b0).
+    + clarify.
+      destruct (classic (exists target, ofs <= target < ofs + size_chunk chunk /\
+                                        lo <= target < hi)).
+      * des.
+        exploit no_valid_access_uncheked_free; eauto.
+        i; ss.
+      * assert(NOTARGET: forall z, ~(ofs <= z < ofs + size_chunk chunk) \/ ~(lo <= z < hi)).
+        { i. eapply not_and_or; eauto. }
+        exploit mi_access0; eauto.
+        { instantiate (1:= p).
+          instantiate (1:= ofs).
+          instantiate (1:= chunk).
+          eapply valid_access_unchecked_free_before; eauto.
+        }
+        intro NEW. repeat rewrite Z.add_0_r in *.
+        clear H2.
+        unfold valid_access in *.
+        des. split; ss. clear NEW0.
+        ii.
+        exploit NEW.
+        { eauto. }
+        i.
+        unfold unchecked_free, perm in *. ss.
+        rewrite Maps.PMap.gsspec in *. des_ifs.
+        ss.
+        apply H3. exists ofs0.
+        unfold proj_sumbool in *. des_ifs.
+    +
+      exploit mi_access0; eauto.
+      { instantiate (1:= p).
+        instantiate (1:= ofs).
+        instantiate (1:= chunk).
+        eapply valid_access_unchecked_free_before; eauto.
+      }
+      intro NEW. repeat rewrite Z.add_0_r in *.
+      eapply valid_access_diffblock_free_after; eauto.
+  - clear mi_access0. ii.
+    destruct (peq b1 b0).
+    + clarify.
+      destruct (zle lo ofs && zlt ofs hi) eqn: NOALIAS.
+      * exfalso. eapply no_perm_uncheked_free; eauto.
+      * exploit mi_memval0; eauto.
+        unfold unchecked_free, perm in *. ss.
+        rewrite Maps.PMap.gsspec in *. des_ifs.
+    + exploit H0; eauto; []; i; des. clarify. repeat rewrite Z.add_0_r in *.
+      exploit mi_memval0; eauto.
+      { instantiate (1:= ofs).
+        unfold unchecked_free, perm in *. ss.
+        rewrite Maps.PMap.gsspec in *. des_ifs.
+      }
+      i.
+      repeat rewrite Z.add_0_r in *.
+      unfold unchecked_free in *. ss.
 Qed.
 
 Global Opaque load alloc.
