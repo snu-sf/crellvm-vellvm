@@ -1267,10 +1267,6 @@ match allocas with
 | alloca::allocas' =>
   let (lo, hi) := Mem.bounds Mem alloca in
   free_allocas TD (Mem.unchecked_free Mem alloca lo hi) allocas'
-  (* match (free TD Mem (blk2GV TD alloca)) with *)
-  (* | Some Mem' => free_allocas TD Mem' allocas' *)
-  (* | None => None *)
-  (* end *)
 end.
 
 Fixpoint mload_aux M (mc:list memory_chunk) b ofs : option GenericValue :=

@@ -2268,9 +2268,6 @@ Proof.
   apply malloc_inv in H.
   apply Mem.nextblock_alloc in H.
   rewrite H. rewrite Pplus_one_succ_r; auto.
-  (* destruct H as [n [J1 [J2 J3]]]. *)
-  (* apply Mem.nextblock_alloc in J3. *)
-  (* rewrite J3. omega. *)
 Qed.
 
 Lemma nextblock_alloca: forall TD M tsz gn M' align0 mb,
@@ -2282,9 +2279,6 @@ Proof.
   unfold Datatypes.option_map, flip in *.
   des_ifs; apply Mem.nextblock_alloc in Heq; apply Mem.nextblock_drop in Heq0;
     rewrite Heq0; rewrite Heq; rewrite Pplus_one_succ_r; auto.
-  (* destruct H as [n [J1 [J2 J3]]]. *)
-  (* apply Mem.nextblock_alloc in J3. *)
-  (* rewrite J3. omega. *)
 Qed.
 
 Lemma malloc_result: forall TD M tsz gn M' align0 mb,
