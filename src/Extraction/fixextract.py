@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python2
 
 import sys, string, os, commands, shutil, re, subprocess
 from math import sqrt, log10, log
