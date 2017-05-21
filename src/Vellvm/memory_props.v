@@ -1,5 +1,6 @@
 Require Import vellvm.
 Require Import memory_sim.
+Require Import sflib.
 
 Ltac unfold_blk2GV := unfold blk2GV, ptr2GV, val2GV.
 
@@ -1249,63 +1250,63 @@ Proof.
     eapply free_preserves_mload_inv in H; eauto.
 Qed.
 
-Lemma free_allocas_preserves_mload_inv: forall TD gptr ty al gvsa als Mem' Mem
-  (H1 : mload TD Mem' gptr ty al = ret gvsa)
-  (H2 : free_allocas TD Mem als = ret Mem'),
-  mload TD Mem gptr ty al = ret gvsa.
-Proof.
-  induction als; simpl; intros.
-    inv H2. auto.
+(* Lemma free_allocas_preserves_mload_inv: forall TD gptr ty al gvsa als Mem' Mem *)
+(*   (H1 : mload TD Mem' gptr ty al = ret gvsa) *)
+(*   (H2 : free_allocas TD Mem als = ret Mem'), *)
+(*   mload TD Mem gptr ty al = ret gvsa. *)
+(* Proof. *)
+(*   induction als; simpl; intros. *)
+(*     inv H2. auto. *)
 
-    inv_mbind'.
-    eapply free_preserves_mload_inv with (Mem':=m); eauto.
-Qed.
+(*     inv_mbind'. *)
+(*     eapply free_preserves_mload_inv with (Mem':=m); eauto. *)
+(* Qed. *)
 
-Lemma nextblock_free_allocas: forall TD als M M',
-  free_allocas TD M als = ret M' -> Mem.nextblock M = Mem.nextblock M'.
-Proof.
-  induction als; simpl; intros.
-    inv H. auto.
+(* Lemma nextblock_free_allocas: forall TD als M M', *)
+(*   free_allocas TD M als = ret M' -> Mem.nextblock M = Mem.nextblock M'. *)
+(* Proof. *)
+(*   induction als; simpl; intros. *)
+(*     inv H. auto. *)
 
-    inv_mbind'. symmetry in HeqR.
-    apply nextblock_free in HeqR; auto.
-    rewrite HeqR. auto.
-Qed.
+(*     inv_mbind'. symmetry in HeqR. *)
+(*     apply nextblock_free in HeqR; auto. *)
+(*     rewrite HeqR. auto. *)
+(* Qed. *)
 
-Lemma free_allocas_preserves_wf_lc: forall td lc als Mem Mem',
-  free_allocas td Mem als = ret Mem' -> wf_lc Mem lc -> wf_lc Mem' lc.
-Proof.
-  induction als; simpl; intros.
-    inv H. auto.
+(* Lemma free_allocas_preserves_wf_lc: forall td lc als Mem Mem', *)
+(*   free_allocas td Mem als = ret Mem' -> wf_lc Mem lc -> wf_lc Mem' lc. *)
+(* Proof. *)
+(*   induction als; simpl; intros. *)
+(*     inv H. auto. *)
 
-    inv_mbind'. symmetry in HeqR.
-    eapply free_preserves_wf_lc in HeqR; eauto.
-Qed.
+(*     inv_mbind'. symmetry in HeqR. *)
+(*     eapply free_preserves_wf_lc in HeqR; eauto. *)
+(* Qed. *)
 
-Lemma free_allocas_preserves_wf_Mem: forall maxb td als Mem Mem',
-  wf_Mem maxb td Mem -> free_allocas td Mem als = ret Mem' ->
-  wf_Mem maxb td Mem'.
-Proof.
-  induction als; simpl; intros.
-    inv H0. auto.
+(* Lemma free_allocas_preserves_wf_Mem: forall maxb td als Mem Mem', *)
+(*   wf_Mem maxb td Mem -> free_allocas td Mem als = ret Mem' -> *)
+(*   wf_Mem maxb td Mem'. *)
+(* Proof. *)
+(*   induction als; simpl; intros. *)
+(*     inv H0. auto. *)
 
-    inv_mbind'.
-    symmetry in HeqR.
-    eapply free_preserves_wf_Mem in HeqR; eauto.
-Qed.
+(*     inv_mbind'. *)
+(*     symmetry in HeqR. *)
+(*     eapply free_preserves_wf_Mem in HeqR; eauto. *)
+(* Qed. *)
 
-Lemma free_allocas_preserves_wf_als : forall maxb TD als als0 M M'
-  (Hfree: free_allocas TD M als0 = ret M')
-  (Hwf: wf_als maxb M als),
-  wf_als maxb M' als.
-Proof.
-  induction als0; simpl; intros.
-    inv Hfree. auto.
+(* Lemma free_allocas_preserves_wf_als : forall maxb TD als als0 M M' *)
+(*   (Hfree: free_allocas TD M als0 = ret M') *)
+(*   (Hwf: wf_als maxb M als), *)
+(*   wf_als maxb M' als. *)
+(* Proof. *)
+(*   induction als0; simpl; intros. *)
+(*     inv Hfree. auto. *)
 
-    inv_mbind'.
-    symmetry in HeqR.
-    eapply free_preserves_wf_als in HeqR; eauto.
-Qed.
+(*     inv_mbind'. *)
+(*     symmetry in HeqR. *)
+(*     eapply free_preserves_wf_als in HeqR; eauto. *)
+(* Qed. *)
 
 Lemma perm_mfree_1: forall TD M1 M2 ptr b ofs k p 
   (Hfree : free TD M1 ptr = ret M2) (Hnoalias: MemProps.no_alias_with_blk ptr b)
@@ -2105,6 +2106,44 @@ Proof.
         rewrite HeqR. auto.
 Qed.
 
+Lemma alloc_drop_preserves_mload_aux_inv': forall M M' mb lo hi b
+  (Hal : Mem.alloc M lo hi = (M', mb)) mc ofs gvs1
+  M''
+  (DROP: Mem.drop_perm M' mb lo hi Writable = ret M'')
+  (H : mload_aux M'' mc b ofs = ret gvs1),
+  mload_aux M mc b ofs = ret gvs1 /\ b <> mb \/
+  gvs1 = mcs2uninits mc /\ b = mb.
+Proof.
+  i.
+  ginduction mc; ii; ss.
+  - inv H.
+    destruct (eq_block b mb).
+    + right. split; ss.
+    + left. split; ss.
+  - destruct (Mem.load a M'' b ofs) eqn:T; ss.
+    destruct (mload_aux M'' mc b (ofs + size_chunk a)) eqn:T2; ss.
+    clarify.
+    hexploit Mem.load_drop; try eassumption.
+    { right. right. right. econs. }
+    intro EQ.
+    rewrite EQ in *.
+    exploit Mem.load_valid_access; eauto; intro VALID; des.
+    eapply Mem.valid_access_alloc_inv in VALID; eauto.
+    eapply IHmc in T2; eauto.
+
+    destruct (eq_block b mb).
+    + clarify. right. split; ss.
+      des_ifs. des; ss.
+      erewrite Mem.load_alloc_same' in T; eauto. clarify.
+    + left. split; ss.
+      eapply Mem.valid_access_implies with (p2:=Nonempty) in VALID; eauto; [|econs].
+      apply Mem.valid_access_valid_block in VALID.
+      eapply Mem.load_alloc_unchanged in Hal; eauto.
+      rewrite <- Hal. rewrite T.
+      des; ss. rewrite T2. ss.
+Qed.
+
+
 Lemma mcs2uninits_spec: forall v m mc, In (v, m) (mcs2uninits mc) -> v = Vundef.
 Proof.
   induction mc; simpl; intros.
@@ -2122,6 +2161,24 @@ Lemma alloc_preserves_mload_aux_inv: forall M M' mb lo hi b
 Proof.
   intros.
   eapply alloc_preserves_mload_aux_inv' in H; eauto.
+  destruct H as [H | H]; auto.
+  right.
+  destruct H; subst.
+  split; auto.
+    intros.
+    eapply mcs2uninits_spec; eauto.
+Qed.
+
+Lemma alloc_drop_preserves_mload_aux_inv: forall M M' mb lo hi b
+  (Hal : Mem.alloc M lo hi = (M', mb)) mc ofs gvs1
+  M''
+  (DROP: Mem.drop_perm M' mb lo hi Writable = ret M'')
+  (H : mload_aux M'' mc b ofs = ret gvs1),
+  mload_aux M mc b ofs = ret gvs1 /\ b <> mb \/
+  (forall v m, In (v, m) gvs1 -> v = Vundef) /\ b = mb.
+Proof.
+  intros.
+  eapply alloc_drop_preserves_mload_aux_inv' in H; eauto.
   destruct H as [H | H]; auto.
   right.
   destruct H; subst.
@@ -2158,6 +2215,29 @@ Proof.
     right. split; try tauto. intros. inv H. auto.
 Qed.
 
+Lemma alloca_preserves_mload_inv: forall TD M M' mb align0 gn tsz
+  (Hal : alloca TD M tsz gn align0 = ret (M', mb))
+  gptr gvs1 ty al
+  (H : mload TD M' gptr ty al = ret gvs1),
+  mload TD M gptr ty al = ret gvs1 /\ no_alias_with_blk gptr mb \/
+  (forall v m, In (v, m) gvs1 -> v = Vundef) /\ ~ no_alias_with_blk gptr mb.
+Proof.
+  ii. unfold alloca in *.
+  remember (match GV2int TD Size.ThirtyTwo gn with
+            | ret n => Size.to_Z tsz * n
+            | merror => 0
+            end) as hi. clear Heqhi.
+  des_ifs. unfold Datatypes.option_map, flip in *.
+  des_ifs.
+  unfold mload in *. des_ifs.
+  exploit alloc_drop_preserves_mload_aux_inv; try exact H; eauto; []; i.
+  unfold GV2ptr in *. des_ifs.
+  des.
+  - left. split; ss.
+  - right. split; ss.
+    ii. des. ss.
+Qed.
+
 Lemma malloc_preserves_mload_inv: forall TD M M' mb align0 gn tsz
   (Hal : malloc TD M tsz gn align0 = ret (M', mb))
   gptr gvs1 ty al
@@ -2188,9 +2268,17 @@ Proof.
   apply malloc_inv in H.
   apply Mem.nextblock_alloc in H.
   rewrite H. rewrite Pplus_one_succ_r; auto.
-  (* destruct H as [n [J1 [J2 J3]]]. *)
-  (* apply Mem.nextblock_alloc in J3. *)
-  (* rewrite J3. omega. *)
+Qed.
+
+Lemma nextblock_alloca: forall TD M tsz gn M' align0 mb,
+  alloca TD M tsz gn align0 = ret (M', mb) ->
+  (Mem.nextblock M + 1)%positive = Mem.nextblock M'.
+Proof.
+  intros.
+  apply alloca_inv in H.
+  unfold Datatypes.option_map, flip in *.
+  des_ifs; apply Mem.nextblock_alloc in Heq; apply Mem.nextblock_drop in Heq0;
+    rewrite Heq0; rewrite Heq; rewrite Pplus_one_succ_r; auto.
 Qed.
 
 Lemma malloc_result: forall TD M tsz gn M' align0 mb,
@@ -2202,6 +2290,39 @@ Proof.
   apply Mem.alloc_result in H; auto.
   (* destruct H as [n [J1 [J2 J3]]]. *)
   (* apply Mem.alloc_result in J3; auto. *)
+Qed.
+
+Lemma alloca_result: forall TD M tsz gn M' align0 mb,
+  alloca TD M tsz gn align0 = ret (M', mb) ->
+  mb = Mem.nextblock M.
+Proof.
+  intros.
+  apply alloca_inv in H.
+  unfold Datatypes.option_map, flip in *.
+  des_ifs; apply Mem.alloc_result in Heq; ss.
+  (* destruct H as [n [J1 [J2 J3]]]. *)
+  (* apply Mem.alloc_result in J3; auto. *)
+Qed.
+
+
+Lemma alloc_drop_preserves_mload_aux: forall M M' mb lo hi b
+  (Hal : Mem.alloc M lo hi = (M', mb)) mc ofs gvs1
+  M''
+  (DROP: Mem.drop_perm M' mb lo hi Writable = ret M'')
+  (H : mload_aux M mc b ofs = ret gvs1),
+  mload_aux M'' mc b ofs = ret gvs1.
+Proof.
+  i. ginduction mc; ii; ss.
+  destruct (Mem.load a M b ofs) eqn:LOAD; ss.
+  destruct (mload_aux M mc b (ofs + size_chunk a)) eqn:LOAD_AUX; ss.
+  clarify.
+  exploit Mem.load_drop; try eassumption.
+  { right. right. right. econs. }
+  intro EQ. rewrite EQ in *.
+  exploit Mem.load_alloc_other; eauto; []; intro LOAD1; des.
+  rewrite LOAD1.
+  exploit IHmc; eauto; []; intro MLOAD_AUX1; des.
+  rewrite MLOAD_AUX1. ss.
 Qed.
 
 Lemma alloc_preserves_mload_aux: forall M M' mb lo hi b
@@ -2247,6 +2368,28 @@ Proof.
     eapply Plt_trans; eauto. rewrite <- EQ. rewrite <- Pplus_one_succ_r; apply Plt_succ.
 Qed.
 
+Ltac u_alloca := unfold alloca, Datatypes.option_map, flip in *.
+
+Lemma alloca_preserves_wf_Mem : forall maxb TD M tsz gn align0 M' mb
+  (Hmlc: alloca TD M tsz gn align0 = ret (M', mb))
+  (Hwf: wf_Mem maxb TD M),
+  wf_Mem maxb TD M'.
+Proof.
+  eauto.
+  intros. destruct Hwf as [J1 J2].
+  assert ((Mem.nextblock M + 1)%positive = Mem.nextblock M') as EQ.
+    eapply nextblock_alloca; eauto.
+  split.
+    rewrite <- EQ.
+    intros.
+    eapply alloca_preserves_mload_inv in H; eauto.
+    destruct H as [[G _]| [G _]]; subst; eauto.
+      apply J1 in G. eapply valid_ptrs__trans; eauto. rewrite <- Pplus_one_succ_r; apply Ple_succ.
+      eapply undefs_valid_ptrs; eauto.
+
+    eapply Plt_trans; eauto. rewrite <- EQ. rewrite <- Pplus_one_succ_r; apply Plt_succ.
+Qed.
+
 Lemma malloc_preserves_wf_als : forall maxb TD M M' tsz gn align0 mb als
   (Hmalloc: malloc TD M tsz gn align0 = ret (M', mb))
   (Hbd: (maxb < Mem.nextblock M)%positive) (Hwf: wf_als maxb M als),
@@ -2269,6 +2412,28 @@ Proof.
       rewrite <- Pplus_one_succ_r; eapply Plt_trans; eauto; eapply Plt_succ.
 Qed.
 
+Lemma alloca_preserves_wf_als : forall maxb TD M M' tsz gn align0 mb als
+  (Hmalloc: alloca TD M tsz gn align0 = ret (M', mb))
+  (Hbd: (maxb < Mem.nextblock M)%positive) (Hwf: wf_als maxb M als),
+  wf_als maxb M' (mb::als).
+Proof.
+  intros. destruct Hwf as [J1 J2].
+  split.
+    constructor; auto.
+      intro J. apply J2 in J.
+      apply alloca_result in Hmalloc. subst.
+      destruct J as [_ J3]. eapply Plt_strict; eauto.
+
+    intros.
+    simpl in H.
+    erewrite <- nextblock_alloca; eauto.
+    apply alloca_result in Hmalloc. subst.
+    destruct H as [H | H]; subst.
+      split; eauto. rewrite <- Pplus_one_succ_r; apply Plt_succ.
+      apply J2 in H. destruct H; split; eauto.
+      rewrite <- Pplus_one_succ_r; eapply Plt_trans; eauto; eapply Plt_succ.
+Qed.
+
 Lemma malloc_preserves_wf_lc_in_tail: forall TD M M' tsz gn align0 mb lc
   (Hmalloc: malloc TD M tsz gn align0 = ret (M', mb))
   (Hwf: wf_lc M lc), wf_lc M' lc.
@@ -2279,6 +2444,18 @@ Proof.
   erewrite <- nextblock_malloc with (M':=M'); eauto.
   rewrite <- Pplus_one_succ_r; apply Ple_succ.
 Qed.
+
+Lemma alloca_preserves_wf_lc_in_tail: forall TD M M' tsz gn align0 mb lc
+  (Halloca: alloca TD M tsz gn align0 = ret (M', mb))
+  (Hwf: wf_lc M lc), wf_lc M' lc.
+Proof.
+  unfold wf_lc.
+  intros. apply Hwf in H.
+  eapply valid_ptrs__trans; eauto.
+  erewrite <- nextblock_alloca with (M':=M'); eauto.
+  rewrite <- Pplus_one_succ_r; apply Ple_succ.
+Qed.
+
 
 (* Lemma bounds_malloc: forall TD M tsz gn M' align0 mb *)
 (*   (H: malloc TD M tsz gn align0 = ret (M', mb)), *)
@@ -2335,7 +2512,14 @@ Axiom malloc_mload_aux_undef: forall TD t tsz mcs M gn align0 M' mb gvs gl
   (Hal : malloc TD M tsz gn align0 = ret (M', mb))
   (Hc2v : Opsem.const2GV TD gl (const_undef t) = ret gvs),
   mload_aux M' mcs mb (Int.signed 31 (Int.repr 31 0)) = ret gvs.
-  
+
+Axiom alloca_mload_aux_undef: forall TD t tsz mcs M gn align0 M' mb gvs gl
+  (Hsz: getTypeAllocSize TD t = Some tsz)
+  (Hflatten: flatten_typ TD t = Some mcs)
+  (Hal : alloca TD M tsz gn align0 = ret (M', mb))
+  (Hc2v : Opsem.const2GV TD gl (const_undef t) = ret gvs),
+  mload_aux M' mcs mb (Int.signed 31 (Int.repr 31 0)) = ret gvs.
+
 Lemma malloc_mload_undef: forall TD t tsz M gn align0 M' mb gvs gl S
   (Hwft: wf_typ S TD t)
   (Hsz: getTypeAllocSize TD t = Some tsz)
@@ -2351,6 +2535,21 @@ Proof.
   eapply malloc_mload_aux_undef; eauto.
 Qed.
 
+Lemma alloca_mload_undef: forall TD t tsz M gn align0 M' mb gvs gl S
+  (Hwft: wf_typ S TD t)
+  (Hsz: getTypeAllocSize TD t = Some tsz)
+  (Hal : alloca TD M tsz gn align0 = ret (M', mb))
+  (Hc2v : Opsem.const2GV TD gl (const_undef t) = ret gvs),
+  mload TD M' (blk2GV TD mb) t align0 = ret gvs.
+Proof.
+  intros.
+  unfold mload. rewrite simpl_blk2GV. simpl.
+  apply flatten_typ_total in Hwft.
+  destruct Hwft as [gv Hwft].
+  rewrite Hwft.
+  eapply alloca_mload_aux_undef; eauto.
+Qed.
+
 Lemma mload_aux_malloc_same': forall TD M M' mb align0 gn tsz mcs t
   (Hsz: getTypeAllocSize TD t = Some tsz)
   (Hflatten: flatten_typ TD t = Some mcs)
@@ -2358,11 +2557,25 @@ Lemma mload_aux_malloc_same': forall TD M M' mb align0 gn tsz mcs t
   exists gvs1, mload_aux M' mcs mb (Int.signed 31 (Int.repr 31 0)) = ret gvs1.
 Proof.
   intros.
-  assert (exists gvs, Opsem.const2GV TD nil (const_undef t) = ret gvs) 
+  assert (exists gvs, Opsem.const2GV TD nil (const_undef t) = ret gvs)
     as J.
     unfold Opsem.const2GV. simpl. unfold gundef. rewrite Hflatten. eauto.
   destruct J as [gvs J].
   exists gvs. eapply malloc_mload_aux_undef; eauto.
+Qed.
+
+Lemma mload_aux_alloca_same': forall TD M M' mb align0 gn tsz mcs t
+  (Hsz: getTypeAllocSize TD t = Some tsz)
+  (Hflatten: flatten_typ TD t = Some mcs)
+  (Hal : alloca TD M tsz gn align0 = ret (M', mb)),
+  exists gvs1, mload_aux M' mcs mb (Int.signed 31 (Int.repr 31 0)) = ret gvs1.
+Proof.
+  intros.
+  assert (exists gvs, Opsem.const2GV TD nil (const_undef t) = ret gvs) 
+    as J.
+    unfold Opsem.const2GV. simpl. unfold gundef. rewrite Hflatten. eauto.
+  destruct J as [gvs J].
+  exists gvs. eapply alloca_mload_aux_undef; eauto.
 Qed.
 
 Lemma promotable_alloc_encode_decode_ident_aux: forall (M : mem) (M' : mem)
@@ -3084,106 +3297,106 @@ Qed.
 
 (**************************************************)
 (* Properties of free_allocas *)
-Lemma perm_mfree_alloca_3: forall TD b ofs k p als M1 M2 
-  (Hfree : free_allocas TD M1 als = ret M2),
-  Mem.perm M2 b ofs k p -> Mem.perm M1 b ofs k p.
-Proof.
-  induction als; simpl; intros.
-    congruence.
+(* Lemma perm_mfree_alloca_3: forall TD b ofs k p als M1 M2  *)
+(*   (Hfree : free_allocas TD M1 als = ret M2), *)
+(*   Mem.perm M2 b ofs k p -> Mem.perm M1 b ofs k p. *)
+(* Proof. *)
+(*   induction als; simpl; intros. *)
+(*     congruence. *)
 
-    inv_mbind.
-    eapply IHals in H1; eauto using perm_mfree_3.
-Qed.
+(*     inv_mbind. *)
+(*     eapply IHals in H1; eauto using perm_mfree_3. *)
+(* Qed. *)
 
-Lemma perm_mfree_alloca_2: forall TD als M1 M2 
-  (Hfree : free_allocas TD M1 als = ret M2),
-  forall b lo hi, 
-    In b als -> Mem.bounds M1 b = (lo, hi) ->
-    forall ofs k p, lo <= ofs < hi -> ~Mem.perm M2 b ofs k p.
-Proof.
-  induction als; simpl; intros.
-    congruence.
+(* Lemma perm_mfree_alloca_2: forall TD als M1 M2  *)
+(*   (Hfree : free_allocas TD M1 als = ret M2), *)
+(*   forall b lo hi,  *)
+(*     In b als -> Mem.bounds M1 b = (lo, hi) -> *)
+(*     forall ofs k p, lo <= ofs < hi -> ~Mem.perm M2 b ofs k p. *)
+(* Proof. *)
+(*   induction als; simpl; intros. *)
+(*     congruence. *)
 
-    inv_mbind. symmetry_ctx.
-    destruct H as [H | H]; subst.
-      destruct TD. unfold free in HeqR. simpl in HeqR.
-      rewrite H0 in HeqR.
-      eapply Mem.perm_free_2 with (p:=p) in HeqR; eauto.
-      intro J.
-      eapply perm_mfree_alloca_3 in H3; eauto.
+(*     inv_mbind. symmetry_ctx. *)
+(*     destruct H as [H | H]; subst. *)
+(*       destruct TD. unfold free in HeqR. simpl in HeqR. *)
+(*       rewrite H0 in HeqR. *)
+(*       eapply Mem.perm_free_2 with (p:=p) in HeqR; eauto. *)
+(*       intro J. *)
+(*       eapply perm_mfree_alloca_3 in H3; eauto. *)
 
-      apply bounds_mfree with (b:=b) in HeqR; auto.
-      eapply IHals; eauto. congruence.
-Qed.
+(*       apply bounds_mfree with (b:=b) in HeqR; auto. *)
+(*       eapply IHals; eauto. congruence. *)
+(* Qed. *)
 
-Lemma perm_mfree_alloca_1: forall TD als M1 M2 
-  (Hfree : free_allocas TD M1 als = ret M2),
-  forall b ofs k p, 
-    ~ In b als ->
-    Mem.perm M1 b ofs k p ->
-    Mem.perm M2 b ofs k p.
-Proof.
-  induction als; simpl; intros.
-    congruence.
+(* Lemma perm_mfree_alloca_1: forall TD als M1 M2  *)
+(*   (Hfree : free_allocas TD M1 als = ret M2), *)
+(*   forall b ofs k p,  *)
+(*     ~ In b als -> *)
+(*     Mem.perm M1 b ofs k p -> *)
+(*     Mem.perm M2 b ofs k p. *)
+(* Proof. *)
+(*   induction als; simpl; intros. *)
+(*     congruence. *)
 
-    inv_mbind. symmetry_ctx.
-    eapply IHals; eauto.
-    eapply perm_mfree_1; eauto.
-    unfold blk2GV, ptr2GV, val2GV. simpl. eauto.
-Qed.
+(*     inv_mbind. symmetry_ctx. *)
+(*     eapply IHals; eauto. *)
+(*     eapply perm_mfree_1; eauto. *)
+(*     unfold blk2GV, ptr2GV, val2GV. simpl. eauto. *)
+(* Qed. *)
 
-Lemma range_perm_mfree_alloca_1: forall TD M1 M2 als b lo hi k p 
-  (Hfree : free_allocas TD M1 als = ret M2) (Hnotin: ~ In b als)
-  (Hperm: Mem.range_perm M1 b lo hi k p),
-  Mem.range_perm M2 b lo hi k p.
-Proof.
-  unfold Mem.range_perm.
-  intros.
-  apply Hperm in H.
-  eapply perm_mfree_alloca_1; eauto.
-Qed.
+(* Lemma range_perm_mfree_alloca_1: forall TD M1 M2 als b lo hi k p  *)
+(*   (Hfree : free_allocas TD M1 als = ret M2) (Hnotin: ~ In b als) *)
+(*   (Hperm: Mem.range_perm M1 b lo hi k p), *)
+(*   Mem.range_perm M2 b lo hi k p. *)
+(* Proof. *)
+(*   unfold Mem.range_perm. *)
+(*   intros. *)
+(*   apply Hperm in H. *)
+(*   eapply perm_mfree_alloca_1; eauto. *)
+(* Qed. *)
   
-Lemma bounds_free_alloca: forall TD als M1 M2,
-  free_allocas TD M1 als = ret M2 ->
-  forall b, Mem.bounds M2 b = Mem.bounds M1 b.
-Proof.
-  induction als; simpl; intros.
-    congruence.
+(* Lemma bounds_free_alloca: forall TD als M1 M2, *)
+(*   free_allocas TD M1 als = ret M2 -> *)
+(*   forall b, Mem.bounds M2 b = Mem.bounds M1 b. *)
+(* Proof. *)
+(*   induction als; simpl; intros. *)
+(*     congruence. *)
 
-    inv_mbind. symmetry_ctx.
-    apply IHals with (b:=b) in H1.
-    apply bounds_mfree with (b:=b) in HeqR.
-    congruence.
-Qed.
+(*     inv_mbind. symmetry_ctx. *)
+(*     apply IHals with (b:=b) in H1. *)
+(*     apply bounds_mfree with (b:=b) in HeqR. *)
+(*     congruence. *)
+(* Qed. *)
 
-Lemma free_allocas_preserves_mload: forall TD al t mb gv als Mem' Mem
-  (H0 : ~ In mb als)
-  (H1 : free_allocas TD Mem als = ret Mem')
-  (H2 : mload TD Mem (blk2GV TD mb) t al = ret gv),
-  mload TD Mem' (blk2GV TD mb) t al = ret gv.
-Proof.
-  induction als; simpl; intros.
-    inv H1. auto.
+(* Lemma free_allocas_preserves_mload: forall TD al t mb gv als Mem' Mem *)
+(*   (H0 : ~ In mb als) *)
+(*   (H1 : free_allocas TD Mem als = ret Mem') *)
+(*   (H2 : mload TD Mem (blk2GV TD mb) t al = ret gv), *)
+(*   mload TD Mem' (blk2GV TD mb) t al = ret gv. *)
+(* Proof. *)
+(*   induction als; simpl; intros. *)
+(*     inv H1. auto. *)
 
-    inv_mbind'.
-    apply IHals in H3; auto.
-    eapply free_preserves_mload; eauto.
-    rewrite simpl_blk2GV. simpl. tauto.
-Qed.
+(*     inv_mbind'. *)
+(*     apply IHals in H3; auto. *)
+(*     eapply free_preserves_mload; eauto. *)
+(*     rewrite simpl_blk2GV. simpl. tauto. *)
+(* Qed. *)
 
-Lemma free_allocas_preserves_encode_decode_ident: forall TD mb ty al als M M'
-  (Hnoalias: ~ In mb als)
-  (Hid: encode_decode_ident TD M (blk2GV TD mb) ty al)
-  (Hfrees: free_allocas TD M als = Some M'),
-  encode_decode_ident TD M' (blk2GV TD mb) ty al.
-Proof.
-  induction als; simpl; intros.
-    inv Hfrees. auto.
+(* Lemma free_allocas_preserves_encode_decode_ident: forall TD mb ty al als M M' *)
+(*   (Hnoalias: ~ In mb als) *)
+(*   (Hid: encode_decode_ident TD M (blk2GV TD mb) ty al) *)
+(*   (Hfrees: free_allocas TD M als = Some M'), *)
+(*   encode_decode_ident TD M' (blk2GV TD mb) ty al. *)
+(* Proof. *)
+(*   induction als; simpl; intros. *)
+(*     inv Hfrees. auto. *)
 
-    inv_mbind.
-    apply IHals in H0; auto.
-    eapply free_preserves_encode_decode_ident; eauto.
-    rewrite simpl_blk2GV. simpl. tauto.
-Qed.
+(*     inv_mbind. *)
+(*     apply IHals in H0; auto. *)
+(*     eapply free_preserves_encode_decode_ident; eauto. *)
+(*     rewrite simpl_blk2GV. simpl. tauto. *)
+(* Qed. *)
 
 End MemProps.

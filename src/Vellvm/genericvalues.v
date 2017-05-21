@@ -1232,6 +1232,18 @@ Definition malloc (TD:TargetData) (M:mem) (bsz:sz) (gn:GenericValue) (al:align)
             | None => 0
           end).
 
+Definition alloca (TD:TargetData) (M:mem) (bsz:sz) (gn:GenericValue) (al:align)
+  : option (mem * mblock)%type :=
+  let hi :=
+      (match GV2int TD Size.ThirtyTwo gn with
+       | Some n => (Size.to_Z bsz) * n
+       | None => 0
+       end)%Z
+  in
+  let (M', nb) := (Mem.alloc M 0 hi) in
+  option_map ((flip pair) nb) (Mem.drop_perm M' nb 0 hi Writable)
+.
+
 Definition malloc_one (TD:TargetData) (M:mem) (bsz:sz) (al:align)
   : option (mem * mblock)%type :=
   Some (Mem.alloc M 0 (Size.to_Z bsz)).
@@ -1253,10 +1265,8 @@ Fixpoint free_allocas (TD:TargetData) (Mem:mem) (allocas:list mblock)
 match allocas with
 | nil => Some Mem
 | alloca::allocas' =>
-  match (free TD Mem (blk2GV TD alloca)) with
-  | Some Mem' => free_allocas TD Mem' allocas'
-  | None => None
-  end
+  let (lo, hi) := Mem.bounds Mem alloca in
+  free_allocas TD (Mem.unchecked_free Mem alloca lo hi) allocas'
 end.
 
 Fixpoint mload_aux M (mc:list memory_chunk) b ofs : option GenericValue :=
@@ -2268,6 +2278,20 @@ Lemma malloc_inv : forall TD Mem0 tsz gn align0 Mem' mb,
         end = (Mem', mb).
 Proof.
   intros. inv H. auto.
+Qed.
+
+Lemma alloca_inv : forall TD Mem0 tsz gn align0 Mem' mb,
+  alloca TD Mem0 tsz gn align0 = ret (Mem', mb) ->
+  let hi :=
+  match GV2int TD Size.ThirtyTwo gn with
+  | ret n => (Size.to_Z tsz * n)%Z
+  | merror => 0%Z
+  end in
+  let (M', nb) := Mem.alloc Mem0 0 hi in
+  option_map (flip pair nb) (Mem.drop_perm M' nb 0 hi Writable) = ret (Mem', mb)
+.
+Proof.
+  intros. unfold alloca in *. eauto.
 Qed.
 
 Lemma store_inv : forall TD Mem0 gvp t gv align Mem',
