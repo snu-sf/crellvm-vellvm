@@ -181,7 +181,7 @@ Proof.
   intro Hop.
   destruct CurCmds.
     destruct Hundef as
-      [Hundef | [Hundef | [Hundef | [J | [J | [J | J]]]]]];
+      [Hundef | [Hundef | [Hundef | [J | [J | [J | [J | Hundef]]]]]]];
       try solve [inversion J].
       destruct Terminator; tinv Hundef.
       destruct ECS; tinv Hundef.
@@ -206,9 +206,14 @@ Proof.
       destruct Terminator; tinv Hundef.
       inv Hop.
 
+      destruct Terminator; tinv Hundef.
+      inversion Hop. subst.
+      rewrite H16 in Hundef.
+      inv H17. rewrite INT in Hundef. inv Hundef.
+      
     destruct Hundef as
       [Hundef | [Hundef | [Hundef | [Hundef |
-        [Hundef | [Hundef | Hundef]]]]]];
+        [Hundef | [Hundef | [Hundef | Hundef]]]]]]];
       tinv Hundef.
       destruct CurBB as [? [? ? t]]; tinv Hundef.
       destruct t; tinv Hundef.
@@ -284,7 +289,7 @@ Proof.
 
           inv Hop.
             symmetry_ctx. uniq_result. 
-            symmetry_ctx. uniq_result. 
+            symmetry_ctx. uniq_result.
 Qed.
 
 Lemma undefined_state__stuck': forall St cfg
