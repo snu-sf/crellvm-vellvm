@@ -330,12 +330,15 @@ match PNs with
   match (getValueViaBlockFromPHINode (insn_phi id0 t vls) b) with
   | None => None
   | Some v =>
-      match (getOperandValue TD v locals globals,
-             getIncomingValuesForBlockFromPHINodes TD PNs b globals locals)
-      with
-      | (Some gv1, Some idgvs) => Some ((id0,gv1)::idgvs)
-      | _ => None
-      end
+    match (getOperandValue TD v locals globals,
+           getIncomingValuesForBlockFromPHINodes TD PNs b globals locals)
+    with
+    | (Some gv1, Some idgvs) =>
+      if (gv_chunks_match_typb TD gv1 t)
+      then Some ((id0,gv1)::idgvs)
+      else None
+    | _ => None
+    end
   end
 end.
 
