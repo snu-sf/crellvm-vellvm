@@ -2798,6 +2798,18 @@ Proof.
   eapply initializeFrameValues__total_aux with (la1:=nil); eauto.
 Qed.
 
+Lemma free_allocas_not_stuck
+      TD m0 als
+  :
+    exists m1, free_allocas TD m0 als = Some m1
+.
+Proof.
+  destruct TD.
+  ginduction als; ii; ss.
+  - esplits; eauto.
+  - des_ifs; esplits; eauto.
+Qed.
+
 Definition undefined_state (cfg: Config) (S : State): Prop :=
 match cfg with
 | {| CurTargetData := td; CurProducts := ps; Globals := gl; FunTable := fs |} =>
@@ -2962,6 +2974,27 @@ Ltac undefbehave := unfold undefined_state; simpl;
     right; right; right; right; right; right; right; auto |
     right; right; right; right; right; right; right; right; auto
   ].
+
+Lemma alloca_no_fail
+      TD m0 s gv al
+  :
+    exists m1 nb,
+      <<ALLOCA: alloca TD m0 s gv al = Some (m1, nb)>>
+.
+Proof.
+  unfold alloca.
+  remember (match GV2int TD Size.ThirtyTwo gv with
+            | ret n => Size.to_Z s * n
+            | merror => 0
+            end) as hi. clear Heqhi.
+  des_ifs.
+  unfold flip.
+  unfold Datatypes.option_map.
+  hexploit Mem.range_perm_drop_2; eauto; revgoals.
+  { i; des. inv X. rewrite H. esplits; eauto. }
+  ii.
+  eapply Mem.perm_alloc_2; eauto.
+Qed.
 
 Lemma progress : forall cfg S1 (HwfCfg: wf_Config cfg),
   wf_State cfg S1 ->
@@ -3501,7 +3534,7 @@ Proof.
       eapply getOperandValue_inCmdOps_isnt_stuck; eauto.
         simpl; auto.
     destruct J as [gn J].
-    remember (malloc (los, nts) M asz gn a) as R.
+    remember (alloca (los, nts) M asz gn a) as R.
     destruct R as [[M' mb] |].
       left.
       exists
@@ -3520,7 +3553,8 @@ Proof.
       exists events.E0.
       eauto.
 
-      inv HeqR0.
+      exfalso.
+      exploit alloca_no_fail; eauto; []; i; des. rewrite ALLOCA in *. clarify.
       (* right. *)
       (* unfold undefined_state. *)
       (* right. rewrite J. rewrite J2. right. right. left. exists gn. *)

@@ -16,6 +16,7 @@ Require Import targetdata_props.
 Require Import typings_props.
 Require Import genericvalues_props.
 Require Import memory_sim.
+Require Import sflib.
 
 Import LLVMinfra.
 Import LLVMgv.
@@ -1769,6 +1770,27 @@ Proof.
     clear - Hmsim1 Hwfmi H0 J H4.
     inv Hwfmi.
     eapply MoreMem.free_inj; eauto.
+Qed.
+
+(* The sb_ds_trans_lib.mem_simulation__free should use this lemma. *)
+Lemma mem_inj__unchecked_free : forall mi Mem0 M2 Mem' mgb hi lo
+  (b2 : Values.block) (delta : Z) blk,
+  wf_sb_mi mgb mi Mem0 M2 ->
+  MoreMem.mem_inj mi Mem0 M2 ->
+  Mem.unchecked_free Mem0 blk lo hi = Mem' ->
+  (lo, hi) = Mem.bounds Mem0 blk ->
+  mi blk = ret (b2, delta) ->
+  exists Mem2',
+    Mem.unchecked_free M2 b2 (lo+delta) (hi+delta) = Mem2' /\
+    wf_sb_mi mgb mi Mem' Mem2' /\
+    MoreMem.mem_inj mi Mem' Mem2'.
+Proof.
+  ii.
+  esplits; eauto.
+  - inv H. econs; eauto.
+  - eapply MoreMem.unchecked_free_inj; eauto.
+    + inv H; ss.
+    + inv H; ss.
 Qed.
 
 Lemma mem_inj__pfree : forall mi Mem0 M2 Mem' mgb hi lo
