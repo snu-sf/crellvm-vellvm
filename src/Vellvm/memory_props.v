@@ -1426,6 +1426,26 @@ match gvs1, gvs1' with
 | _, _ => False
 end.
 
+Axiom mstore_mload_same: forall
+      td Mem mp2 typ1 gv1 align1 Mem'
+      (MSTORE: mstore td Mem mp2 typ1 gv1 align1 = ret Mem'),
+    <<MLOAD: mload td Mem' mp2 typ1 align1 = ret gv1>>
+.
+
+Axiom mstore_aux_never_produce_new_ptr: forall
+      TD mem0 mem1
+      nptr ch val b o
+      (MEM_NOALIAS: forall ptr ty a gv,
+          mload TD mem0 ptr ty a = Some gv ->
+          MemProps.no_alias nptr gv)
+      (STORE_AUX: mstore_aux mem0 ch val b o = Some mem1)
+      (NOALIAS: MemProps.no_alias nptr val)
+  ,
+    forall ptr ty a gv,
+    mload TD mem1 ptr ty a = Some gv ->
+    MemProps.no_alias nptr gv
+.
+
 Lemma store_preserves_mload_aux_inv': forall b1 b2 v2 m2 Mem' Mem ofs2 
   (Hst: Mem.store m2 Mem b2 ofs2 v2 = ret Mem') mc ofs1 gvs0,
   mload_aux Mem' mc b1 ofs1 = ret gvs0 ->
@@ -3203,6 +3223,14 @@ Proof.
     apply Pos.lt_gt; rewrite <- Pplus_one_succ_r; apply Pos.lt_1_succ.
     rewrite <- Pplus_one_succ_r; apply Plt_succ.
 Qed.
+
+Axiom wf_globals_const2GV: forall
+    gmax gl TD cnst gv
+    (GLOBALS: genericvalues_inject.wf_globals gmax gl)
+    (C2G: const2GV TD gl cnst = Some gv)
+  ,
+    <<VALID_PTR: MemProps.valid_ptrs (gmax + 1)%positive gv>>
+.
 
 Lemma params2GVs_preserves_no_alias: forall maxb gl
   (Hwfg : wf_globals maxb gl) los nts lc mb (Hinbound: (maxb < mb)%positive) S F Ps tavl
