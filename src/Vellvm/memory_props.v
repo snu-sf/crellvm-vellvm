@@ -3224,12 +3224,11 @@ Proof.
     rewrite <- Pplus_one_succ_r; apply Plt_succ.
 Qed.
 
-Axiom wf_globals_const2GV: forall
-    gmax gl TD cnst gv
-    (GLOBALS: genericvalues_inject.wf_globals gmax gl)
-    (C2G: const2GV TD gl cnst = Some gv)
+Axiom zeroconst2GV_no_ptr: forall
+      TD t g
+      (ZCGV: zeroconst2GV TD t = Some g)
   ,
-    <<VALID_PTR: MemProps.valid_ptrs (gmax + 1)%positive gv>>
+    <<NOPTR: MemProps.no_embedded_ptrs g>>
 .
 
 Lemma params2GVs_preserves_no_alias: forall maxb gl
