@@ -175,22 +175,6 @@ Proof.
     inv H. rewrite (IHlist_forall2); auto.
 Qed.
 
-Lemma proj_bytes_not_inject:
-  forall f vl vl',
-  list_forall2 (memval_inject f) vl vl' ->
-  proj_bytes vl = None -> proj_bytes vl' <> None -> In Undef vl.
-Proof.
-  induction 1; simpl; intros.
-    congruence.
-    inv H; try congruence; auto.
-      remember (proj_bytes al) as R.
-      remember (proj_bytes bl) as R'.
-      destruct R; destruct R';
-        try solve [inversion H1 | inversion H2 | contradict H2; auto].
-        right. eapply IHlist_forall2; eauto.
-        congruence.
-Qed.
-
 (* Properties of proj_pointer *)
 Definition meminj_no_overlap (f: meminj) : Prop :=
   forall b1 b1' delta1 b2 b2' delta2,
@@ -366,14 +350,6 @@ Proof.
 
   exploit check_value_iptr_inject_false. eexact H. eauto. eauto. 
   intro. rewrite H3. econstructor; eauto.  
-Qed.
-
-Lemma proj_value_undef:
-  forall vl, In Undef vl -> proj_value Q32 vl = Vundef.
-Proof.
-  intros; unfold proj_value.
-  destruct vl; auto. destruct m; auto. 
-  rewrite check_value_undef. auto. auto.
 Qed.
 
 (* Properties of encode/decode val *)
@@ -579,105 +555,9 @@ Proof.
   repeat (rewrite Maps.PMap.gso; auto).
 Qed.
 
-Lemma store_unmapped_inj:
-  forall f chunk m1 b1 ofs v1 n1 m2,
-  mem_inj f m1 m2 ->
-  store chunk m1 b1 ofs v1 = Some n1 ->
-  f b1 = None ->
-  mem_inj f n1 m2.
-Proof.
-  intros. inversion H.
-  constructor.
-(* access *)
-  eauto with mem.
-(* mem_contents *)
-  intros. 
-  rewrite (store_mem_contents _ _ _ _ _ _ H0).
-  rewrite Maps.PMap.gso. eauto with mem. 
-  congruence.
-Qed.
-
-Lemma store_outside_inj:
-  forall f m1 m2 chunk b ofs v m2',
-  mem_inj f m1 m2 ->
-  (forall b' delta ofs' pk,
-    f b' = Some(b, delta) ->
-    perm m1 b' ofs' pk Nonempty ->
-    ofs' + delta < ofs \/ ofs' + delta >= ofs + size_chunk chunk) ->
-  store chunk m2 b ofs v = Some m2' ->
-  mem_inj f m1 m2'.
-Proof.
-  intros. inversion H. constructor.
-(* access *)
-  eauto with mem.
-(* mem_contents *)
-  intros. 
-  rewrite (store_mem_contents _ _ _ _ _ _ H1).
-  destruct (peq b2 b). subst b2.
-  rewrite Maps.PMap.gss.
-  rewrite setN_outside. eauto. 
-  rewrite encode_val_length. rewrite <- size_chunk_conv. 
-  eapply H0; eauto.
-  rewrite Maps.PMap.gso; auto.
-Qed.
-
 (** Preservation of allocations *)
 
-Lemma alloc_right_inj:
-  forall f m1 m2 lo hi b2 m2',
-  mem_inj f m1 m2 ->
-  alloc m2 lo hi = (m2', b2) ->
-  mem_inj f m1 m2'.
-Proof.
-  intros. injection H0. intros NEXT MEM.
-  inversion H. constructor.
-(* access *)
-  intros. eauto with mem. 
-(* mem_contents *)
-  intros.
-  assert (valid_access m2 (Mint 7) b0 (ofs + delta) Nonempty).
-  {
-    eapply mi_access0; eauto.
-    split. simpl. red; intros. replace (bytesize_chunk 7) with 1 in H3 by auto. assert (ofs0 = ofs) by omega.
-    congruence.
-    simpl. apply Zone_divide.
-  }
-  assert (valid_block m2 b0) by eauto with mem.
-  rewrite <- MEM; simpl. rewrite Maps.PMap.gso. eauto with mem.
-  rewrite NEXT. eauto with mem. 
-Qed.
-
 (** Preservation of frees *)
-
-Lemma free_right_inj:
-  forall f m1 m2 b lo hi m2',
-  mem_inj f m1 m2 ->
-  free m2 b lo hi = Some m2' ->
-  (forall b1 delta ofs p,
-    f b1 = Some(b, delta) -> perm m1 b1 ofs Cur p ->
-    lo <= ofs + delta < hi -> False) ->
-  mem_inj f m1 m2'.
-Proof.
-  intros. exploit free_result; eauto. intro FREE. inversion H. constructor.
-(* access *)
-  intros. exploit mi_access0; eauto. intros [RG AL]. split; auto.
-  red; intros. eapply perm_free_1; eauto. 
-  destruct (peq b2 b); auto. subst b. right.
-  destruct (zlt ofs0 lo); auto. destruct (zle hi ofs0); auto.
-  elimtype False. eapply H1 with (ofs := ofs0 - delta). eauto. 
-  apply H3. omega. omega.
-(* mem_contents *)
-  intros. rewrite FREE; simpl.
-  specialize (mi_memval0 _ _ _ _ H2 H3).
-  assert (b=b2 /\ lo <= ofs+delta < hi \/ (b<>b2 \/ ofs+delta<lo \/ hi <= ofs+delta)).
-  {
-    assert (lo <= ofs+delta < hi \/ ofs + delta < lo \/ hi <= ofs + delta) by omega.
-    destruct (peq b b2); tauto.
-  }
-  destruct H4. destruct H4. subst b2.
-  specialize (H1 _ _ _ _ H2 H3). elimtype False; auto.
-  auto.
-Qed.
 
 Lemma free_inj:
   forall f m1 m2 b1 b2 delta lo hi m1' m2',
@@ -814,30 +694,6 @@ Proof.
   rewrite Maps.PMap.gsspec in *. des_ifs.
 Qed.
 
-Lemma valid_access_noalias_free_after
-      m0 b0 lo hi ofs p chunk
-      (NOALIAS: (zle lo (ofs + size_chunk chunk) && zlt ofs hi) = false)
-      (VALID: valid_access m0 chunk b0 ofs p)
-  :
-    <<VALID: valid_access (unchecked_free m0 b0 lo hi) chunk b0 ofs p>>
-.
-Proof.
-  unfold valid_access in *.
-  des. split; ss. clear VALID0.
-  ii.
-  exploit VALID; eauto; []; intro NEW; des. clear VALID.
-  unfold unchecked_free, perm in *. ss.
-  rewrite Maps.PMap.gsspec in *. des_ifs.
-  ss.
-  apply andb_true_iff in Heq. des.
-  apply andb_false_iff in NOALIAS.
-  des.
-  - unfold proj_sumbool in *. des_ifs.
-    omega.
-  - unfold proj_sumbool in *. des_ifs.
-    omega.
-Qed.
-
 Lemma unchecked_free_inj:
   forall f m1 m2 b1 b2 delta lo hi m1' m2',
   meminj_no_overlap f ->
@@ -912,25 +768,6 @@ Proof.
 Qed.
 
 Global Opaque load alloc.
-
-Lemma free_left_nonmap_inj:
-  forall f m1 m2 b lo hi m1' (Hprop: f b = None),
-  mem_inj f m1 m2 ->
-  Mem.free m1 b lo hi = Some m1' ->
-  mem_inj f m1' m2.
-Proof.
-  intros. exploit Mem.free_result; eauto. intro FREE. inversion H. constructor.
-(* access *)
-  intros. eauto with mem.
-(* mem_contents *)
-  intros. rewrite FREE; simpl.
-  assert (b=b1 /\ lo <= ofs < hi \/ (b<>b1 \/ ofs<lo \/ hi <= ofs))
-    by (assert (lo <= ofs < hi \/ ofs<lo \/ hi <= ofs) by omega; tauto).
-  destruct H3.
-    destruct H3. subst b1. uniq_result.
-    apply mi_memval; auto.
-    eapply Mem.perm_free_3; eauto.
-Qed.
 
 End MoreMem.
 
