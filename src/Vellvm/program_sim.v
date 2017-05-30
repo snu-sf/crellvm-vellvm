@@ -181,7 +181,7 @@ Proof.
   intro Hop.
   destruct CurCmds.
     destruct Hundef as
-      [Hundef | [Hundef | [Hundef | [J | [J | [J | [J | Hundef]]]]]]];
+      [Hundef | [Hundef | [Hundef | [J | [J | [J | [J | [Hundef | [Hundef | J]]]]]]]]];
       try solve [inversion J].
       destruct Terminator; tinv Hundef.
       destruct ECS; tinv Hundef.
@@ -211,9 +211,16 @@ Proof.
       rewrite H16 in Hundef.
       inv H17. rewrite INT in Hundef. inv Hundef.
       
+      destruct Terminator; tinv Hundef.
+      inversion Hop. subst.
+      rewrite H17 in Hundef.
+      unfold Opsem.get_switch_branch in H18.
+      destruct typ5; (try inv H18).
+      destruct (GV2int CurTargetData sz5 ValGV). eauto. inv H0.
+
     destruct Hundef as
       [Hundef | [Hundef | [Hundef | [Hundef |
-        [Hundef | [Hundef | [Hundef | Hundef]]]]]]];
+        [Hundef | [Hundef | [Hundef | [Hundef | [Hundef | Hundef]]]]]]]]];
       tinv Hundef.
       destruct CurBB as [? [? ? t]]; tinv Hundef.
       destruct t; tinv Hundef.
@@ -290,6 +297,14 @@ Proof.
           inv Hop.
             symmetry_ctx. uniq_result. 
             symmetry_ctx. uniq_result.
+
+      destruct_cmd c; tinv Hundef.
+        remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R.
+        destruct R; tinv Hundef.
+        remember (GV2int CurTargetData Size.One g) as R.
+        destruct R; tinv Hundef.
+        inv Hop. rewrite H19 in HeqR. inv HeqR.
+        inversion H22. rewrite <- HeqR0 in INT. inv INT.
 Qed.
 
 Lemma undefined_state__stuck': forall St cfg
