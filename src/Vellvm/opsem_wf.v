@@ -1932,7 +1932,7 @@ Case "sReturnVoid".
 
 Focus.
 Case "sBranch".
-  apply decide_nonzero_gvzero_equiv in H0.
+  apply decide_nonzero_implies_gvzero in H0.
   destruct_wfCfgState HwfCfg HwfS1.
   remember (inscope_of_tmn F 
                            (l3, stmts_intro ps3 (cs3' ++ nil) (insn_br bid Cond l1 l2))
@@ -2897,24 +2897,25 @@ match cfg with
     | _ => False
     end
   | _ => False
-  end \/
-  match S with
-  | {|
-      EC := {|
-             CurCmds := insn_select id v0 t v1 v2 :: cs;
-             Locals := lc
-           |}
-    |} =>
-    match getOperandValue td v0 lc gl with
-    | Some ValGV =>
-      match GV2int td Size.One ValGV with
-      | Some ValsZ => False
-      | None => True
-      end
-    | _ => False
-    end
-  | _ => False
   end
+  (* \/ *)
+  (* match S with *)
+  (* | {| *)
+  (*     EC := {| *)
+  (*            CurCmds := insn_select id v0 t v1 v2 :: cs; *)
+  (*            Locals := lc *)
+  (*          |} *)
+  (*   |} => *)
+  (*   match getOperandValue td v0 lc gl with *)
+  (*   | Some ValGV => *)
+  (*     match GV2int td Size.One ValGV with *)
+  (*     | Some ValsZ => False *)
+  (*     | None => True *)
+  (*     end *)
+  (*   | _ => False *)
+  (*   end *)
+  (* | _ => False *)
+  (* end *)
 end.
 
 Ltac undefbehave := unfold undefined_state; simpl;
@@ -3120,7 +3121,7 @@ Proof.
                                 stmts_intro ps' cs' tmn') cs' tmn' lc'
               als) ecs M).
       exists events.E0. 
-      exploit decide_nonzero_gvzero_equiv. apply Hnzero.
+      exploit decide_nonzero_implies_gvzero. apply Hnzero.
       intros. 
       rewrite <- H in *.
       assert ((if negb decision then l3 else l2) = (if decision then l2 else l3)).
@@ -3271,7 +3272,6 @@ Proof.
       (* destruct typ5; rewrite Hget.  *)
       right. right. right.
       right. right. right. right. right. right. right.
-      left.
       destruct typ5; rewrite Hget; auto.
       destruct (GV2int (los,nts) sz5 ValGV).
       inversion Heqtgt. auto.
@@ -3830,7 +3830,8 @@ Proof.
           ECS := ecs;
           Mem := M |}.
       exists events.E0. eauto.
-      right. simpl. repeat right. rewrite J. rewrite Hcint. auto.
+      (* right. simpl. repeat right. rewrite J. rewrite Hcint. auto. *)
+      admit.
   SCase "call".
     assert (exists gvs, params2GVs (los, nts) p lc gl = Some gvs) as G.
       eapply params2GVs_isnt_stuck; eauto.
@@ -3915,8 +3916,8 @@ Proof.
      right.
      unfold undefined_state.
      right. rewrite J'. rewrite G. right. right. right. right. right. left.
-     rewrite <- HeqHlk. rewrite <- HeqHelk. split; auto.
-Qed.
+     rewrite <- HeqHlk. rewrite <- HeqHelk. auto.
+Admitted.
 
 End OpsemPP. End OpsemPP.
 

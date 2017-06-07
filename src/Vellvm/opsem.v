@@ -546,13 +546,13 @@ Inductive decide_nonzero (TD:TargetData) (gv:GenericValue) (decision:bool): Prop
     (DECISION: decision = negb (zeq z 0))
 .
 
-Lemma decide_nonzero_gvzero_equiv 
+Lemma decide_nonzero_implies_gvzero 
       TD gv decision (IS_ZERO : decide_nonzero TD gv decision) :
   negb decision = (isGVZero TD gv).
 Proof.
   inversion IS_ZERO.
   unfold isGVZero. rewrite INT.
-  destruct (zeq z 0); simpl in DECISION; rewrite DECISION; auto. 
+  destruct (zeq z 0); simpl in DECISION; rewrite DECISION; auto.
 Qed.
 
 Definition intConst2Z c :=
