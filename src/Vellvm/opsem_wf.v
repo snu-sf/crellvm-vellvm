@@ -2207,7 +2207,12 @@ Case "sSelect".
   eapply getOperandValue__wf_gvs in H0; eauto.
   eapply getOperandValue__wf_gvs in H1; eauto.
   inversion H2. 
-  destruct decision; eapply preservation_cmd_updated_case in HwfS1; simpl; eauto.
+  destruct decision; eapply preservation_cmd_updated_case in HwfS1; simpl; eauto;
+    destruct z; simpl in RESULT; rewrite RESULT; auto.
+  
+  eapply preservation_cmd_updated_case in HwfS1. simpl. eauto. eauto. simpl.
+  instantiate (1:=t). auto. rewrite RESULT. eapply gundef_cgv2gvs__wf_gvs; eauto.
+  inv H15. instantiate (1:=S); auto. auto. auto.
 
 Focus.
 Case "sCall".
@@ -2898,24 +2903,6 @@ match cfg with
     end
   | _ => False
   end
-  (* \/ *)
-  (* match S with *)
-  (* | {| *)
-  (*     EC := {| *)
-  (*            CurCmds := insn_select id v0 t v1 v2 :: cs; *)
-  (*            Locals := lc *)
-  (*          |} *)
-  (*   |} => *)
-  (*   match getOperandValue td v0 lc gl with *)
-  (*   | Some ValGV => *)
-  (*     match GV2int td Size.One ValGV with *)
-  (*     | Some ValsZ => False *)
-  (*     | None => True *)
-  (*     end *)
-  (*   | _ => False *)
-  (*   end *)
-  (* | _ => False *)
-  (* end *)
 end.
 
 Ltac undefbehave := unfold undefined_state; simpl;
@@ -3811,12 +3798,23 @@ Proof.
       eapply getOperandValue_inCmdOps_isnt_stuck; eauto.
       simpl; auto.
     destruct J1 as [gv1 J1].
-    destruct (GV2int (los,nts) Size.One c) eqn:Hcint.
+    (* destruct (GV2int (los,nts) Size.One c) eqn:Hcint. *)
     left.
-    assert (exists decision, decide_nonzero (los, nts) c decision) as Hnzero.
-      destruct z; [exists false| exists true| exists true]; eapply decide_nonzero_intro;
-        (try apply Hcint); simpl; auto.
-    destruct Hnzero as [decision Hnzero].
+    assert(J2 : exists decision gvundef gvresult,
+              decide_nonzero_with_undef (los,nts) c gv0 gv1 gvundef gvresult t decision).
+      destruct (GV2int (los,nts) Size.One c) eqn:Hcint.
+      exists (Some (negb (zeq z 0))), c; destruct z. 
+      exists gv1. eapply decide_nonzero_def; eauto. 
+      exists gv0. eapply decide_nonzero_def; eauto.
+      exists gv0. eapply decide_nonzero_def; eauto.
+      exists None.
+      assert (U:exists vundef, gundef (los,nts) t = Some vundef).
+        eapply gundef__total.
+        inv Hwfc. inv H10. instantiate (1:=s). auto. auto.
+      destruct U as [gvundef U].
+      exists gvundef, gvundef. eapply decide_nonzero_undef; eauto.
+
+    destruct J2 as [decision [gvundef [gvresult J2]]].  
     exists
           {|
           EC := {|
@@ -3825,13 +3823,13 @@ Proof.
                             (cs1 ++ insn_select i0 v t v0 v1 :: cs) tmn);
                  CurCmds := cs;
                  Terminator := tmn;
-                 Locals := updateAddAL GenericValue lc i0 (if decision then gv0 else gv1);
+                 Locals := updateAddAL GenericValue lc i0 gvresult;
                  Allocas := als |};
           ECS := ecs;
           Mem := M |}.
       exists events.E0. eauto.
+
       (* right. simpl. repeat right. rewrite J. rewrite Hcint. auto. *)
-      admit.
   SCase "call".
     assert (exists gvs, params2GVs (los, nts) p lc gl = Some gvs) as G.
       eapply params2GVs_isnt_stuck; eauto.
@@ -3917,7 +3915,7 @@ Proof.
      unfold undefined_state.
      right. rewrite J'. rewrite G. right. right. right. right. right. left.
      rewrite <- HeqHlk. rewrite <- HeqHelk. auto.
-Admitted.
+Qed.
 
 End OpsemPP. End OpsemPP.
 

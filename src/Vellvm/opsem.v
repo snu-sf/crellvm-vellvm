@@ -555,6 +555,18 @@ Proof.
   destruct (zeq z 0); simpl in DECISION; rewrite DECISION; auto.
 Qed.
 
+Inductive decide_nonzero_with_undef (TD:TargetData) (gv gvs1 gvs2 gvundef gvresult:GenericValue) (t:typ) (decision:option bool): Prop :=
+| decide_nonzero_def
+    z
+    (INT: GV2int TD Size.One gv = Some z)
+    (DECISION: decision = Some (negb (zeq z 0)))
+    (RESULT: gvresult = if (negb (zeq z 0)) then gvs1 else gvs2)
+| decide_nonzero_undef
+    (NOINT: GV2int TD Size.One gv = None)
+    (UNDEF: gundef TD t = Some gvundef)
+    (RESULT: gvresult = gvundef)
+.
+
 Definition intConst2Z c :=
   match c with
   | const_int sz i =>
@@ -833,14 +845,14 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     E0
 
 | sSelect : forall S TD Ps F B lc gl fs id v0 t v1 v2 c ECS cs tmn Mem als decision
-                    gvs1 gvs2,
+                    gvs1 gvs2 gvundef gvresult,
   getOperandValue TD v0 lc gl = Some c ->
   getOperandValue TD v1 lc gl = Some gvs1 ->
   getOperandValue TD v2 lc gl = Some gvs2 ->
-  decide_nonzero TD c decision ->
+  decide_nonzero_with_undef TD c gvs1 gvs2 gvundef gvresult t decision ->
   sInsn (mkCfg S TD Ps gl fs)
     (mkState (mkEC F B ((insn_select id v0 t v1 v2)::cs) tmn lc als) (ECS) Mem)
-    (mkState (mkEC F B cs tmn (updateAddAL _ lc id (if decision then gvs1 else gvs2)) als) (ECS) Mem)
+    (mkState (mkEC F B cs tmn (updateAddAL _ lc id gvresult) als) (ECS) Mem)
     E0
 
 | sCall : forall S TD Ps F B lc gl fs rid noret ca fid fv lp cs tmn fptr
