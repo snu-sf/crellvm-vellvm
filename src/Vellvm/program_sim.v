@@ -224,24 +224,6 @@ Proof.
       tinv Hundef.
       destruct CurBB as [? [? ? t]]; tinv Hundef.
       destruct t; tinv Hundef.
-      (* destruct_cmd c; tinv Hundef. *)
-        (* remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R. *)
-        (* destruct R; tinv Hundef. *)
-        (* remember (getTypeAllocSize CurTargetData t) as R. *)
-        (* destruct R; tinv Hundef. *)
-        (* destruct Hundef as [gn [Hinst Hundef]]. *)
-        (* remember (malloc CurTargetData Mem s gn a) as R. *)
-        (* destruct R; tinv Hundef. *)
-        (* inv Hop. symmetry_ctx. uniq_result.  *)
-
-        (* remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R. *)
-        (* destruct R; tinv Hundef. *)
-        (* remember (getTypeAllocSize CurTargetData t) as R. *)
-        (* destruct R; tinv Hundef. *)
-        (* destruct Hundef as [gn [Hinst Hundef]]. *)
-        (* remember (malloc CurTargetData Mem s gn a) as R. *)
-        (* destruct R; tinv Hundef. *)
-        (* inv Hop. symmetry_ctx. uniq_result.  *)
 
       destruct_cmd c; tinv Hundef.
         remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R.

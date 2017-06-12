@@ -2206,10 +2206,9 @@ Case "sSelect".
   inv Hwfc.
   eapply getOperandValue__wf_gvs in H0; eauto.
   eapply getOperandValue__wf_gvs in H1; eauto.
-  inversion H2. 
-  destruct decision; eapply preservation_cmd_updated_case in HwfS1; simpl; eauto;
-    destruct z; simpl in RESULT; rewrite RESULT; auto.
-  
+  inversion H2.
+  eapply preservation_cmd_updated_case in HwfS1; simpl; eauto;
+    destruct z; simpl in RESULT; rewrite RESULT; auto.   
   eapply preservation_cmd_updated_case in HwfS1. simpl. eauto. eauto. simpl.
   instantiate (1:=t). auto. rewrite RESULT. eapply gundef_cgv2gvs__wf_gvs; eauto.
   inv H15. instantiate (1:=S); auto. auto. auto.
@@ -3798,23 +3797,20 @@ Proof.
       eapply getOperandValue_inCmdOps_isnt_stuck; eauto.
       simpl; auto.
     destruct J1 as [gv1 J1].
-    (* destruct (GV2int (los,nts) Size.One c) eqn:Hcint. *)
+    assert (U:exists vundef, gundef (los,nts) t = Some vundef).
+      eapply gundef__total. inv Hwfc. inv H10. instantiate (1:=s). auto. auto.
+    destruct U as [gvundef U].
     left.
-    assert(J2 : exists decision gvundef gvresult,
-              decide_nonzero_with_undef (los,nts) c gv0 gv1 gvundef gvresult t decision).
+    assert (exists gvresult, calc_select (los,nts) t c gv0 gv1 gvresult)
+      as J2.
       destruct (GV2int (los,nts) Size.One c) eqn:Hcint.
-      exists (Some (negb (zeq z 0))), c; destruct z. 
-      exists gv1. eapply decide_nonzero_def; eauto. 
-      exists gv0. eapply decide_nonzero_def; eauto.
-      exists gv0. eapply decide_nonzero_def; eauto.
-      exists None.
-      assert (U:exists vundef, gundef (los,nts) t = Some vundef).
-        eapply gundef__total.
-        inv Hwfc. inv H10. instantiate (1:=s). auto. auto.
-      destruct U as [gvundef U].
-      exists gvundef, gvundef. eapply decide_nonzero_undef; eauto.
+      destruct z.
+      exists gv1. eapply select_cond_def; eauto.
+      exists gv0. eapply select_cond_def; eauto.
+      exists gv0. eapply select_cond_def; eauto.
+      exists gvundef. eapply select_cond_undef; eauto.
 
-    destruct J2 as [decision [gvundef [gvresult J2]]].  
+    destruct J2 as [gvresult J2].
     exists
           {|
           EC := {|
@@ -3828,8 +3824,6 @@ Proof.
           ECS := ecs;
           Mem := M |}.
       exists events.E0. eauto.
-
-      (* right. simpl. repeat right. rewrite J. rewrite Hcint. auto. *)
   SCase "call".
     assert (exists gvs, params2GVs (los, nts) p lc gl = Some gvs) as G.
       eapply params2GVs_isnt_stuck; eauto.
