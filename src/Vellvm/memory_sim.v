@@ -33,7 +33,7 @@ Inductive val_inject (mi: meminj): val -> val -> Prop :=
       val_inject mi (Vptr b1 ofs1) (Vptr b2 ofs2)
   | val_inject_inttoptr:
       forall i, val_inject mi (Vinttoptr i) (Vinttoptr i)
-  | val_inject_undef: val_inject mi Vundef Vundef.
+  | val_inject_undef: forall v, val_inject mi Vundef v.
 
 Hint Resolve val_inject_int val_inject_float val_inject_single val_inject_ptr val_inject_inttoptr 
              val_inject_undef.
@@ -67,10 +67,10 @@ Proof.
   destruct m, v; try inv Hchk; auto.
 Qed.
 
-Lemma val_inject__has_chunkb: forall mi v1 v2 m
-  (H : val_inject mi v1 v2),
-  Val.has_chunkb v1 m = Val.has_chunkb v2 m.
-Proof. intros. inv H; auto. Qed.
+(* Lemma val_inject__has_chunkb: forall mi v1 v2 m *)
+(*   (H : val_inject mi v1 v2), *)
+(*   Val.has_chunkb v1 m = Val.has_chunkb v2 m. *)
+(* Proof. intros. inv H; auto. Qed. *)
 
 (** Monotone evolution of a memory injection. *)
 
@@ -118,7 +118,7 @@ Inductive memval_inject (f: meminj): memval -> memval -> Prop :=
       memval_inject f (Fragment (Vptr b1 ofs1) Q32 n) (Fragment (Vptr b2 ofs2) Q32 n)
   | memval_inject_inttoptr:
       forall i n, memval_inject f (Fragment (Vinttoptr i) Q32 n) (Fragment (Vinttoptr i) Q32 n)
-  | memval_inject_undef: memval_inject f Undef Undef.
+  | memval_inject_undef: forall v, memval_inject f Undef v.
 
 (* Properties of memval_inject. *)
 Lemma memval_inject_incr: forall f f' v1 v2, 
