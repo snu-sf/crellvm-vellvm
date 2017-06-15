@@ -29,6 +29,7 @@ Import LLVMtypings.
 Import LLVMgv.
 Import AtomSet.
 
+Require Import sflib.
 (********************************************)
 (** * total *)
 
@@ -1592,7 +1593,9 @@ Proof.
 Qed.
 
 Lemma mtrunc_typsize : forall S los nts top t1 t2 gv1 gv2
-  (H0: wf_typ S (los,nts) t2) (H1: mtrunc (los,nts) top t1 t2 gv1 = Some gv2),
+  (H0: wf_typ S (los,nts) t2) (H1: mtrunc (los,nts) top t1 t2 gv1 = Some gv2)
+    (NOTUNDEF: gundef (los, nts) t2 <> Some gv2)
+,
   exists sz, exists al,
     _getTypeSizeInBits_and_Alignment los 
       (getTypeSizeInBits_and_Alignment_for_namedts (los,nts) true) true t2 = 
@@ -1617,11 +1620,10 @@ Proof.
     destruct_typ t1; try solve [eapply gundef__getTypeSizeInBits; eauto].
     destruct_typ t2; try solve [eapply gundef__getTypeSizeInBits; eauto].
     remember (floating_point_order f1 f0) as R.
-    destruct R; tinv H1.
-    destruct f0; inv H1.
-    destruct f1; inv HeqR.
-      simpl. exists 32%nat. exists (getFloatAlignmentInfo los 32 true).
-      auto.
+    {
+      des_ifs.
+      inv Heq. ss. destruct f1; ss. esplits; eauto.
+    }
 
     destruct_typ t1; try solve [eapply gundef__getTypeSizeInBits; eauto].
     destruct_typ t2; try solve [eapply gundef__getTypeSizeInBits; eauto].
@@ -2016,6 +2018,11 @@ Case "wfconst_trunc_int". Focus.
   inv_mbind. 
   split; auto.
     symmetry in HeqR0.
+    Require Import Classical.
+    destruct (classic (gundef (los, nts) (typ_int sz2) = ret gv)).
+    { exploit H0; eauto. i. des. clarify.
+      esplits; eauto.
+    }
     eapply mtrunc_typsize in HeqR0; eauto.
 
 Case "wfconst_trunc_fp". Focus.
