@@ -1932,104 +1932,98 @@ Case "sReturnVoid".
 
 Focus.
 Case "sBranch".
-  admit.
-  (* destruct_wfCfgState HwfCfg HwfS1. *)
-  (* remember (inscope_of_tmn F *)
-  (*            (l3, stmts_intro ps3 (cs3' ++ nil)(insn_br bid Cond l1 l2)) *)
-  (*            (insn_br bid Cond l1 l2)) as R1. *)
-  (* destruct R1; try solve [inversion Hinscope1]. *)
-  (* (* split. intros; congruence. *) *)
-  (* split; auto. *)
-  (* SCase "1". *)
-  (*   assert (HwfF := HwfSystem). *)
-  (*   eapply wf_system__wf_fdef with (f:=F) in HwfF; eauto. *)
-  (*   assert (HuniqF := HwfSystem). *)
-  (*   eapply wf_system__uniqFdef with (f:=F) in HuniqF; eauto. *)
-  (*   assert (isReachableFromEntry F  *)
-  (*            (if isGVZero (los, nts) conds then l2 else l1, *)
-  (*             stmts_intro ps' cs' tmn')) as Hreach'. *)
-  (*     clear - Hreach1 H0 HBinF1 HFinPs1 HmInS HwfSystem HuniqF HwfF. *)
-  (*     unfold isReachableFromEntry in *. *)
-  (*     destruct (isGVZero (los, nts) conds); *)
-  (*       symmetry in H0; *)
-  (*       apply lookupBlockViaLabelFromFdef_inv in H0; eauto; *)
-  (*       eapply reachable_successors; try apply HBinF1; eauto; simpl; auto. *)
-  (*   split; auto. *)
-  (*   split. *)
-  (*     clear - H0 HBinF1 HFinPs1 HmInS HwfSystem HuniqF. *)
-  (*     destruct (isGVZero (los, nts) conds); *)
-  (*       symmetry in H0; apply lookupBlockViaLabelFromFdef_inv in H0; auto. *)
-  (*   split; auto. *)
-  (*   split. *)
-  (*     destruct (isGVZero (los, nts) conds); *)
-  (*       eapply wf_lc_br_aux in H1; eauto. *)
-  (*   split. *)
-  (*     clear - HeqR1 H0 Hinscope1 H1 HwfSystem HBinF1 HwfF HuniqF Hwflc1 Hwfg *)
-  (*             Hwftd Hreach'. *)
-  (*     eapply inscope_of_tmn_br in HeqR1; eauto. *)
-  (*     destruct HeqR1 as [ids0' [HeqR1 [J1 J2]]]. *)
-  (*     destruct cs'; rewrite <- HeqR1; auto. *)
-
-  (*     exists (if isGVZero (los, nts) conds then l2 else l1).  *)
-  (*     exists ps'. exists nil. simpl_env. auto. *)
+  apply decide_nonzero_implies_gvzero in H0.
+  destruct_wfCfgState HwfCfg HwfS1.
+  remember (inscope_of_tmn F 
+                           (l3, stmts_intro ps3 (cs3' ++ nil) (insn_br bid Cond l1 l2))
+                           (insn_br bid Cond l1 l2)) as R1.
+  destruct R1; try solve [inversion Hinscope1]. 
+  split; auto.
+  SCase "1".
+    assert (HwfF := HwfSystem).
+    eapply wf_system__wf_fdef with (f:=F) in HwfF; eauto.
+    assert (HuniqF := HwfSystem).
+    eapply wf_system__uniqFdef with (f:=F) in HuniqF; eauto.
+    assert (isReachableFromEntry F
+                                 (if decision then l1 else l2, 
+                                  stmts_intro ps' cs' tmn')) as Hreach'.    
+    clear - Hreach1 HBinF1 H0 H1 HFinPs1 HmInS HwfSystem HuniqF HwfF.
+    unfold isReachableFromEntry in *. 
+    destruct decision; 
+      symmetry in H1; 
+      apply lookupBlockViaLabelFromFdef_inv in H1; eauto;
+        eapply reachable_successors; try apply HBinF1; eauto; simpl; auto.
+    split; auto.
+    split.
+    clear - H0 H1 HBinF1 HFinPs1 HmInS HwfSystem HuniqF.
+    destruct decision;
+      symmetry in H1; apply lookupBlockViaLabelFromFdef_inv in H1; auto.
+    split; auto.
+    split.
+    destruct decision;
+      eapply wf_lc_br_aux in H2; eauto.
+    split.
+    clear - HeqR1 H0 H1 Hinscope1 H2 HwfSystem HBinF1 HwfF HuniqF Hwflc1 Hwfg 
+                  Hwftd Hreach'.
+    eapply inscope_of_tmn_br in HeqR1; eauto.
+    destruct HeqR1 as [ids0' [HeqR1 [J1 J2]]].
+    inversion H0.
+    rewrite <- H0 in HeqR1.
+    instantiate (2 := cs') in HeqR1. 
+    instantiate (1 := tmn') in HeqR1.
+    destruct cs'; destruct decision; simpl in *; rewrite <- HeqR1; auto.
+    rewrite <- H0. destruct decision; simpl; auto.
+    rewrite <- H0. destruct decision; simpl; auto.
+    exists (if decision then l1 else l2). exists ps'. exists nil. simpl_env. auto.
 
 Focus.
 Case "sSwitch".
-  admit.
-  (* destruct_wfCfgState HwfCfg HwfS1. *)
-  (* set (get_tgt_branch (los, nts) ty ValGV cases dflt) as tgt. *)
-  (* remember (inscope_of_tmn F (l3, stmts_intro ps3 (cs3' ++ nil) (insn_switch id0 ty Val dflt cases)) *)
-  (*                 (insn_switch id0 ty Val dflt cases)) as R1. *)
-  (* destruct R1; try solve [inversion Hinscope1]. *)
-  (* split; auto. *)
+  destruct_wfCfgState HwfCfg HwfS1.
+  remember (inscope_of_tmn F (l3, stmts_intro ps3 (cs3' ++ nil) (insn_switch id0 ty Val dflt cases))
+                  (insn_switch id0 ty Val dflt cases)) as R1.
+  destruct R1; try solve [inversion Hinscope1].
+  split; auto.
+  assert (HwfF := HwfSystem).
+  eapply wf_system__wf_fdef with (f:=F) in HwfF; eauto.
+  assert (HuniqF := HwfSystem).
+  eapply wf_system__uniqFdef with (f:=F) in HuniqF; eauto.
+  assert (isReachableFromEntry F (tgt, stmts_intro ps' cs' tmn')) as Hreach'.
+  clear - Hreach1 H0 H1 H2 HBinF1 HFinPs1 HmInS HwfSystem HuniqF HwfF.
+  unfold isReachableFromEntry in *.
+  assert(HReachTgat : reachable F tgt).
+  {
+    eapply reachable_successors; eauto.
+    destruct ty; inversion H0; destruct (GV2int (los, nts) sz5 ValGV); inversion H3.
+    apply get_switch_branch_aux_in_successors.
+  }
+  auto.
+  repeat split; eauto.
+  apply lookupBlockViaLabelFromFdef_inv; auto.
+  eapply wf_lc_br_aux in H2; eauto.
+  clear - HeqR1 H2 Hinscope1 H1 H0 HwfSystem HBinF1 HwfF HuniqF Hwflc1 Hwfg 
+                Hwftd Hreach'.
+  assert(dflt = tgt \/ In tgt (list_prj2 const l cases)).
+  {
+    destruct ty; inversion H0.
+    destruct (GV2int (los, nts) sz5 ValGV); inversion H3.
+    exploit (get_switch_branch_aux_in_successors id0 (typ_int sz5) Val z cases); eauto.
+    instantiate (1:=dflt).
+    intros.
+    simpl in *.
+    destruct (in_dec eq_atom_dec dflt (list_prj2 const l cases)).
+    - apply nodup_In in H; right; auto.
+    - destruct H.
+      + left; auto.
+      + apply nodup_In in H; right; auto.
+  }
+  idtac.
+  rewrite app_nil_r in *.
+  exploit inscope_of_tmn_switch; eauto.
+  intros.
+  destruct H3 as [ids0' [H4 [J1 J2]]].
+  destruct cs'; rewrite <- H4; auto.
+  exists tgt. exists ps'. exists nil. simpl_env. auto.
 
-  (* assert (HwfF := HwfSystem). *)
-  (* eapply wf_system__wf_fdef with (f:=F) in HwfF; eauto. *)
-  (* assert (HuniqF := HwfSystem). *)
-  (* eapply wf_system__uniqFdef with (f:=F) in HuniqF; eauto. *)
-  (* assert (isReachableFromEntry F (tgt, stmts_intro ps' cs' tmn')) as Hreach'. *)
-  (* clear - Hreach1 H1 H2 HBinF1 HFinPs1 HmInS HwfSystem HuniqF HwfF. *)
-  (* unfold isReachableFromEntry in *. *)
-  (* assert(HReachTgat : reachable F tgt). *)
-  (* { *)
-  (*   eapply reachable_successors; eauto. *)
-  (*   unfold tgt. *)
-  (*   apply tgt_branch_in_successors. *)
-  (* } *)
-  (* auto. *)
-
-  (* repeat split; eauto. *)
-  (* apply lookupBlockViaLabelFromFdef_inv; auto. *)
-  (* eapply wf_lc_br_aux in H1; eauto. *)
-  (* clear - HeqR1 H2 Hinscope1 H1 HwfSystem HBinF1 HwfF HuniqF Hwflc1 Hwfg *)
-  (*               Hwftd Hreach'. *)
-  (* assert(dflt = tgt \/ In tgt (list_prj2 const l cases)). *)
-  (* { *)
-  (*   exploit (tgt_branch_in_successors id0 (los, nts) ty Val ValGV cases); eauto. *)
-  (*   instantiate (1:= dflt). *)
-  (*   (* IDK why it should be instantiated separately... *) *)
-  (*   (* Also exploit without any explicit instantiating, and then callig instantiate does not work here.. *) *)
-  (*   intros. *)
-  (*   simpl in *. *)
-  (*   fold tgt in H. *)
-  (*   destruct (in_dec eq_atom_dec dflt (list_prj2 const l cases)). *)
-  (*   - *)
-  (*     apply nodup_In in H; right; auto. *)
-  (*   - *)
-  (*     destruct H. *)
-  (*     + left; auto. *)
-  (*     + apply nodup_In in H; right; auto. *)
-  (* } *)
-
-  (* idtac. *)
-  (* rewrite app_nil_r in *. *)
-  (* exploit inscope_of_tmn_switch; eauto. *)
-  (* intros. *)
-  (* destruct H0 as [ids0' [H3 [J1 J2]]]. *)
-  (* destruct cs'; rewrite <- H3; auto. *)
-
-  (* exists tgt. *)
-  (* exists ps'. exists nil. simpl_env. auto. *)
 Focus.
 Case "sBranch_uncond".
   destruct_wfCfgState HwfCfg HwfS1.
@@ -2206,15 +2200,18 @@ Case "sFcmp".
     try solve [eauto | solve_wf_gvs]).
 
 Case "sSelect".
-  admit.
-  (* assert (J:=HwfS1). *)
-  (* apply wf_State__inv in J; auto. *)
-  (* destruct J as [Hwftd [Hwfg [Hwflc Hwfc]]]. *)
-  (* inv Hwfc. *)
-  (* eapply getOperandValue__wf_gvs in H0; eauto. *)
-  (* eapply getOperandValue__wf_gvs in H1; eauto. *)
-  (* destruct (isGVZero (los, nts) c); *)
-  (*   eapply preservation_cmd_updated_case in HwfS1; simpl; eauto. *)
+  assert (J:=HwfS1).
+  apply wf_State__inv in J; auto.
+  destruct J as [Hwftd [Hwfg [Hwflc Hwfc]]].
+  inv Hwfc.
+  eapply getOperandValue__wf_gvs in H0; eauto.
+  eapply getOperandValue__wf_gvs in H1; eauto.
+  inversion H2.
+  eapply preservation_cmd_updated_case in HwfS1; simpl; eauto;
+    destruct z; simpl in RESULT; rewrite RESULT; auto.   
+  eapply preservation_cmd_updated_case in HwfS1. simpl. eauto. eauto. simpl.
+  instantiate (1:=t). auto. rewrite RESULT. eapply gundef_cgv2gvs__wf_gvs; eauto.
+  inv H15. instantiate (1:=S); auto. auto. auto.
 
 Focus.
 Case "sCall".
@@ -2276,7 +2273,7 @@ Case "sExCall".
         H24: wf_insn_base _ _ _ |- _ => inv H11; inv H24
       end.
       eapply fit_gv_gv2gvs__wf_gvs_aux; eauto.
-Admitted.
+Qed.
 
 Lemma preservation_star: forall cfg IS IS' tr (Hwfcfg: wf_Config cfg),
   wf_State cfg IS ->
@@ -2865,6 +2862,45 @@ match cfg with
        | _ => False
        end
   | _ => False
+  end \/
+  match S with
+  | {|
+      EC := {|
+             CurCmds := [];
+             Terminator := insn_br id value l2 l3;
+             Locals := lc
+           |}
+    |} =>
+    match getOperandValue td value lc gl with
+    | Some cond => match GV2int td Size.One cond with
+                   | None => True
+                   | _ => False
+                   end
+    | None => False
+    end
+  | _ => False
+  end \/
+  match S with
+  | {|
+      EC := {|
+             CurCmds := [];
+             Terminator := insn_switch id ty Val dflt cases;
+             Locals := lc
+           |}
+    |} =>
+    match getOperandValue td Val lc gl with
+    | Some ValGV =>
+      match ty with
+      | typ_int sz =>
+        match GV2int td sz ValGV with
+        | Some ValZ => False
+        | None => True
+        end
+      | _ =>  True
+      end
+    | _ => False
+    end
+  | _ => False
   end
 end.
 
@@ -2999,74 +3035,87 @@ Proof.
         eauto.
 
     SCase "tmn=br".
-      admit.
-      (* right. left. *)
-      (* assert (wf_fdef s (module_intro los nts ps) f) as HwfF. *)
-      (*   eapply wf_system__wf_fdef; eauto. *)
-      (* assert (uniqFdef f) as HuniqF. *)
-      (*   eapply wf_system__uniqFdef; eauto. *)
-      (* assert (exists cond, getOperandValue (los,nts) value5 lc gl = *)
-      (*   Some cond) as Hget. *)
-      (*   eapply getOperandValue_inTmnOperans_isnt_stuck; eauto. *)
-      (*     simpl. auto. *)
-      (* destruct Hget as [cond Hget]. *)
-      (* assert (Hwfc := HbInF). *)
-      (* eapply wf_system__wf_tmn in Hwfc; eauto. *)
-      (* assert (exists sts', *)
-      (*         Some sts' = *)
-      (*         (if isGVZero (los,nts) cond *)
-      (*            then lookupBlockViaLabelFromFdef f l3 *)
-      (*            else lookupBlockViaLabelFromFdef f l2)) as HlkB. *)
-      (*   inv Hwfc. *)
-      (*   destruct (isGVZero (los, nts) cond); eauto. *)
+      assert (wf_fdef s (module_intro los nts ps) f) as HwfF.
+        eapply wf_system__wf_fdef; eauto.
+      assert (uniqFdef f) as HuniqF.
+        eapply wf_system__uniqFdef; eauto.
+        
+      assert (exists cond, getOperandValue (los,nts) value5 lc gl = 
+         Some cond) as Hget. 
+         eapply getOperandValue_inTmnOperans_isnt_stuck; eauto. 
+           simpl. auto. 
+      destruct Hget as [cond Hget]. 
+      assert (Hwfc := HbInF). 
+        eapply wf_system__wf_tmn in Hwfc; eauto. 
+      assert (exists sts', 
+              Some sts' = 
+               (if isGVZero (los,nts) cond 
+                  then lookupBlockViaLabelFromFdef f l3 
+                  else lookupBlockViaLabelFromFdef f l2)) as HlkB. 
+         inv Hwfc. 
+         destruct (isGVZero (los, nts) cond); eauto.
+      destruct (GV2int (los,nts) Size.One cond) eqn:Hcint.
+      right. left.
+      assert (exists decision, decide_nonzero (los,nts) cond decision) as Hnzero.       
+        destruct z; [exists false| exists true| exists true]; eapply decide_nonzero_intro
+        ;(try apply Hcint); simpl; auto. 
+      destruct Hnzero as [decision Hnzero].
+      destruct HlkB as [[ps' cs' tmn'] HlkB].
+      assert (exists lc', switchToNewBasicBlock (los, nts)
+        (if isGVZero (los, nts) cond then l3 else l2, stmts_intro ps' cs' tmn')
+        (l1, stmts_intro ps1 (cs1++nil) (insn_br id5 value5 l2 l3)) gl lc =
+          Some lc') as Hswitch.
+         assert (exists RVs,
+           getIncomingValuesForBlockFromPHINodes (los, nts) ps'
+             (l1, stmts_intro ps1 (cs1++nil) (insn_br id5 value5 l2 l3)) gl lc =
+           Some RVs) as J.
+           assert (HwfB := HbInF).
+           eapply wf_system__blockInFdefB__wf_block in HwfB; eauto.
+           simpl_env in *.
+           destruct (isGVZero (los, nts) cond).
+             assert (J:=HlkB).
+             symmetry in J.
+             apply lookupBlockViaLabelFromFdef_inv in J; auto.
+             inv J.
+             (* destruct J as [Heq J]; subst. *)
+             eapply wf_system__lookup__wf_block in HlkB; eauto.
+             inv HlkB. clear H9 H10.
+             eapply wf_phinodes__getIncomingValuesForBlockFromPHINodes
+               with (ps':=ps')(cs':=cs')(tmn':=tmn')(l0:=l3); eauto.
+               simpl. auto.
+               exists nil. auto.
 
-      (* destruct HlkB as [[ps' cs' tmn'] HlkB]. *)
-      (* assert (exists lc', switchToNewBasicBlock (los, nts) *)
-      (*   (if isGVZero (los, nts) cond then l3 else l2, stmts_intro ps' cs' tmn') *)
-      (*   (l1, stmts_intro ps1 (cs1++nil) (insn_br id5 value5 l2 l3)) gl lc = *)
-      (*     Some lc') as Hswitch. *)
-      (*    assert (exists RVs, *)
-      (*      getIncomingValuesForBlockFromPHINodes (los, nts) ps' *)
-      (*        (l1, stmts_intro ps1 (cs1++nil) (insn_br id5 value5 l2 l3)) gl lc = *)
-      (*      Some RVs) as J. *)
-      (*      assert (HwfB := HbInF). *)
-      (*      eapply wf_system__blockInFdefB__wf_block in HwfB; eauto. *)
-      (*      simpl_env in *. *)
-      (*      destruct (isGVZero (los, nts) cond). *)
-      (*        assert (J:=HlkB). *)
-      (*        symmetry in J. *)
-      (*        apply lookupBlockViaLabelFromFdef_inv in J; auto. *)
-      (*        inv J. *)
-      (*        (* destruct J as [Heq J]; subst. *) *)
-      (*        eapply wf_system__lookup__wf_block in HlkB; eauto. *)
-      (*        inv HlkB. clear H9 H10. *)
-      (*        eapply wf_phinodes__getIncomingValuesForBlockFromPHINodes *)
-      (*          with (ps':=ps')(cs':=cs')(tmn':=tmn')(l0:=l3); eauto. *)
-      (*          simpl. auto. *)
-      (*          exists nil. auto. *)
+             assert (J:=HlkB).
+             symmetry in J.
+             apply lookupBlockViaLabelFromFdef_inv in J; auto.
+             (* destruct J as [Heq J]; subst. *)
+             inv J.
+             eapply wf_system__lookup__wf_block in HlkB; eauto.
+             inv HlkB. clear H9 H10.
+             eapply wf_phinodes__getIncomingValuesForBlockFromPHINodes
+               with (ps':=ps')(cs':=cs')(tmn':=tmn')(l0:=l2); eauto.
+               simpl. auto.
+               exists nil. auto.
 
-      (*        assert (J:=HlkB). *)
-      (*        symmetry in J. *)
-      (*        apply lookupBlockViaLabelFromFdef_inv in J; auto. *)
-      (*        (* destruct J as [Heq J]; subst. *) *)
-      (*        inv J. *)
-      (*        eapply wf_system__lookup__wf_block in HlkB; eauto. *)
-      (*        inv HlkB. clear H9 H10. *)
-      (*        eapply wf_phinodes__getIncomingValuesForBlockFromPHINodes *)
-      (*          with (ps':=ps')(cs':=cs')(tmn':=tmn')(l0:=l2); eauto. *)
-      (*          simpl. auto. *)
-      (*          exists nil. auto. *)
+         destruct J as [RVs J].
+         unfold switchToNewBasicBlock. simpl.
+         rewrite J.
+         exists (updateValuesForNewBlock RVs lc). auto.
 
-      (*    destruct J as [RVs J]. *)
-      (*    unfold switchToNewBasicBlock. simpl. *)
-      (*    rewrite J. *)
-      (*    exists (updateValuesForNewBlock RVs lc). auto. *)
-
-      (* destruct Hswitch as [lc' Hswitch]. *)
-      (* exists (mkState (mkEC f (if isGVZero (los, nts) cond then l3 else l2,  *)
-      (*                           stmts_intro ps' cs' tmn') cs' tmn' lc' *)
-      (*         als) ecs M). *)
-      (* exists events.E0. eauto. *)
+      destruct Hswitch as [lc' Hswitch].
+      exists (mkState (mkEC f (if isGVZero (los, nts) cond then l3 else l2,
+                                stmts_intro ps' cs' tmn') cs' tmn' lc'
+              als) ecs M).
+      exists events.E0. 
+      exploit decide_nonzero_implies_gvzero. apply Hnzero.
+      intros. 
+      rewrite <- H in *.
+      assert ((if negb decision then l3 else l2) = (if decision then l2 else l3)).
+        destruct decision; auto.
+      rewrite H0.
+      apply sBranch with (Cond := value5) (conds := cond); auto.
+      destruct decision; simpl in HlkB; auto.
+      simpl. repeat (right; (try rewrite Hget); (try rewrite Hcint); auto).
 
     SCase "tmn=br_uncond".
       right. left.
@@ -3109,9 +3158,7 @@ Proof.
       exists events.E0. eauto.
 
     SCase "tmn=switch".
-    { admit.
-      (*
-      right. left.
+    {
       assert (wf_fdef s (module_intro los nts ps) f) as HwfF.
         eapply wf_system__wf_fdef; eauto.
       assert (uniqFdef f) as HuniqF.
@@ -3125,12 +3172,24 @@ Proof.
       eapply wf_system__wf_tmn in Hwfc; eauto.
       rename lcl5 into cases.
       rename l5 into dflt.
-      remember (get_tgt_branch (los, nts) typ5 ValGV cases dflt) as tgt.
-      assert(exists sts', Some sts' = lookupBlockViaLabelFromFdef f tgt) as HlkB.
+      remember (get_switch_branch (los, nts) typ5 ValGV cases dflt) as tgt.
+      destruct tgt.
+
+      right. left.
+      assert(exists sts', Some sts' = lookupBlockViaLabelFromFdef f l2) as HlkB.
       { inv Hwfc.
-        unfold get_tgt_branch, get_switch_branch.
-        destruct (GV2int (los, nts) sz5 ValGV); s; try by (rewrite H11; eauto).
-        destruct (find
+        assert (forall (l_: l) (stmts_: stmts),
+                   (dflt, stmts_5) = (l_, stmts_) \/
+                   In (l_, stmts_)
+                      (List.map
+                         (fun pat_ : const * l * stmts =>
+                            let (p, stmts_0) := pat_ in let (_, l_0) := p in (l_0, stmts_0)) const_l_stmts_list) -> lookupBlockViaLabelFromFdef f l_ = ret stmts_).
+        {
+          intros. inversion H. inversion H0. rewrite <- H2. rewrite <- H3. auto.
+          apply H10. auto.
+        }
+        destruct (GV2int (los, nts) sz5 ValGV) eqn:HGVZ; s; try by (rewrite H11; eauto).
+        - destruct (find
              (fun x : const * l =>
               match (intConst2Z (fst x)) with
               | ret y => Zeq_bool y z
@@ -3139,15 +3198,34 @@ Proof.
              (List.map
                 (fun pat_ : const * l * stmts => let (p, _) := pat_ in let (const_, l_) := p in (const_, l_))
                 const_l_stmts_list)) eqn:T.
-        - exploit find_some. rewrite T; eauto. s. i. des.
-          destruct p; s.
-          clear - H H10.
+          + exploit find_some. rewrite T; eauto. s. i. des.
+            destruct p; s.
+            generalize dependent const_l_stmts_list.
+            induction const_l_stmts_list; i; ss.
+            destruct a, p; ss. des; eauto. inv H0.
+            rewrite HGVZ in Heqtgt.
 
-          generalize dependent const_l_stmts_list.
-          induction const_l_stmts_list; i; ss.
-          destruct a, p; ss. des; eauto. inv H.
-          erewrite H10; eauto.
-        - eexists. simpl. eauto.
+            erewrite H; eauto.
+            unfold get_switch_branch_aux in Heqtgt.
+            simpl in Heqtgt.
+            rewrite T in Heqtgt. inv Heqtgt.
+            right. left. instantiate (1:=s0). auto.
+
+            apply list_in_map_inv in H0. destruct H0. inv H0.
+            destruct x. destruct p. exists s1.
+            erewrite H; eauto.
+            rewrite HGVZ in Heqtgt.
+            unfold get_switch_branch_aux in Heqtgt.
+            simpl in Heqtgt, T.
+            rewrite T in Heqtgt. inv Heqtgt.
+            right. right.
+            rewrite in_map_iff. exists (c1, l5, s1). split. inversion H2. auto. auto.
+          + eexists. simpl. unfold get_switch_branch in Heqtgt.
+            rewrite HGVZ in Heqtgt.
+            unfold get_switch_branch_aux in Heqtgt.
+            rewrite T in Heqtgt. inv Heqtgt.
+            erewrite H; eauto.
+        - unfold get_switch_branch in Heqtgt. rewrite HGVZ in Heqtgt. inv Heqtgt.
       }
       destruct HlkB as [[ps' cs' tmn'] HlkB].
       assert (exists RVs,
@@ -3166,16 +3244,23 @@ Proof.
         eapply wf_system__lookup__wf_block in HlkB; eauto.
         inv HlkB. clear H9 H10.
         eapply wf_phinodes__getIncomingValuesForBlockFromPHINodes; eauto.
-        apply tgt_branch_in_successors.
+        apply get_switch_branch_in_successors with (TD := (los,nts)) (ValGV := ValGV); auto.
         exists nil; eauto.
       }
       destruct J as [RVs J].
       eexists; eexists; eapply sSwitch; eauto.
-      rewrite <- Heqtgt. eauto.
+      (* rewrite <- Heqtgt. eauto. *)
       unfold switchToNewBasicBlock; simpl.
       rewrite J.
       eauto.
-      *)
+      unfold get_switch_branch in Heqtgt.
+      simpl.
+      (* destruct typ5; rewrite Hget.  *)
+      right. right. right.
+      right. right. right. right. right. right. right.
+      destruct typ5; rewrite Hget; auto.
+      destruct (GV2int (los,nts) sz5 ValGV).
+      inversion Heqtgt. auto.
     }
     SCase "tmn=unreachable".
       undefbehave.
@@ -3699,39 +3784,46 @@ Proof.
      exists events.E0. eauto.
 
   SCase "select".
-    admit.
-    (* assert (exists gv, getOperandValue (los, nts) v lc gl = Some gv) *)
-    (*   as J. *)
-    (*   eapply getOperandValue_inCmdOps_isnt_stuck; eauto. *)
-    (*     simpl; auto. *)
-    (* destruct J as [c J]. *)
-    (* assert (exists gv0, getOperandValue (los, nts) v0 lc gl = Some gv0) *)
-    (*   as J0. *)
-    (*   eapply getOperandValue_inCmdOps_isnt_stuck; eauto. *)
-    (*     simpl; auto. *)
-    (* destruct J0 as [gv0 J0]. *)
-    (* assert (exists gv1, getOperandValue (los, nts) v1 lc gl = Some gv1) *)
-    (*   as J1. *)
-    (*   eapply getOperandValue_inCmdOps_isnt_stuck; eauto. *)
-    (*     simpl; auto. *)
-    (* destruct J1 as [gv1 J1]. *)
-    (* left. *)
-    (* exists *)
-    (*      {| *)
-    (*      EC := {| *)
-    (*             CurFunction := f; *)
-    (*             CurBB := (l1, stmts_intro ps1 *)
-    (*                        (cs1 ++ insn_select i0 v t v0 v1 :: cs) tmn); *)
-    (*             CurCmds := cs; *)
-    (*             Terminator := tmn; *)
-    (*             Locals := (if isGVZero (los, nts) c *)
-    (*                        then updateAddAL _ lc i0 gv1 *)
-    (*                        else updateAddAL _ lc i0 gv0); *)
-    (*             Allocas := als |}; *)
-    (*      ECS := ecs; *)
-    (*      Mem := M |}. *)
-    (*  exists events.E0. eauto. *)
+    assert (exists gv, getOperandValue (los, nts) v lc gl = Some gv) as J.
+      eapply getOperandValue_inCmdOps_isnt_stuck; eauto.
+      simpl; auto.
+    destruct J as [c J].
+    assert (exists gv0, getOperandValue (los, nts) v0 lc gl = Some gv0) as J0.
+      eapply getOperandValue_inCmdOps_isnt_stuck; eauto.
+      simpl; auto.
+    destruct J0 as [gv0 J0].
+    assert (exists gv1, getOperandValue (los, nts) v1 lc gl = Some gv1)
+      as J1.
+      eapply getOperandValue_inCmdOps_isnt_stuck; eauto.
+      simpl; auto.
+    destruct J1 as [gv1 J1].
+    assert (U:exists vundef, gundef (los,nts) t = Some vundef).
+      eapply gundef__total. inv Hwfc. inv H10. instantiate (1:=s). auto. auto.
+    destruct U as [gvundef U].
+    left.
+    assert (exists gvresult, calc_select (los,nts) t c gv0 gv1 gvresult)
+      as J2.
+      destruct (GV2int (los,nts) Size.One c) eqn:Hcint.
+      destruct z.
+      exists gv1. eapply select_cond_def; eauto.
+      exists gv0. eapply select_cond_def; eauto.
+      exists gv0. eapply select_cond_def; eauto.
+      exists gvundef. eapply select_cond_undef; eauto.
 
+    destruct J2 as [gvresult J2].
+    exists
+          {|
+          EC := {|
+                 CurFunction := f;
+                 CurBB := (l1, stmts_intro ps1
+                            (cs1 ++ insn_select i0 v t v0 v1 :: cs) tmn);
+                 CurCmds := cs;
+                 Terminator := tmn;
+                 Locals := updateAddAL GenericValue lc i0 gvresult;
+                 Allocas := als |};
+          ECS := ecs;
+          Mem := M |}.
+      exists events.E0. eauto.
   SCase "call".
     assert (exists gvs, params2GVs (los, nts) p lc gl = Some gvs) as G.
       eapply params2GVs_isnt_stuck; eauto.
@@ -3815,9 +3907,9 @@ Proof.
    SSCase "stuck".
      right.
      unfold undefined_state.
-     right. rewrite J'. rewrite G. right. right. right. right. right.
-     rewrite <- HeqHlk. rewrite <- HeqHelk. split; auto.
-Admitted.
+     right. rewrite J'. rewrite G. right. right. right. right. right. left.
+     rewrite <- HeqHlk. rewrite <- HeqHelk. auto.
+Qed.
 
 End OpsemPP. End OpsemPP.
 
