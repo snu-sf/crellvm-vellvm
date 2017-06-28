@@ -207,19 +207,19 @@ Lemma check_value_ptr_inject_true:
   f b = Some(b', delta) ->
   check_value n (Vptr b' (Int.add 31 ofs (Int.repr 31 delta))) Q32 vl' = true.
 Proof.
-  (* induction 1; intros; destruct n; simpl in *; auto. *)
-  (* inv H; auto. *)
-  (* destruct (andb_prop _ _ H1). destruct (andb_prop _ _ H). *)
-  (* destruct (andb_prop _ _ H5). *)
-  (* assert (n = n0) by (apply beq_nat_true; auto). *)
-  (* assert (b = b0) by (destruct (Val.eq _ _); try (inversion e; auto); inv H7). *)
-  (* assert (ofs = ofs1) by (destruct (Val.eq _ _); try (inversion e; auto); inv H7). *)
-  (* subst. rewrite H3 in H2; inv H2. *)
-  (* unfold proj_sumbool. rewrite dec_eq_true. rewrite dec_eq_true. *)
-  (* rewrite <- beq_nat_refl. simpl. eauto. *)
+  induction 1; intros; destruct n; simpl in *; auto.
+  inv H; auto.
+  destruct (andb_prop _ _ H1). destruct (andb_prop _ _ H).
+  destruct (andb_prop _ _ H5).
+  assert (n = n0) by (apply beq_nat_true; auto).
+  assert (b = b0) by (destruct (Val.eq _ _); try (inversion e; auto); inv H7).
+  assert (ofs = ofs1) by (destruct (Val.eq _ _); try (inversion e; auto); inv H7).
+  subst. rewrite H3 in H2; inv H2.
+  unfold proj_sumbool. rewrite dec_eq_true. rewrite dec_eq_true.
+  rewrite <- beq_nat_refl. simpl. eauto.
 
-  (* rewrite ptr_iptr_diff in H1; inv H1. *)
-Admitted.
+  rewrite ptr_iptr_diff in H1; inv H1.
+Qed.
 
 Definition meminj_zero_delta (f: meminj) : Prop :=
   forall b b' delta, f b = Some(b', delta) -> delta = 0.
@@ -232,59 +232,76 @@ Lemma check_value_ptr_inject_false:
   forall n b ofs b' delta,
   check_value n (Vptr b ofs) Q32 vl = false ->
   f b = Some(b', delta) ->
+  List.Forall2 (fun x x' => ~(exists v q n, x = Undef /\ x' = Fragment v q n)) vl vl' ->
   check_value n (Vptr b' (Int.add 31 ofs (Int.repr 31 delta))) Q32 vl' = false.
 Proof.
-  (* induction 1; intros; destruct n; simpl in *; auto. *)
-  (* inv H; auto. *)
-  (* apply andb_false_elim in H3. *)
-  (* destruct H3 as [H3 | H3]. *)
-  (*   apply andb_false_elim in H3. *)
-  (*   destruct H3 as [H3 | H3]. *)
-  (*     apply andb_false_elim in H3. *)
-  (*     destruct H3 as [H3 | H3]. *)
-  (*       apply andb_false_intro1. *)
-  (*       apply andb_false_intro1. *)
-  (*       apply andb_false_intro1. *)
-  (*       destruct (Val.eq (Vptr b ofs) (Vptr b0 ofs1)). inv H3. *)
-  (* Lemma Vptr_diff: forall b ofs b0 ofs0, Vptr b ofs <> Vptr b0 ofs0 -> b <> b0 \/ ofs <> ofs0. *)
-  (* Proof. *)
-  (*   intros. *)
-  (*   elim (Pos.eq_dec b b0); intro Beq; *)
-  (*   elim (Int.eq_dec 31 ofs ofs0); intro Oeq; *)
-  (*   subst; try congruence; *)
-  (*   tauto. *)
-  (* Qed. *)
-  (*       exploit (Vptr_diff b ofs b0 ofs1); auto. intro Neq. *)
-  (*       destruct Neq; unfold meminj_no_overlap in H1. *)
-  (*       eapply H1 in H; eauto. *)
-  (*       unfold proj_sumbool. *)
-  (*       destruct (Val.eq (Vptr _ _) (Vptr _ _)); auto. *)
-  (*       inv e. congruence. *)
-  (*       unfold proj_sumbool.  *)
-  (*       destruct (Val.eq (Vptr _ _) (Vptr _ _)); auto. *)
-  (*       inv e. *)
-  (*       rewrite !Int.Z_mod_modulus_eq in H8. *)
-  (*       apply H2 in H5. apply H2 in H4. subst. *)
-  (*       rewrite Zmod_0_l in H8. rewrite <- !Zplus_0_r_reverse in H8. *)
-  (*       rewrite <- !Int.unsigned_repr_eq in H8. *)
-  (*       rewrite !Int.repr_unsigned in H8. *)
-  (*       unfold Int.unsigned in H8. *)
-  (*       apply Int.mkint_eq with (wordsize_one:=31%nat) (Px:=Int.intrange 31 ofs) (Py:=Int.intrange 31 ofs1) in H8. *)
-  (*       destruct ofs, ofs1.  simpl in H8. apply H in H8. inv H8. *)
+  induction 1; intros; destruct n; simpl in *; auto.
+  rename H5 into UNDEF.
+  inv H; auto.
+  {
+  apply andb_false_elim in H3.
+  destruct H3 as [H3 | H3].
+    apply andb_false_elim in H3.
+    destruct H3 as [H3 | H3].
+      apply andb_false_elim in H3.
+      destruct H3 as [H3 | H3].
+        apply andb_false_intro1.
+        apply andb_false_intro1.
+        apply andb_false_intro1.
+        destruct (Val.eq (Vptr b ofs) (Vptr b0 ofs1)). inv H3.
+  Lemma Vptr_diff: forall b ofs b0 ofs0, Vptr b ofs <> Vptr b0 ofs0 -> b <> b0 \/ ofs <> ofs0.
+  Proof.
+    intros.
+    elim (Pos.eq_dec b b0); intro Beq;
+    elim (Int.eq_dec 31 ofs ofs0); intro Oeq;
+    subst; try congruence;
+    tauto.
+  Qed.
+        exploit (Vptr_diff b ofs b0 ofs1); auto. intro Neq.
+        destruct Neq; unfold meminj_no_overlap in H1.
+        eapply H1 in H; eauto.
+        unfold proj_sumbool.
+        destruct (Val.eq (Vptr _ _) (Vptr _ _)); auto.
+        inv e. congruence.
+        unfold proj_sumbool.
+        destruct (Val.eq (Vptr _ _) (Vptr _ _)); auto.
+        inv e.
+        rewrite !Int.Z_mod_modulus_eq in H8.
+        apply H2 in H5. apply H2 in H4. subst.
+        rewrite Zmod_0_l in H8. rewrite <- !Zplus_0_r_reverse in H8.
+        rewrite <- !Int.unsigned_repr_eq in H8.
+        rewrite !Int.repr_unsigned in H8.
+        unfold Int.unsigned in H8.
+        apply Int.mkint_eq with (wordsize_one:=31%nat) (Px:=Int.intrange 31 ofs) (Py:=Int.intrange 31 ofs1) in H8.
+        destruct ofs, ofs1.  simpl in H8. apply H in H8. inv H8.
         
-  (*       apply andb_false_intro1. *)
-  (*       apply andb_false_intro1. *)
-  (*       apply andb_false_intro2. apply H3. *)
+        apply andb_false_intro1.
+        apply andb_false_intro1.
+        apply andb_false_intro2. apply H3.
 
-  (*       apply andb_false_intro1. *)
-  (*       apply andb_false_intro2. apply H3. *)
+        apply andb_false_intro1.
+        apply andb_false_intro2. apply H3.
 
-  (*       apply andb_false_intro2. *)
-  (*       apply IHlist_forall2 with b; auto. *)
-
-  (*       rewrite ptr_iptr_diff. reflexivity. *)
-  (* Qed. *)
-Admitted.
+        apply andb_false_intro2.
+        apply IHlist_forall2 with b; auto.
+        inv UNDEF; ss.
+  }
+  {
+        rewrite ptr_iptr_diff. reflexivity.
+  }
+  { des_ifs.
+    inv UNDEF; ss. exfalso. apply H7; eauto.
+    (* match goal with *)
+    (* | [ |- ?G = false ] => destruct G eqn:T *)
+    (* end; ss. *)
+    (* exfalso. *)
+    (* apply andb_true_iff in T. des. *)
+    (* apply andb_true_iff in T. des. *)
+    (* apply andb_true_iff in T. des. *)
+    (* apply beq_nat_true in T1. clarify. *)
+    (* destruct (Val.eq _ _) eqn:U; ss. clarify. clear U. *)
+  }
+Qed.
 
 Lemma check_value_iptr_inject_true:
   forall f vl vl',
@@ -293,33 +310,33 @@ Lemma check_value_iptr_inject_true:
   check_value n (Vinttoptr i) Q32 vl = true ->
   check_value n (Vinttoptr i) Q32 vl' = true. 
 Proof.
-  (* induction 1; intros; destruct n; simpl in *; auto.  *)
-  (* inv H; auto. *)
-  (* rewrite iptr_ptr_diff in H1; inv H1. *)
+  induction 1; intros; destruct n; simpl in *; auto.
+  inv H; auto.
+  rewrite iptr_ptr_diff in H1; inv H1.
 
-  (* destruct (andb_prop _ _ H1). destruct (andb_prop _ _ H). *)
-  (* apply IHlist_forall2 in H2. *)
-  (* congruence. *)
-(* Qed. *)
-Admitted.
+  destruct (andb_prop _ _ H1). destruct (andb_prop _ _ H).
+  apply IHlist_forall2 in H2.
+  congruence.
+Qed.
 
-Lemma check_value_iptr_inject_false:
-  forall f vl vl',
-  list_forall2 (memval_inject f) vl vl' ->
-  forall n i,
-  check_value n (Vinttoptr i) Q32 vl = false ->
-  check_value n (Vinttoptr i) Q32 vl' = false. 
+Lemma not_forall2
+      X (xs0 xs1: list X) f
+      (LEN: length xs0 = length xs1)
+      (NOT: ~List.Forall2 f xs0 xs1)
+  :
+    <<EXIST: exists n x0 x1, List.nth_error xs0 n = Some x0 /\
+                             List.nth_error xs1 n = Some x1 /\
+                             ~ f x0 x1>>
+.
 Proof.
-(*   induction 1; intros; destruct n; simpl in *; auto.  *)
-(*   inv H; auto. *)
-(*   rewrite iptr_ptr_diff; auto. *)
-
-(*   apply andb_false_elim in H1. *)
-(*   destruct H1; auto using andb_false_intro1. *)
-(*     apply IHlist_forall2 in e. *)
-(*     auto using andb_false_intro2. *)
-(* Qed. *)
-Admitted.
+  red.
+  ginduction xs0; ii; ss.
+  - destruct xs1; ss.
+  - destruct xs1; ss. clarify.
+    destruct (classic (f a x)).
+    { exploit IHxs0; eauto. i; des. exists (1+n)%nat. ss. esplits; eauto. }
+    { exists 0%nat. ss. esplits; eauto. }
+Qed.
 
 Lemma proj_value_inject:
   forall f vl1 vl2
@@ -328,26 +345,37 @@ Lemma proj_value_inject:
   list_forall2 (memval_inject f) vl1 vl2 ->
   val_inject f (proj_value Q32 vl1) (proj_value Q32 vl2).
 Proof.
-(*   intros. unfold proj_value. *)
-(*   inversion H; subst; auto. inversion H0; subst; auto. *)
-(*   case_eq (check_value (size_quantity_nat Q32) (Vptr b0 ofs1) Q32 *)
-(*         (Fragment (Vptr b0 ofs1) Q32 n :: al)); intros. *)
-(*   exploit check_value_ptr_inject_true. eexact H. eauto. eauto.  *)
-(*   intro. rewrite H4. econstructor; eauto. *)
+  intros.
+  destruct (classic (Forall2
+                       (fun x x' => ~ (exists v q n0, x = Undef /\ x' = Fragment v q n0)) vl1 vl2)); cycle 1.
+  { eapply not_forall2 in H0; cycle 1.
+    { eapply list_forall2_length; eauto. }
+    des. apply NNPP in H2. des. clarify.
+    exploit proj_value_undef; eauto.
+    { eapply nth_error_in; eauto. }
+    i. rewrite x0. econs; eauto.
+  }
+  rename H0 into UNDEF.
+  intros. unfold proj_value.
+  inversion H; subst; auto. inversion H0; subst; auto.
+  case_eq (check_value (size_quantity_nat Q32) (Vptr b0 ofs1) Q32
+        (Fragment (Vptr b0 ofs1) Q32 n :: al)); intros.
+  exploit check_value_ptr_inject_true. eexact H. eauto. eauto.
+  intro H4. rewrite H4. econstructor; eauto.
 
-(*   exploit check_value_ptr_inject_false. eexact H. eauto. eauto. eauto. eauto.  *)
-(*   intro. rewrite H4. econstructor; eauto. *)
+  exploit check_value_ptr_inject_false. eexact H. eauto. eauto. eauto. eauto. eauto.
+  intro H4. rewrite H4. econstructor; eauto.
 
-(*   inversion H; subst; auto. inversion H0; subst; auto. *)
-(*   case_eq (check_value (size_quantity_nat Q32) (Vinttoptr i) Q32 *)
-(*         (Fragment (Vinttoptr i) Q32 n :: al)); intros. *)
-(*   exploit check_value_iptr_inject_true. eexact H. eauto. eauto.  *)
-(*   intro. rewrite H3. econstructor; eauto. *)
+  inversion H; subst; auto. inversion H0; subst; auto.
+  case_eq (check_value (size_quantity_nat Q32) (Vinttoptr i) Q32
+        (Fragment (Vinttoptr i) Q32 n :: al)); intros.
+  exploit check_value_iptr_inject_true. eexact H. eauto. eauto.
+  intro H3. rewrite H3. econstructor; eauto.
 
-(*   exploit check_value_iptr_inject_false. eexact H. eauto. eauto.  *)
-(*   intro. rewrite H3. econstructor; eauto.   *)
-(* Qed. *)
-Admitted.
+  {
+    des_ifs.
+  }
+Qed.
 
 Lemma memval_inject_implies
       f vl1 vl2
