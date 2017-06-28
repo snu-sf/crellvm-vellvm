@@ -165,7 +165,8 @@ Proof.
     destruct_typ t1; eauto using undef__no_embedded_ptrs.
       destruct_typ t2; eauto using undef__no_embedded_ptrs.
       destruct (floating_point_order f1 f0); tinv H.
-      destruct f0; inv H; unfold val2GV; simpl; auto.
+      destruct f0; inv H; unfold val2GV; simpl; auto; eauto using undef__no_embedded_ptrs.
+      eauto using undef__no_embedded_ptrs.
 
     destruct_typ t1; eauto using undef__no_embedded_ptrs.
       destruct_typ t2; eauto using undef__no_embedded_ptrs.

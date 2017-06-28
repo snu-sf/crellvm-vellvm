@@ -407,9 +407,9 @@ match GV2val TD gv1 with
           match fp1 with
           | fp_double => 
                Some (val2GV TD (Vsingle (Float.to_single f)) Mfloat32)
-          | _ => None (* FIXME: not supported 80 and 128 yet. *)
+          | _ => gundef TD t2 (* FIXME: not supported 80 and 128 yet. *)
           end
-        else None
+        else gundef TD t2
     | _ => gundef TD t2
     end
 | Some (Vsingle f) =>

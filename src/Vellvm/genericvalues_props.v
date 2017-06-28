@@ -29,6 +29,7 @@ Import LLVMtypings.
 Import LLVMgv.
 Import AtomSet.
 
+Require Import sflib.
 (********************************************)
 (** * total *)
 
@@ -1592,7 +1593,8 @@ Proof.
 Qed.
 
 Lemma mtrunc_typsize : forall S los nts top t1 t2 gv1 gv2
-  (H0: wf_typ S (los,nts) t2) (H1: mtrunc (los,nts) top t1 t2 gv1 = Some gv2),
+  (H0: wf_typ S (los,nts) t2) (H1: mtrunc (los,nts) top t1 t2 gv1 = Some gv2)
+,
   exists sz, exists al,
     _getTypeSizeInBits_and_Alignment los 
       (getTypeSizeInBits_and_Alignment_for_namedts (los,nts) true) true t2 = 
@@ -1617,11 +1619,12 @@ Proof.
     destruct_typ t1; try solve [eapply gundef__getTypeSizeInBits; eauto].
     destruct_typ t2; try solve [eapply gundef__getTypeSizeInBits; eauto].
     remember (floating_point_order f1 f0) as R.
-    destruct R; tinv H1.
-    destruct f0; inv H1.
-    destruct f1; inv HeqR.
+    {
+      des_ifs; try by (eapply gundef__getTypeSizeInBits; eauto).
+      destruct f1; inv Heq.
       simpl. exists 32%nat. exists (getFloatAlignmentInfo los 32 true).
       auto.
+    }
 
     destruct_typ t1; try solve [eapply gundef__getTypeSizeInBits; eauto].
     destruct_typ t2; try solve [eapply gundef__getTypeSizeInBits; eauto].
@@ -2793,8 +2796,8 @@ Proof.
     destruct_typ t1; try solve [eapply gundef__matches_chunks; eauto].
     destruct_typ t2; try solve [eapply gundef__matches_chunks; eauto].
     remember (floating_point_order f1 f0) as R.
-    destruct R; tinv H1.
-    destruct f0; inv H1.
+    destruct R; tinv H1; try (by eapply gundef__matches_chunks; eauto).
+    destruct f0; inv H1; try (by eapply gundef__matches_chunks; eauto).
     destruct f1; inv HeqR.
       unfold gv_chunks_match_typ, vm_matches_typ; simpl.
       constructor; auto.
