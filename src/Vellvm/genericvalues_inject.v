@@ -165,6 +165,46 @@ Proof.
   eapply gv_inject_mc2undefs'; eauto.
 Qed.
 
+Lemma gv_inject_gundef_val2GV_int
+      TD sz0 gv0 wz i0 mi
+      (UNDEF: gundef TD (typ_int sz0) = ret gv0)
+  :
+    gv_inject mi gv0 (val2GV TD (Val.trunc (Vint wz i0) (sz0 - 1)) (AST.Mint (sz0 - 1)))
+.
+Proof.
+  unfold gundef in *. des_ifs.
+  unfold flatten_typ in *. des_ifs.
+  ginduction l0; ii; ss; clarify; ss.
+  - econs; eauto.
+    i. des_ifs.
+    ss.
+    exploit Int.Z_mod_modulus_range; eauto.
+    instantiate (1:= (sz0 - 1)%nat).
+    instantiate (1:= (Int.unsigned wz i0)).
+    i.
+    repeat (apply andb_true_iff; split); try omega.
+    + destruct (Nat.eq_dec _ _); ss.
+    + destruct (zle _ _); ss. exfalso.
+      omega.
+    + destruct (zlt _ _); ss. exfalso.
+      omega.
+Qed.
+
+Lemma gv_inject_gundef_val2GV_float
+      TD gv0 mi
+      fp f
+      (UNDEF: gundef TD (typ_floatpoint fp) = ret gv0)
+      (ORDER: floating_point_order fp fp_double = true)
+  :
+    gv_inject mi gv0 (val2GV TD (Vsingle (Floats.Float.to_single f)) AST.Mfloat32)
+.
+Proof.
+  unfold gundef in *. des_ifs.
+  unfold flatten_typ in *. des_ifs. ss.
+  des_ifs.
+  - econs; eauto.
+Qed.
+
 Ltac chunk_simpl := i; clarify.
 Ltac chunk_auto := econs; eauto; chunk_simpl.
 Ltac chunk_auto_try := try (by chunk_auto).
@@ -280,6 +320,29 @@ Proof.
     eapply wf_globals__wf_global; eauto.
 Qed.
 
+
+
+(* TODO: location *)
+Ltac des_ifs_safe_aux TAC :=
+  TAC;
+  repeat
+    multimatch goal with
+    | |- context[match ?x with _ => _ end] =>
+      match (type of x) with
+      | { _ } + { _ } => destruct x; TAC; []
+      | _ => let Heq := fresh "Heq" in destruct x as [] eqn: Heq; TAC; []
+      end
+    | H: context[ match ?x with _ => _ end ] |- _ =>
+      match (type of x) with
+      | { _ } + { _ } => destruct x; TAC; []
+      | _ => let Heq := fresh "Heq" in destruct x as [] eqn: Heq; TAC; []
+      end
+    end.
+Tactic Notation "des_ifs_safe" := des_ifs_safe_aux clarify.
+Tactic Notation "des_ifs_safe" tactic(TAC) := des_ifs_safe_aux TAC.
+
+
+
 (* Generic-value operations preserve gv_inject. *)
 Lemma simulation__mtrunc_aux : forall mi TD top t1 gv1 t2 gv1' gv2,
   gv_inject mi gv1 gv1' ->
@@ -290,32 +353,61 @@ Lemma simulation__mtrunc_aux : forall mi TD top t1 gv1 t2 gv1' gv2,
     mtrunc TD top t1 t2 gv1' = Some gv2' /\
     gv_inject mi gv2 gv2'.  
 Proof.
-(*   intros. *)
-(*   apply gv_inject__val_inject with (TD:=TD) in H. *)
-(*   destruct H as [v1 [v2 [J1 [J2 J3]]]]. *)
-(*   unfold mtrunc in *. *)
-(*   rewrite J1. rewrite J2. rewrite J1 in H0. *)
-(*   inv J3; auto. *)
-(*     destruct_typ t1; destruct_typ t2; inv H0; try solve [ *)
-(*       eauto using gv_inject_gundef | *)
-(*       unfold val2GV; simpl; destruct (le_lt_dec wz (s1-1)); auto *)
-(*     ]. *)
+  intros.
+  apply gv_inject__val_inject with (TD:=TD) in H.
+  destruct H as [v1 [v2 [J1 [J2 J3]]]].
+  unfold mtrunc in *.
+  rewrite J1. rewrite J2. rewrite J1 in H0.
+  inv J3; auto.
+    destruct_typ t1; destruct_typ t2; inv H0; try solve [
+      eauto using gv_inject_gundef |
+      unfold val2GV; simpl; destruct (le_lt_dec wz (s1-1)); auto
+    ].
 
-(*     destruct_typ t1; destruct_typ t2; inv H0; eauto using gv_inject_gundef. *)
-(*       match goal with *)
-(*       | H: context [floating_point_order ?f1 ?f0] |- _ =>  *)
-(*         destruct (floating_point_order f1 f0); inv H;  *)
-(*            simpl; eauto using gv_inject_gundef; *)
-(*         destruct f0; inv H0; unfold val2GV; simpl; eauto using gv_inject_gundef *)
-(*       end. *)
-(*     destruct_typ t1; destruct_typ t2; inv H0; eauto using gv_inject_gundef. *)
+    { unfold GV2val in *.
+      des_ifs.
+      - right. esplits; eauto.
+        unfold val2GV. ss. econs; eauto. i.
+        des_ifs. ss.
+        omega.
+      - left. split; ss. unfold val2GV.
+        econs; eauto. chunk_simpl.
+    }
+
+    destruct_typ t1; destruct_typ t2; inv H0; eauto using gv_inject_gundef.
+      match goal with
+      | H: context [floating_point_order ?f1 ?f0] |- _ =>
+        destruct (floating_point_order f1 f0); inv H;
+           simpl; eauto using gv_inject_gundef;
+        destruct f0; inv H0; unfold val2GV; simpl; eauto using gv_inject_gundef
+      end.
+    destruct_typ t1; destruct_typ t2; inv H0; eauto using gv_inject_gundef.
  
-(*     inv H0. eauto using gv_inject_gundef. *)
-(*     inv H0. eauto using gv_inject_gundef. *)
+    inv H0. eauto using gv_inject_gundef.
+    inv H0. eauto using gv_inject_gundef.
 
-(*     right. rewrite H0. eauto using gv_inject_gundef. *)
-(* Qed. *)
-Admitted.
+    { unfold GV2val in *. des_ifs_safe.
+      des_ifs; try (by (right; esplits; eauto using gv_inject_gundef)).
+      - right.
+        esplits; eauto.
+        eapply gv_inject_gundef_val2GV_int; eauto.
+      - right.
+        esplits; eauto.
+        eapply gv_inject_gundef_val2GV_int; eauto.
+      - right.
+        esplits; eauto.
+        eapply gv_inject_gundef_val2GV_int; eauto.
+      - right.
+        esplits; eauto.
+        eapply gv_inject_gundef_val2GV_float; eauto.
+      - right.
+        esplits; eauto.
+        eapply gv_inject_gundef_val2GV_float; eauto.
+      - right.
+        esplits; eauto.
+        eapply gv_inject_gundef_val2GV_float; eauto.
+    }
+Qed.
 
 Lemma simulation__mtrunc : forall mi TD top t1 gv1 t2 gv1' gv2,
   gv_inject mi gv1 gv1' ->
