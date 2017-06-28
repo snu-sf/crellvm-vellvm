@@ -125,22 +125,6 @@ Proof.
       congruence.
 Qed.
 
-Lemma val_inject__result_match: forall mi v1 v2
-  (Hinj: MoreMem.val_inject mi v1 v2), val_result_match v1 v2.
-Proof.
-  intros.
-  inv Hinj; constructor; auto.
-Qed.
-
-Lemma gv_inject__result_match: forall mi gvs1 gvs2
-  (Hinj:  genericvalues_inject.gv_inject mi gvs1 gvs2), result_match gvs1 gvs2.
-Proof.
-  unfold result_match.
-  induction 1; auto.
-    constructor; auto.
-      split; eauto using val_inject__result_match.
-Qed.
-
 (***********************************************************************)
 (* Properties of undefined programs *)
 Lemma s_goeswrong__undefined_program: forall P main VarArgs tr St
