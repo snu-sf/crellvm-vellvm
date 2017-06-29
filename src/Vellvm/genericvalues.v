@@ -600,7 +600,7 @@ match (t1, t2) with
                         (Mint (sz2-1)))
      | extop_s => Some (val2GV TD (Val.sign_ext' (sz2-1) (Vint wz1 i1))
                         (Mint (sz2-1)))
-     | _ => None
+     | _ => gundef TD t2
      end
    | _ => gundef TD t2
    end
@@ -613,14 +613,14 @@ match (t1, t2) with
       | extop_fp =>
          match fp2 with
          | fp_double => Some (val2GV TD (Vfloat f1) Mfloat64)
-         | _ => None (* FIXME: not supported 80 and 128 yet. *)
+         | _ => gundef TD t2 (* FIXME: not supported 80 and 128 yet. *)
          end
-      | _ => None
+      | _ => gundef TD t2
       end
     | _ => gundef TD t2
     end
-  else None
-| (_, _) => None
+  else gundef TD t2
+| (_, _) => gundef TD t2
 end.
 
 Definition micmp_int TD c gv1 gv2 : option GenericValue :=

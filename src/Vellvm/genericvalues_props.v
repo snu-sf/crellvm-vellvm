@@ -1638,37 +1638,44 @@ Lemma mext_typsize : forall S los nts eop t1 t2 gv1 gv2
       (getTypeSizeInBits_and_Alignment_for_namedts (los,nts) true) true t2 = 
          Some (sz, al) /\
     Coqlib.nat_of_Z (Coqlib.ZRdiv (Z_of_nat sz) 8) = sizeGenericValue gv2.
-Proof.  
-  intros. unfold mext, GV2val in H1.
-  destruct_typ t1; tinv H1.
-    destruct_typ t2; tinv H1.
-    destruct gv1; 
-      try solve [inversion H1 | eapply gundef__getTypeSizeInBits; eauto].
-    destruct p.
-    destruct gv1; 
-      try solve [inversion H1 | eapply gundef__getTypeSizeInBits; eauto].
-    destruct v; try solve [eapply gundef__getTypeSizeInBits; eauto].
-    destruct eop; inv H1.
-      simpl. exists (Size.to_nat s1).
-      exists (getIntAlignmentInfo los (Size.to_nat s1) true).
-      erewrite int_typsize; eauto.
+Proof.
+  {
+    ii. unfold mext, GV2val in H1.
+    des_ifs; try (by eapply gundef__getTypeSizeInBits; eauto).
+    - ss. esplits; eauto. erewrite int_typsize; eauto.
+    - ss. esplits; eauto. erewrite int_typsize; eauto.
+    - ss. esplits; eauto.
+  }
+  (* intros. unfold mext, GV2val in H1. *)
+  (* destruct_typ t1; tinv H1. *)
+  (*   destruct_typ t2; tinv H1. *)
+  (*   destruct gv1;  *)
+  (*     try solve [inversion H1 | eapply gundef__getTypeSizeInBits; eauto]. *)
+  (*   destruct p. *)
+  (*   destruct gv1;  *)
+  (*     try solve [inversion H1 | eapply gundef__getTypeSizeInBits; eauto]. *)
+  (*   destruct v; try solve [eapply gundef__getTypeSizeInBits; eauto]. *)
+  (*   destruct eop; inv H1. *)
+  (*     simpl. exists (Size.to_nat s1). *)
+  (*     exists (getIntAlignmentInfo los (Size.to_nat s1) true). *)
+  (*     erewrite int_typsize; eauto. *)
 
-      simpl. exists (Size.to_nat s1).
-      exists (getIntAlignmentInfo los (Size.to_nat s1) true).
-      erewrite int_typsize; eauto.
+  (*     simpl. exists (Size.to_nat s1). *)
+  (*     exists (getIntAlignmentInfo los (Size.to_nat s1) true). *)
+  (*     erewrite int_typsize; eauto. *)
 
-    destruct_typ t2; tinv H1.
-    remember (floating_point_order f f0) as R.
-    destruct R; tinv H1.
-    destruct gv1; 
-      try solve [inversion H1 | eapply gundef__getTypeSizeInBits; eauto].
-    destruct p.
-    destruct gv1; 
-      try solve [inversion H1 | eapply gundef__getTypeSizeInBits; eauto].
-    destruct v; try solve [eapply gundef__getTypeSizeInBits; eauto].
-    destruct eop; inv H1.
-    destruct f0; inv H2; simpl.
-      exists 64%nat. exists (getFloatAlignmentInfo los 64 true). auto.
+  (*   destruct_typ t2; tinv H1. *)
+  (*   remember (floating_point_order f f0) as R. *)
+  (*   destruct R; tinv H1. *)
+  (*   destruct gv1;  *)
+  (*     try solve [inversion H1 | eapply gundef__getTypeSizeInBits; eauto]. *)
+  (*   destruct p. *)
+  (*   destruct gv1;  *)
+  (*     try solve [inversion H1 | eapply gundef__getTypeSizeInBits; eauto]. *)
+  (*   destruct v; try solve [eapply gundef__getTypeSizeInBits; eauto]. *)
+  (*   destruct eop; inv H1. *)
+  (*   destruct f0; inv H2; simpl. *)
+  (*     exists 64%nat. exists (getFloatAlignmentInfo los 64 true). auto. *)
 Qed.
 
 Lemma extractGenericValue_typsize : forall los nts t1 gv1 const_list typ' gv
@@ -2809,37 +2816,64 @@ Qed.
 Lemma mext_matches_chunks : forall S td eop t1 t2 gv1 gv2
   (Hzty: wf_typ S td t2) (H1: mext td eop t1 t2 gv1 = Some gv2),
   gv_chunks_match_typ td gv2 t2.
-Proof.  
-  intros. destruct td. unfold mext, GV2val in H1.
-  destruct_typ t1; tinv H1.
-    destruct_typ t2; tinv H1.
-    destruct gv1; 
-      try solve [inversion H1 | eapply gundef__matches_chunks; eauto].
-    destruct p.
-    destruct gv1; 
-      try solve [inversion H1 | eapply gundef__matches_chunks; eauto].
-    destruct v; try solve [eapply gundef__matches_chunks; eauto].
-Local Opaque Val.zero_ext' Val.sign_ext'.
-    destruct eop; inv H1;
-      unfold gv_chunks_match_typ, vm_matches_typ; constructor; try solve [
-        auto |
-        split; try solve [auto | simpl; apply Val.zero_ext'_has_chunk
-                               | simpl; apply Val.sign_ext'_has_chunk]
-      ].
-Transparent Val.zero_ext' Val.sign_ext'.
+Proof.
+  {
+    ii. unfold mext in *.
+    Local Opaque Val.zero_ext' Val.sign_ext'.
+    des_ifs; try (by eapply gundef__matches_chunks; eauto).
+    - unfold val2GV, GV2val in *. des_ifs.
+      unfold gv_chunks_match_typ. unfold flatten_typ. des_ifs.
+      ss. clarify.
+      econs; eauto.
+      exploit Val.zero_ext'_has_chunk; eauto.
+      instantiate (1:= (sz0 - 1)%nat).
+      instantiate (1:= (Vint wz i0)%nat).
+      i. unfold Val.has_chunk in *. des_ifs.
+    - unfold val2GV, GV2val in *. des_ifs.
+      unfold gv_chunks_match_typ. unfold flatten_typ. des_ifs.
+      ss. clarify.
+      econs; eauto.
+      exploit Val.sign_ext'_has_chunk; eauto.
+      instantiate (1:= (sz0 - 1)%nat).
+      instantiate (1:= (Vint wz i0)%nat).
+      i. unfold Val.has_chunk in *. des_ifs.
+    - unfold val2GV, GV2val in *. des_ifs.
+      unfold gv_chunks_match_typ. unfold flatten_typ. des_ifs.
+      unfold floating_point_order in *. des_ifs.
+      compute in Heq0. clarify.
+      econs; eauto.
+      ss.
+  }
+(*   intros. destruct td. unfold mext, GV2val in H1. *)
+(*   destruct_typ t1; tinv H1. *)
+(*     destruct_typ t2; tinv H1. *)
+(*     destruct gv1;  *)
+(*       try solve [inversion H1 | eapply gundef__matches_chunks; eauto]. *)
+(*     destruct p. *)
+(*     destruct gv1;  *)
+(*       try solve [inversion H1 | eapply gundef__matches_chunks; eauto]. *)
+(*     destruct v; try solve [eapply gundef__matches_chunks; eauto]. *)
+(* Local Opaque Val.zero_ext' Val.sign_ext'. *)
+(*     destruct eop; inv H1; *)
+(*       unfold gv_chunks_match_typ, vm_matches_typ; constructor; try solve [ *)
+(*         auto | *)
+(*         split; try solve [auto | simpl; apply Val.zero_ext'_has_chunk *)
+(*                                | simpl; apply Val.sign_ext'_has_chunk] *)
+(*       ]. *)
+(* Transparent Val.zero_ext' Val.sign_ext'. *)
 
-    destruct_typ t2; tinv H1.
-    destruct (floating_point_order f f0); tinv H1.
-    destruct gv1; 
-      try solve [inversion H1 | eapply gundef__matches_chunks; eauto].
-    destruct p.
-    destruct gv1; 
-      try solve [inversion H1 | eapply gundef__matches_chunks; eauto].
-    destruct v; try solve [eapply gundef__matches_chunks; eauto].
-    destruct eop; inv H1.
-    destruct f0; inv H0; simpl;
-      unfold gv_chunks_match_typ, vm_matches_typ; simpl; constructor; 
-        simpl; auto.
+(*     destruct_typ t2; tinv H1. *)
+(*     destruct (floating_point_order f f0); tinv H1. *)
+(*     destruct gv1;  *)
+(*       try solve [inversion H1 | eapply gundef__matches_chunks; eauto]. *)
+(*     destruct p. *)
+(*     destruct gv1;  *)
+(*       try solve [inversion H1 | eapply gundef__matches_chunks; eauto]. *)
+(*     destruct v; try solve [eapply gundef__matches_chunks; eauto]. *)
+(*     destruct eop; inv H1. *)
+(*     destruct f0; inv H0; simpl; *)
+(*       unfold gv_chunks_match_typ, vm_matches_typ; simpl; constructor;  *)
+(*         simpl; auto. *)
 Qed.
 
 Lemma extractGenericValue_matches_chunks : forall S td t1 gv1 const_list typ' gv

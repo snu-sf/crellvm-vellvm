@@ -175,23 +175,27 @@ Qed.
 Lemma mext_preserves_no_embedded_ptrs: forall td eop t1 t2 gv gv',
   mext td eop t1 t2 gv = Some gv' -> no_embedded_ptrs gv'.
 Proof.
-  intros.
-  unfold mext in H.
-  remember (GV2val td gv) as R.
-  destruct t1; tinv H.
-    destruct t2; tinv H.
-    destruct R; eauto using undef__no_embedded_ptrs.
-    destruct v; eauto using undef__no_embedded_ptrs.
-    destruct eop; inv H; simpl; auto.
+  {
+    ii. unfold mext in *.
+    des_ifs; eauto using undef__no_embedded_ptrs.
+  }
+  (* intros. *)
+  (* unfold mext in H. *)
+  (* remember (GV2val td gv) as R. *)
+  (* destruct t1; tinv H. *)
+  (*   destruct t2; tinv H. *)
+  (*   destruct R; eauto using undef__no_embedded_ptrs. *)
+  (*   destruct v; eauto using undef__no_embedded_ptrs. *)
+  (*   destruct eop; inv H; simpl; auto. *)
 
-    destruct_typ t2; tinv H.
-    match goal with
-      | H : (if ?t then _ else _ ) = _ |- _ => destruct t; tinv H
-    end.
-    destruct R; eauto using undef__no_embedded_ptrs.
-    destruct v; eauto using undef__no_embedded_ptrs.
-    destruct eop; tinv H; simpl; auto.
-    destruct f; inv H; unfold val2GV; simpl; auto.
+  (*   destruct_typ t2; tinv H. *)
+  (*   match goal with *)
+  (*     | H : (if ?t then _ else _ ) = _ |- _ => destruct t; tinv H *)
+  (*   end. *)
+  (*   destruct R; eauto using undef__no_embedded_ptrs. *)
+  (*   destruct v; eauto using undef__no_embedded_ptrs. *)
+  (*   destruct eop; tinv H; simpl; auto. *)
+  (*   destruct f; inv H; unfold val2GV; simpl; auto. *)
 Qed.
 
 Lemma nonptr_no_embedded_ptrs: forall v t td,
