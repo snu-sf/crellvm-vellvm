@@ -23,6 +23,11 @@ Import LLVMgv.
 Import LLVMtd.
 Import LLVMtypings.
 
+Ltac chunk_simpl := i; clarify.
+Ltac chunk_auto := econs; eauto; chunk_simpl.
+Ltac chunk_auto_try := try (by chunk_auto).
+Ltac public_auto := econs; eauto; i; clarify.
+
 
 (* TODO: location *)
 Lemma has_chunk__has_chunkb
@@ -43,6 +48,12 @@ Proof.
   + destruct (zlt (Int.unsigned n i0) (Int.modulus n)); ss.
 Qed.
 
+Inductive undef_implies_public (mi: meminj) (v1 v2: val): Prop :=
+| undef_implies_public_intro
+    (PUBLIC: v1 = Vundef ->
+             (forall b2 ofs2, v2 = Vptr b2 ofs2 ->
+             exists b1 ofs1 delta, mi b1 = Some (b2, delta) /\ ofs2 = Int.add 31 ofs1 (Int.repr 31 delta)))
+.
 
 (* The file proves the injection between generic values in terms of memory
    injection. *)
@@ -50,7 +61,9 @@ Inductive gv_inject (mi: meminj) : GenericValue -> GenericValue -> Prop :=
 | gv_inject_nil : gv_inject mi nil nil
 | gv_inject_cons : forall
     v1 m v2 gv1 gv2
-    (CHUNK: v1 = Vundef -> v2 <> Vundef -> Val.has_chunkb v2 m),
+    (CHUNK: v1 = Vundef -> v2 <> Vundef -> Val.has_chunkb v2 m)
+    (PUBLIC: undef_implies_public mi v1 v2)
+  ,
     MoreMem.val_inject mi v1 v2 -> gv_inject mi gv1 gv2 ->
     gv_inject mi ((v1,m)::gv1) ((v2,m)::gv2)
 .
@@ -107,6 +120,12 @@ Lemma gv_inject_incr:
 Proof.
   intros.
   induction H0; eauto using val_list_inject_incr.
+  econs; eauto.
+  - inv H0; ss.
+    inv PUBLIC.
+    econs; eauto.
+    i. clarify.
+    exploit PUBLIC0; eauto. i; des. esplits; eauto.
 Qed.
 
 Lemma gv_inject_app : forall mi gv1 gv1' gv2 gv2',
@@ -131,6 +150,7 @@ Lemma gv_inject_uninits : forall mi n, gv_inject mi (uninits n) (uninits n).
 Proof.
   unfold uninits.
   induction n; intros; simpl; eauto using gv_inject_app.
+  chunk_auto.
 Qed.
 
 Lemma gv_inject__val_inject : forall mi gv1 gv2 TD,
@@ -150,6 +170,7 @@ Lemma gv_inject_mc2undefs: forall mi mcs,
 Proof.
   unfold mc2undefs.
   induction mcs; simpl; auto.
+  chunk_auto.
 Qed.
 
 Lemma gv_inject_mc2undefs': forall mi mcs gvs',
@@ -164,7 +185,9 @@ Proof.
     apply andb_true_iff in H. des.
     apply memory_chunk_eq_prop in H. subst.
     econs; eauto.
-Qed.
+    (* i; clarify. ss. des_ifs. *)
+    (* exploit IHmcs; eauto. i; des. *)
+Abort.
 
 Lemma gv_inject_gundef : forall mi TD t gv, gundef TD t = Some gv -> gv_inject mi gv gv.
 Proof.
@@ -183,8 +206,9 @@ Proof.
   intros. unfold gundef in UNDEF. 
   inv_mbind. (* apply gv_inject_mc2undefs. *)
   unfold gv_chunks_match_typb in *. des_ifs.
-  eapply gv_inject_mc2undefs'; eauto.
-Qed.
+(*   eapply gv_inject_mc2undefs'; eauto. *)
+(* Qed. *)
+Abort.
 
 Lemma gv_inject_gundef_val2GV
       TD gv0 mi ty
@@ -192,6 +216,7 @@ Lemma gv_inject_gundef_val2GV
       v mc
       (TY: flatten_typ TD ty = ret [mc])
       (CHUNK: Val.has_chunkb v mc)
+      (PUBLIC: undef_implies_public mi Vundef v)
   :
     gv_inject mi gv0 (val2GV TD v mc)
 .
@@ -271,6 +296,8 @@ Proof.
   eapply gv_inject_gundef_val2GV; eauto.
   { compute. des_ifs. }
   { apply has_chunkb_trunc_int. }
+  econs; eauto.
+  i. ss. des_ifs.
 Qed.
 
 Lemma gv_inject_gundef_trunc_float
@@ -282,12 +309,10 @@ Lemma gv_inject_gundef_trunc_float
     gv_inject mi gv0 (val2GV TD (Vsingle (Floats.Float.to_single f)) AST.Mfloat32)
 .
 Proof.
-  eapply gv_inject_gundef_val2GV; eauto. compute. des_ifs.
+  eapply gv_inject_gundef_val2GV; eauto.
+  { compute. des_ifs. }
+  { public_auto. }
 Qed.
-
-Ltac chunk_simpl := i; clarify.
-Ltac chunk_auto := econs; eauto; chunk_simpl.
-Ltac chunk_auto_try := try (by chunk_auto).
 
 Lemma gv_inject_nptr_val_refl : forall TD v mi m,
   (forall b ofs, v <> Vptr b ofs) ->
@@ -371,6 +396,7 @@ Proof.
         apply mi_globals0 in H1.
         apply gv_inject_cons; auto.
           { chunk_simpl. }
+          { public_auto. }
           apply MoreMem.val_inject_ptr with (delta:=0); auto.
             rewrite Int.add_zero; auto.
 Qed.
@@ -447,11 +473,17 @@ Proof.
     { unfold GV2val in *.
       des_ifs.
       - right. esplits; eauto.
-        unfold val2GV. ss. econs; eauto. i.
-        des_ifs. ss.
-        omega.
+        unfold val2GV. ss.
+        econs; eauto.
+        + i.
+          des_ifs. ss.
+          omega.
+        + public_auto.
+          des_ifs.
       - left. split; ss. unfold val2GV.
-        econs; eauto. chunk_simpl.
+        econs; eauto.
+        + chunk_simpl.
+        + public_auto.
     }
 
     destruct_typ t1; destruct_typ t2; inv H0; eauto using gv_inject_gundef.
@@ -461,6 +493,7 @@ Proof.
            simpl; eauto using gv_inject_gundef;
         destruct f0; inv H0; unfold val2GV; simpl; eauto using gv_inject_gundef
       end.
+      { left. split; ss. econs; eauto. econs; eauto. i; clarify. }
     destruct_typ t1; destruct_typ t2; inv H0; eauto using gv_inject_gundef.
  
     inv H0. eauto using gv_inject_gundef.
@@ -531,8 +564,8 @@ Proof.
     destruct t1; destruct t2; inv H0; simpl; eauto using gv_inject_gundef.
       destruct eop; inv H1;
         try solve [unfold val2GV; simpl; eauto using gv_inject_gundef].
-      { left. split; ss. econs; eauto. chunk_simpl. }
-      { left. split; ss. econs; eauto. chunk_simpl. }
+      { left. split; ss. econs; eauto. chunk_simpl. public_auto. }
+      { left. split; ss. econs; eauto. chunk_simpl. public_auto. }
       match goal with
       | H: context [floating_point_order ?f1 ?f0] |- _ =>
          destruct (floating_point_order f1 f0); inv H; eauto using gv_inject_gundef
@@ -547,6 +580,7 @@ Proof.
         destruct eop; inv H0; simpl; eauto using gv_inject_gundef;
         destruct f1; inv H1; simpl; unfold val2GV; auto
       end; eauto using gv_inject_gundef.
+      { left. split; ss. econs; eauto. public_auto. }
 
   { Local Opaque Val.zero_ext' Val.sign_ext'.
     des_ifs; ss; try (by (right; esplits; eauto using gv_inject_gundef)).
@@ -554,13 +588,16 @@ Proof.
       { compute. des_ifs. }
       eapply has_chunk__has_chunkb; eauto.
       eapply Val.zero_ext'_has_chunk.
+      public_auto.
     - right. esplits; eauto. eapply gv_inject_gundef_val2GV; eauto.
       { compute. des_ifs. }
       eapply has_chunk__has_chunkb; eauto.
       eapply Val.sign_ext'_has_chunk.
+      public_auto.
     - right. esplits; eauto. compute in Heq. des_ifs.
       eapply gv_inject_gundef_val2GV; eauto.
       compute; des_ifs.
+      public_auto.
   }
 Qed.
 
@@ -625,39 +662,67 @@ Proof.
        apply xor_isnt_ptr.
   {
     des_ifs; try (by right; esplits; eauto using gv_inject_gundef);
-      right; esplits; eauto; (eapply gv_inject_gundef_val2GV; eauto; [ by compute; des_ifs | ]);
-        rewrite <- e; rewrite Nat.add_sub; eapply has_chunk__has_chunkb.
+      right; esplits; eauto; (eapply gv_inject_gundef_val2GV; eauto;
+                              [ by compute; des_ifs | | public_auto ]);
+        try (rewrite <- e; rewrite Nat.add_sub; eapply has_chunk__has_chunkb).
     - eapply Val.add_has_chunk1.
+    - exploit add_isnt_ptr; eauto; []; i; ss.
     - eapply Val.sub_has_chunk1.
+    - exploit sub_isnt_ptr; eauto; []; i; ss.
     - eapply Val.mul_has_chunk1.
+    - exploit mul_isnt_ptr; eauto; []; i; ss.
     - unfold Val.divu in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - exploit divu_isnt_ptr; eauto; []; i; ss.
     - unfold Val.divs in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - exploit divs_isnt_ptr; eauto; []; i; ss.
     - unfold Val.modu in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - exploit modu_isnt_ptr; eauto; []; i; ss.
     - unfold Val.mods in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - exploit mods_isnt_ptr; eauto; []; i; ss.
     - unfold Val.shl in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - exploit shl_isnt_ptr; eauto; []; i; ss.
     - unfold Val.shrx in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - exploit shrx_isnt_ptr; eauto; []; i; ss.
     - unfold Val.shr in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - exploit shr_isnt_ptr; eauto; []; i; ss.
     - unfold Val.and in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - exploit and_isnt_ptr; eauto; []; i; ss.
     - unfold Val.or in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - exploit or_isnt_ptr; eauto; []; i; ss.
     - unfold Val.xor in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - exploit xor_isnt_ptr; eauto; []; i; ss.
   }
   {
     des_ifs; try (by right; esplits; eauto using gv_inject_gundef);
-      right; esplits; eauto; (eapply gv_inject_gundef_val2GV; eauto; [ by compute; des_ifs | ]);
-        rewrite <- e; rewrite Nat.add_sub; eapply has_chunk__has_chunkb.
+      right; esplits; eauto; (eapply gv_inject_gundef_val2GV; eauto;
+                              [ by compute; des_ifs | | public_auto ]);
+      try (rewrite <- e; rewrite Nat.add_sub; eapply has_chunk__has_chunkb).
     - eapply Val.add_has_chunk1.
+    - exploit add_isnt_ptr; eauto; []; i; ss.
     - eapply Val.sub_has_chunk1.
+    - exploit sub_isnt_ptr; eauto; []; i; ss.
     - eapply Val.mul_has_chunk1.
+    - exploit mul_isnt_ptr; eauto; []; i; ss.
     - unfold Val.divu in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - exploit divu_isnt_ptr; eauto; []; i; ss.
     - unfold Val.divs in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - exploit divs_isnt_ptr; eauto; []; i; ss.
     - unfold Val.modu in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - exploit modu_isnt_ptr; eauto; []; i; ss.
     - unfold Val.mods in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - exploit mods_isnt_ptr; eauto; []; i; ss.
     - unfold Val.shl in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - exploit shl_isnt_ptr; eauto; []; i; ss.
     - unfold Val.shrx in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - exploit shrx_isnt_ptr; eauto; []; i; ss.
     - unfold Val.shr in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - exploit shr_isnt_ptr; eauto; []; i; ss.
     - unfold Val.and in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - exploit and_isnt_ptr; eauto; []; i; ss.
     - unfold Val.or in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - exploit or_isnt_ptr; eauto; []; i; ss.
     - unfold Val.xor in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - exploit xor_isnt_ptr; eauto; []; i; ss.
   }
 Qed.
 
@@ -703,12 +768,13 @@ Proof.
   inv J3; try solve [inv H1; eauto using gv_inject_gundef].
   {
     - des_ifs; inv J3'; try (by left; split; ss; eauto using gv_inject_gundef);
-        try (by right; esplits; eauto; eapply gv_inject_gundef_val2GV; eauto; solve_flatten_typ).
-      + left. split; ss. unfold val2GV. econs; eauto.
-      + left. split; ss. unfold val2GV. econs; eauto.
-      + left. split; ss. unfold val2GV. econs; eauto.
-      + left. split; ss. unfold val2GV. econs; eauto.
-      + left. split; ss. unfold val2GV. econs; eauto.
+        try (by right; esplits; eauto; eapply gv_inject_gundef_val2GV;
+             eauto; [ solve_flatten_typ | public_auto ]).
+      + left. split; ss. unfold val2GV. econs; eauto. public_auto.
+      + left. split; ss. unfold val2GV. econs; eauto. public_auto.
+      + left. split; ss. unfold val2GV. econs; eauto. public_auto.
+      + left. split; ss. unfold val2GV. econs; eauto. public_auto.
+      + left. split; ss. unfold val2GV. econs; eauto. public_auto.
   }
   {
     (* Float(64) *)
@@ -718,7 +784,8 @@ Proof.
           try (left; split; auto; apply gv_inject_nptr_val_refl;
             try solve [auto | intro; simpl; congruence]).
     { des_ifs; try (by left; split; ss; eauto using gv_inject_gundef);
-        try (by right; esplits; eauto; eapply gv_inject_gundef_val2GV; eauto; solve_flatten_typ).
+        try (by right; esplits; eauto; eapply gv_inject_gundef_val2GV; eauto;
+             [ solve_flatten_typ | public_auto ]).
     }
   }
   {
@@ -834,9 +901,9 @@ Proof.
   instantiate (1:= v1).
   instantiate (1:= cmp).
   intro BOOL. unfold Val.is_bool in *. des.
-  - repeat rewrite BOOL. econs; eauto.
-  - repeat rewrite BOOL. econs; eauto. econs; eauto.
-  - repeat rewrite BOOL. econs; eauto. econs; eauto.
+  - repeat rewrite BOOL. econs; eauto. public_auto.
+  - repeat rewrite BOOL. econs; eauto. public_auto. econs; eauto.
+  - repeat rewrite BOOL. econs; eauto. public_auto. econs; eauto.
 Qed.
 
 Lemma simulation__micmp_aux : forall mi TD c t gv1 gv1' gv2 gv2' gv3,
@@ -861,9 +928,13 @@ Proof.
     inv J3; inv J3';
       des_ifs; try (by left; split; ss; eauto using gv_inject_gundef; unfold val2GV in *;
                     try apply inject_val_cmp; try apply inject_val_cmpu_int);
-        try (by right; esplits; eauto; eapply gv_inject_gundef_val2GV; eauto; try solve_flatten_typ;
-             try eapply has_chunk__has_chunkb;
-             try eapply Val.cmp_has_Mint0; try eapply Val.cmpu_int_has_Mint0).
+        try (by right; esplits; eauto; eapply gv_inject_gundef_val2GV;
+             eauto; [ solve_flatten_typ | eapply has_chunk__has_chunkb;
+                                          try eapply Val.cmp_has_Mint0; try eapply Val.cmpu_int_has_Mint0 |
+                      public_auto;
+                      try (exploit cmp_isnt_ptr; eauto; []; i; ss);
+                      try (exploit cmpu_int_isnt_ptr; eauto; []; i; ss)
+            ]).
   }
   (* inv J3; try solve [inv H1; eauto 3 using gv_inject_gundef]. *)
   (*   inv J3'; try solve [auto | inv H1; eauto using gv_inject_gundef]; *)
@@ -907,6 +978,16 @@ Proof.
   all: econs; eauto.
 Qed.
 
+Lemma fcmp_isnt_ptr
+      cmp v1 v2 b ofs
+  :
+    <<VAL: Val.cmpf cmp v1 v2 <> Vptr b ofs>>
+.
+Proof.
+  red.
+  unfold Val.cmpf. unfold Val.of_optbool. des_ifs.
+Qed.
+
 Lemma simulation__mfcmp_aux : forall mi TD c t gv1 gv1' gv2 gv2' gv3,
   gv_inject mi gv1 gv1' ->
   gv_inject mi gv2 gv2' ->
@@ -930,10 +1011,16 @@ Proof.
       des_ifs;
       try (by left; split; ss; eauto using gv_inject_gundef; try unfold val2GV;
            try apply inject_val_cmpf; repeat (econs; eauto));
-      try (by right; esplits; eauto; eapply gv_inject_gundef_val2GV; eauto; try solve_flatten_typ;
-           try eapply has_chunk__has_chunkb; try eapply Val.cmpf_has_Mint0
-          ).
+      try (by right; esplits; eauto;
+           eapply gv_inject_gundef_val2GV; eauto; [ solve_flatten_typ | public_auto ]);
+      try (by right; esplits; eauto;
+           eapply gv_inject_gundef_val2GV; eauto;
+           [ solve_flatten_typ | eapply has_chunk__has_chunkb; try eapply Val.cmpf_has_Mint0 |
+             public_auto; try (exploit fcmp_isnt_ptr; eauto; []; i; ss)
+           ]).
   }
+  Unshelve.
+  all: ss.
   (* inv J3; try solve [inv H1; eauto using gv_inject_gundef]. *)
   (*   inv J3'; try solve [auto | inv H1; eauto using gv_inject_gundef]; *)
   (*   destruct t; try solve [inv H1; eauto using gv_inject_gundef]. *)
@@ -1651,7 +1738,10 @@ Proof.
     rewrite EQ.
     rewrite Hmloads. eauto.
     { esplits; eauto. chunk_auto.
-      eapply load_implies_has_chunkb; eauto. }
+      eapply load_implies_has_chunkb; eauto.
+      { public_auto. inv Hinj.
+      }
+    }
 Qed.
 
 Lemma simulation__fit_gv : forall maxb mi TD t Mem Mem2 gv1 gv1' gv2,
