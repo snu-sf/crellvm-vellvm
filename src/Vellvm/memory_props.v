@@ -444,6 +444,15 @@ Proof.
     eapply micmp_int_preserves_valid_ptrs; eauto.
 Qed.
 
+Lemma cmpf_non_ptr
+      cmp v1 v2
+  :
+    forall b ofs, Val.cmpf cmp v1 v2 <> Vptr b ofs
+.
+Proof.
+  i. compute; des_ifs.
+Qed.
+
 Lemma mfcmp_preserves_valid_ptrs: forall td fop fp gv1 gv2 gv' bd,
   mfcmp td fop fp gv1 gv2 = Some gv' -> valid_ptrs bd gv'.
 Proof.
@@ -454,10 +463,12 @@ Proof.
   destruct (GV2val td gv2); eauto using undef_valid_ptrs.
   destruct v; eauto using undef_valid_ptrs.
   apply no_embedded_ptrs__valid_ptrs.
-  destruct fp; tinv H;
-    destruct fop; inv H; apply nonptr_no_embedded_ptrs;
-      try solve [auto | apply Vfalse_isnt_ptr | apply Vtrue_isnt_ptr |
-                 apply val_of_bool_isnt_ptr].
+  des_ifs; try (by (eapply nonptr_no_embedded_ptrs; eapply cmpf_non_ptr));
+    try (by compute in H; des_ifs).
+  (* destruct fp; tinv H; *)
+  (*   destruct fop; inv H; apply nonptr_no_embedded_ptrs; *)
+  (*     try solve [auto | apply Vfalse_isnt_ptr | apply Vtrue_isnt_ptr | *)
+  (*                apply val_of_bool_isnt_ptr]. *)
 Qed.
 
 Lemma splitGenericValue_preserves_valid_ptrs: forall bd g0 z0 g1 g2,

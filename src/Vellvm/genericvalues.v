@@ -489,7 +489,7 @@ match (GV2val TD gv1, GV2val TD gv2) with
   match fp with
   | fp_double => Some (val2GV TD v Mfloat64)
   | fp_float => gundef TD (typ_floatpoint fp)
-  | _ => None
+  | _ => gundef TD (typ_floatpoint fp)
   end
 | (Some (Vsingle f1), Some (Vsingle f2)) =>
   let v :=
@@ -503,7 +503,7 @@ match (GV2val TD gv1, GV2val TD gv2) with
   match fp with
   | fp_float => Some (val2GV TD v Mfloat32)
   | fp_double => gundef TD (typ_floatpoint fp)
-  | _ => None
+  | _ => gundef TD (typ_floatpoint fp)
   end
 | _ => gundef TD (typ_floatpoint fp)
 end.
@@ -656,7 +656,7 @@ Definition micmp (TD:TargetData) (c:cond) (t:typ) (gv1 gv2:GenericValue)
 match t with
 | typ_int sz => micmp_int TD c gv1 gv2
 | typ_pointer _ => gundef TD (typ_int 1%nat)
-| _ => None
+| _ => gundef TD (typ_int 1%nat)
 end.
 
 (* TODO: issue. Single vs Float. *)
@@ -679,7 +679,7 @@ match (GV2val TD gv1, GV2val TD gv2) with
          Some (val2GV TD (Val.cmpf Cle (Vfloat f1) (Vfloat f2)) (Mint 0))
      | fcond_one =>
          Some (val2GV TD (Val.cmpf Cne (Vfloat f1) (Vfloat f2)) (Mint 0))
-     | fcond_ord => None (*FIXME: not supported yet. *)
+     | fcond_ord => gundef TD (typ_int 1%nat) (*FIXME: not supported yet. *)
      | fcond_ueq =>
          Some (val2GV TD (Val.cmpf Ceq (Vfloat f1) (Vfloat f2)) (Mint 0))
      | fcond_ugt =>
@@ -692,13 +692,13 @@ match (GV2val TD gv1, GV2val TD gv2) with
          Some (val2GV TD (Val.cmpf Cle (Vfloat f1) (Vfloat f2)) (Mint 0))
      | fcond_une =>
          Some (val2GV TD (Val.cmpf Cne (Vfloat f1) (Vfloat f2)) (Mint 0))
-     | fcond_uno => None (*FIXME: not supported yet. *)
+     | fcond_uno => gundef TD (typ_int 1%nat) (*FIXME: not supported yet. *)
      | fcond_true => Some (val2GV TD Vtrue (Mint 0))
      end in
    match fp with
    | fp_float => ov
    | fp_double => ov
-   | _ => None (*FIXME: not supported 80 and 128 yet. *)
+   | _ => gundef TD (typ_int 1%nat) (*FIXME: not supported 80 and 128 yet. *)
    end
 | _ => gundef TD (typ_int 1%nat)
 end.

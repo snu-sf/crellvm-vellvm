@@ -589,42 +589,77 @@ Lemma simulation__mbop_aux : forall mi TD op bsz gv1 gv1' gv2 gv2' gv3,
     mbop TD op bsz gv1' gv2' = Some gv3' /\
     gv_inject mi gv3 gv3'.  
 Proof.
-(*   intros. assert (J0:=H0). assert (J:=H). *)
-(*   apply gv_inject__val_inject with (TD:=TD) in H. *)
-(*   destruct H as [v1 [v1' [J1 [J2 J3]]]]. *)
-(*   apply gv_inject__val_inject with (TD:=TD) in H0. *)
-(*   destruct H0 as [v2 [v2' [J1' [J2' J3']]]]. *)
-(*   unfold mbop in *. *)
-(*   rewrite J1. rewrite J2. rewrite J1'. rewrite J2'.   *)
-(*   rewrite J1 in H1. rewrite J1' in H1.  *)
-(*   inv J3; try solve [inv H1; eauto using gv_inject_gundef]. *)
-(*     inv J3'; try solve [auto | inv H1; eauto using gv_inject_gundef]. *)
-(*     destruct (eq_nat_dec (wz + 1) (Size.to_nat bsz));  *)
-(*        try solve [inv H1; eauto using gv_inject_gundef]. *)
-(*     destruct op;  *)
-(*     try match goal with *)
-(*       | H0 : match ?s with *)
-(*         | ret _ => _ *)
-(*         | merror => _ *)
-(*         end = _ |- _ => destruct s eqn:Heqn *)
-(*     end; *)
-(*     inv H1;  *)
-(*        try (left; split; auto; apply gv_inject_nptr_val_refl); eauto using gv_inject_gundef. *)
-(*        apply add_isnt_ptr. *)
-(*        apply sub_isnt_ptr. *)
-(*        apply mul_isnt_ptr. *)
-(*        intros; eapply divu_isnt_ptr; eauto. *)
-(*        intros; eapply divs_isnt_ptr; eauto. *)
-(*        intros; eapply modu_isnt_ptr; eauto. *)
-(*        intros; eapply mods_isnt_ptr; eauto. *)
-(*        apply shl_isnt_ptr. *)
-(*        intros; eapply shrx_isnt_ptr; eauto. *)
-(*        apply shr_isnt_ptr. *)
-(*        apply and_isnt_ptr. *)
-(*        apply or_isnt_ptr. *)
-(*        apply xor_isnt_ptr. *)
-(* Qed. *)
-Admitted.
+  intros. assert (J0:=H0). assert (J:=H).
+  apply gv_inject__val_inject with (TD:=TD) in H.
+  destruct H as [v1 [v1' [J1 [J2 J3]]]].
+  apply gv_inject__val_inject with (TD:=TD) in H0.
+  destruct H0 as [v2 [v2' [J1' [J2' J3']]]].
+  unfold mbop in *.
+  rewrite J1. rewrite J2. rewrite J1'. rewrite J2'.
+  rewrite J1 in H1. rewrite J1' in H1.
+  inv J3; try solve [inv H1; eauto using gv_inject_gundef].
+    inv J3'; try solve [auto | inv H1; eauto using gv_inject_gundef].
+    destruct (eq_nat_dec (wz + 1) (Size.to_nat bsz));
+       try solve [inv H1; eauto using gv_inject_gundef].
+    destruct op;
+    try match goal with
+      | H0 : match ?s with
+        | ret _ => _
+        | merror => _
+        end = _ |- _ => destruct s eqn:Heqn
+    end;
+    inv H1;
+       try (left; split; auto; apply gv_inject_nptr_val_refl); eauto using gv_inject_gundef.
+       apply add_isnt_ptr.
+       apply sub_isnt_ptr.
+       apply mul_isnt_ptr.
+       intros; eapply divu_isnt_ptr; eauto.
+       intros; eapply divs_isnt_ptr; eauto.
+       intros; eapply modu_isnt_ptr; eauto.
+       intros; eapply mods_isnt_ptr; eauto.
+       apply shl_isnt_ptr.
+       intros; eapply shrx_isnt_ptr; eauto.
+       apply shr_isnt_ptr.
+       apply and_isnt_ptr.
+       apply or_isnt_ptr.
+       apply xor_isnt_ptr.
+  {
+    des_ifs; try (by right; esplits; eauto using gv_inject_gundef);
+      right; esplits; eauto; (eapply gv_inject_gundef_val2GV; eauto; [ by compute; des_ifs | ]);
+        rewrite <- e; rewrite Nat.add_sub; eapply has_chunk__has_chunkb.
+    - eapply Val.add_has_chunk1.
+    - eapply Val.sub_has_chunk1.
+    - eapply Val.mul_has_chunk1.
+    - unfold Val.divu in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - unfold Val.divs in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - unfold Val.modu in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - unfold Val.mods in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - unfold Val.shl in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - unfold Val.shrx in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - unfold Val.shr in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - unfold Val.and in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - unfold Val.or in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - unfold Val.xor in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+  }
+  {
+    des_ifs; try (by right; esplits; eauto using gv_inject_gundef);
+      right; esplits; eauto; (eapply gv_inject_gundef_val2GV; eauto; [ by compute; des_ifs | ]);
+        rewrite <- e; rewrite Nat.add_sub; eapply has_chunk__has_chunkb.
+    - eapply Val.add_has_chunk1.
+    - eapply Val.sub_has_chunk1.
+    - eapply Val.mul_has_chunk1.
+    - unfold Val.divu in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - unfold Val.divs in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - unfold Val.modu in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - unfold Val.mods in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - unfold Val.shl in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - unfold Val.shrx in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - unfold Val.shr in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - unfold Val.and in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - unfold Val.or in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+    - unfold Val.xor in *. des_ifs. econs; eauto using Int.unsigned_range; eauto.
+  }
+Qed.
 
 Lemma simulation__mbop : forall mi TD op bsz gv1 gv1' gv2 gv2' gv3,
   gv_inject mi gv1 gv1' ->
@@ -642,6 +677,11 @@ Proof.
     exists gv3. split; auto.
 Qed.
 
+Ltac solve_flatten_typ :=
+  match goal with
+  | [ |- flatten_typ ?a ?b = ?c ] => compute; des_ifs
+  end.
+
 Lemma simulation__mfbop_aux : forall mi TD op fp gv1 gv1' gv2 gv2' gv3,
   gv_inject mi gv1 gv1' ->
   gv_inject mi gv2 gv2' ->
@@ -652,29 +692,52 @@ Lemma simulation__mfbop_aux : forall mi TD op fp gv1 gv1' gv2 gv2' gv3,
     mfbop TD op fp gv1' gv2' = Some gv3' /\
     gv_inject mi gv3 gv3'.  
 Proof.
-(*   intros. assert (J0:=H0). assert (J:=H). *)
-(*   apply gv_inject__val_inject with (TD:=TD) in H. *)
-(*   destruct H as [v1 [v1' [J1 [J2 J3]]]]. *)
-(*   apply gv_inject__val_inject with (TD:=TD) in H0. *)
-(*   destruct H0 as [v2 [v2' [J1' [J2' J3']]]]. *)
-(*   unfold mfbop in *. *)
-(*   rewrite J1. rewrite J2. rewrite J1'. rewrite J2'.   *)
-(*   rewrite J1 in H1. rewrite J1' in H1.  *)
-(*   inv J3; try solve [inv H1; eauto using gv_inject_gundef]. *)
-(*     (* Float(64) *) *)
-(*     inv J3'; try solve [auto | inv H1; eauto using gv_inject_gundef]. *)
-(*     destruct fp; inv H1; try solve [eauto using gv_inject_gundef]. *)
-(*        destruct op;  *)
-(*           try (left; split; auto; apply gv_inject_nptr_val_refl;  *)
-(*             try solve [auto | intro; simpl; congruence]). *)
-(*     (* Float(32) *) *)
-(*     inv J3'; try solve [auto | inv H1; eauto using gv_inject_gundef]. *)
-(*     destruct fp; inv H1; try solve [eauto using gv_inject_gundef]. *)
-(*       destruct op; *)
-(*         try (left; split; auto; apply gv_inject_nptr_val_refl;  *)
-(*           try solve [auto | intro; congruence]). *)
-(* Qed. *)
-Admitted.
+  intros. assert (J0:=H0). assert (J:=H).
+  apply gv_inject__val_inject with (TD:=TD) in H.
+  destruct H as [v1 [v1' [J1 [J2 J3]]]].
+  apply gv_inject__val_inject with (TD:=TD) in H0.
+  destruct H0 as [v2 [v2' [J1' [J2' J3']]]].
+  unfold mfbop in *.
+  rewrite J1. rewrite J2. rewrite J1'. rewrite J2'.
+  rewrite J1 in H1. rewrite J1' in H1.
+  inv J3; try solve [inv H1; eauto using gv_inject_gundef].
+  {
+    - des_ifs; inv J3'; try (by left; split; ss; eauto using gv_inject_gundef);
+        try (by right; esplits; eauto; eapply gv_inject_gundef_val2GV; eauto; solve_flatten_typ).
+      + left. split; ss. unfold val2GV. econs; eauto.
+      + left. split; ss. unfold val2GV. econs; eauto.
+      + left. split; ss. unfold val2GV. econs; eauto.
+      + left. split; ss. unfold val2GV. econs; eauto.
+      + left. split; ss. unfold val2GV. econs; eauto.
+  }
+  {
+    (* Float(64) *)
+    inv J3'; try solve [auto | inv H1; eauto using gv_inject_gundef].
+    destruct fp; inv H1; try solve [eauto using gv_inject_gundef].
+       destruct op;
+          try (left; split; auto; apply gv_inject_nptr_val_refl;
+            try solve [auto | intro; simpl; congruence]).
+    { des_ifs; try (by left; split; ss; eauto using gv_inject_gundef);
+        try (by right; esplits; eauto; eapply gv_inject_gundef_val2GV; eauto; solve_flatten_typ).
+    }
+  }
+  {
+    (* Float(32) *)
+    inv J3'; try rewrite H1; try (by des_ifs; right; esplits; eauto using gv_inject_gundef).
+    - des_ifs; try (by left; split; ss; eauto using gv_inject_gundef);
+        right; esplits; eauto; eapply gv_inject_gundef_val2GV; eauto; compute; des_ifs.
+    - des_ifs; try (by left; split; ss; eauto using gv_inject_gundef);
+        right; esplits; eauto; eapply gv_inject_gundef_val2GV; eauto; compute; des_ifs.
+    - des_ifs; try (by left; split; ss; eauto using gv_inject_gundef);
+        right; esplits; eauto; eapply gv_inject_gundef_val2GV; eauto; compute; des_ifs.
+    (* inv J3'; try solve [auto | inv H1; eauto using gv_inject_gundef]. *)
+    (* destruct fp; inv H1; try solve [eauto using gv_inject_gundef]. *)
+    (* { right. rewrite H0. des_ifs; esplits; eauto using gv_inject_gundef. } *)
+    (*   destruct op; *)
+    (*     try (left; split; auto; apply gv_inject_nptr_val_refl; *)
+    (*       try solve [auto | intro; congruence]). *)
+  }
+Qed.
 
 Lemma simulation__mfbop : forall mi TD op fp gv1 gv1' gv2 gv2' gv3,
   gv_inject mi gv1 gv1' ->
@@ -749,6 +812,33 @@ Proof.
     exists gv2. split; auto.
 Qed.
 
+Lemma inject_val_cmp
+      cmp mi v1 v2 mc
+  :
+    gv_inject mi [(Val.cmp cmp v1 v2, mc)] [(Val.cmp cmp v1 v2, mc)]
+.
+Proof.
+  unfold Val.cmp. unfold Val.cmp_bool. unfold Val.of_optbool.
+  destruct cmp; ss; des_ifs; econs; eauto; chunk_simpl.
+  all: econs; eauto.
+Qed.
+
+Lemma inject_val_cmpu_int
+      cmp mi v1 v2
+  :
+    gv_inject mi [(Val.cmpu_int cmp v1 v2, AST.Mint 0)] [(Val.cmpu_int cmp v1 v2, AST.Mint 0)]
+.
+Proof.
+  exploit Val.cmpu_int_is_bool; eauto.
+  instantiate (1:= v2).
+  instantiate (1:= v1).
+  instantiate (1:= cmp).
+  intro BOOL. unfold Val.is_bool in *. des.
+  - repeat rewrite BOOL. econs; eauto.
+  - repeat rewrite BOOL. econs; eauto. econs; eauto.
+  - repeat rewrite BOOL. econs; eauto. econs; eauto.
+Qed.
+
 Lemma simulation__micmp_aux : forall mi TD c t gv1 gv1' gv2 gv2' gv3,
   gv_inject mi gv1 gv1' ->
   gv_inject mi gv2 gv2' ->
@@ -759,29 +849,36 @@ Lemma simulation__micmp_aux : forall mi TD c t gv1 gv1' gv2 gv2' gv3,
     micmp TD c t gv1' gv2' = Some gv3' /\
     gv_inject mi gv3 gv3'.  
 Proof.
-(*   intros. assert (J0:=H0). assert (J:=H). *)
-(*   apply gv_inject__val_inject with (TD:=TD) in H. *)
-(*   destruct H as [v1 [v1' [J1 [J2 J3]]]]. *)
-(*   apply gv_inject__val_inject with (TD:=TD) in H0. *)
-(*   destruct H0 as [v2 [v2' [J1' [J2' J3']]]]. *)
-(*   unfold micmp, micmp_int in *. *)
-(*   rewrite J1. rewrite J2. rewrite J1'. rewrite J2'.   *)
-(*   rewrite J1 in H1. rewrite J1' in H1. *)
-(*   inv J3; try solve [inv H1; eauto 3 using gv_inject_gundef]. *)
-(*     inv J3'; try solve [auto | inv H1; eauto using gv_inject_gundef]; *)
-(*     destruct t; try solve [inv H1; eauto using gv_inject_gundef]. *)
-(*       destruct c; inv H1;  *)
-(*         try (left; split; auto;  *)
-(*           apply gv_inject_nptr_val_refl; try solve  *)
-(*             [auto | apply cmp_isnt_ptr | apply cmpu_isnt_ptr *)
-(*             | apply cmpu_int_isnt_ptr]). *)
-(*     destruct t; try solve [inv H1; eauto using gv_inject_gundef]. *)
-(*     destruct t; try solve [inv H1; eauto using gv_inject_gundef]. *)
-(*     destruct t; try solve [inv H1; eauto using gv_inject_gundef]. *)
-(*     destruct t; try solve [inv H1; eauto using gv_inject_gundef]. *)
-(*     destruct t; try solve [inv H1; eauto using gv_inject_gundef]. *)
-(* Qed. *)
-Admitted.
+  intros. assert (J0:=H0). assert (J:=H).
+  apply gv_inject__val_inject with (TD:=TD) in H.
+  destruct H as [v1 [v1' [J1 [J2 J3]]]].
+  apply gv_inject__val_inject with (TD:=TD) in H0.
+  destruct H0 as [v2 [v2' [J1' [J2' J3']]]].
+  unfold micmp, micmp_int in *.
+  rewrite J1. rewrite J2. rewrite J1'. rewrite J2'.
+  rewrite J1 in H1. rewrite J1' in H1.
+  {
+    inv J3; inv J3';
+      des_ifs; try (by left; split; ss; eauto using gv_inject_gundef; unfold val2GV in *;
+                    try apply inject_val_cmp; try apply inject_val_cmpu_int);
+        try (by right; esplits; eauto; eapply gv_inject_gundef_val2GV; eauto; try solve_flatten_typ;
+             try eapply has_chunk__has_chunkb;
+             try eapply Val.cmp_has_Mint0; try eapply Val.cmpu_int_has_Mint0).
+  }
+  (* inv J3; try solve [inv H1; eauto 3 using gv_inject_gundef]. *)
+  (*   inv J3'; try solve [auto | inv H1; eauto using gv_inject_gundef]; *)
+  (*   destruct t; try solve [inv H1; eauto using gv_inject_gundef]. *)
+  (*     destruct c; inv H1; *)
+  (*       try (left; split; auto; *)
+  (*         apply gv_inject_nptr_val_refl; try solve *)
+  (*           [auto | apply cmp_isnt_ptr | apply cmpu_isnt_ptr *)
+  (*           | apply cmpu_int_isnt_ptr]). *)
+  (*   destruct t; try solve [inv H1; eauto using gv_inject_gundef]. *)
+  (*   destruct t; try solve [inv H1; eauto using gv_inject_gundef]. *)
+  (*   destruct t; try solve [inv H1; eauto using gv_inject_gundef]. *)
+  (*   destruct t; try solve [inv H1; eauto using gv_inject_gundef]. *)
+  (*   destruct t; try solve [inv H1; eauto using gv_inject_gundef]. *)
+Qed.
 
 Lemma simulation__micmp : forall mi TD c t gv1 gv1' gv2 gv2' gv3,
   gv_inject mi gv1 gv1' ->
@@ -799,6 +896,17 @@ Proof.
     exists gv3. split; auto.
 Qed.
 
+Lemma inject_val_cmpf
+      cmp mi v1 v2 mc
+  :
+    gv_inject mi [(Val.cmpf cmp v1 v2, mc)] [(Val.cmpf cmp v1 v2, mc)]
+.
+Proof.
+  unfold Val.cmpf. unfold Val.cmpf_bool. unfold Val.of_optbool.
+  destruct cmp; ss; des_ifs; econs; eauto; chunk_simpl.
+  all: econs; eauto.
+Qed.
+
 Lemma simulation__mfcmp_aux : forall mi TD c t gv1 gv1' gv2 gv2' gv3,
   gv_inject mi gv1 gv1' ->
   gv_inject mi gv2 gv2' ->
@@ -809,35 +917,43 @@ Lemma simulation__mfcmp_aux : forall mi TD c t gv1 gv1' gv2 gv2' gv3,
     mfcmp TD c t gv1' gv2' = Some gv3' /\
     gv_inject mi gv3 gv3'.  
 Proof.
-(*   intros. assert (J0:=H0). assert (J:=H). *)
-(*   apply gv_inject__val_inject with (TD:=TD) in H. *)
-(*   destruct H as [v1 [v1' [J1 [J2 J3]]]]. *)
-(*   apply gv_inject__val_inject with (TD:=TD) in H0. *)
-(*   destruct H0 as [v2 [v2' [J1' [J2' J3']]]]. *)
-(*   unfold mfcmp in *. *)
-(*   rewrite J1. rewrite J2. rewrite J1'. rewrite J2'.   *)
-(*   rewrite J1 in H1. rewrite J1' in H1.  *)
-(*   inv J3; try solve [inv H1; eauto using gv_inject_gundef]. *)
-(*     inv J3'; try solve [auto | inv H1; eauto using gv_inject_gundef]; *)
-(*     destruct t; try solve [inv H1; eauto using gv_inject_gundef]. *)
-(*       destruct c; inv H1;  *)
-(*         try solve [ *)
-(*           eauto using gv_inject_gundef | *)
-(*           (left; split; auto;  *)
-(*           apply gv_inject_nptr_val_refl; try solve  *)
-(*             [auto | apply val_of_bool_isnt_ptr | apply Vfalse_isnt_ptr |  *)
-(*              apply Vtrue_isnt_ptr]) *)
-(*         ]. *)
-(*       destruct c; inv H1;  *)
-(*         try solve [ *)
-(*           eauto using gv_inject_gundef | *)
-(*           (left; split; auto;  *)
-(*           apply gv_inject_nptr_val_refl; try solve  *)
-(*             [auto | apply val_of_bool_isnt_ptr | apply Vfalse_isnt_ptr |  *)
-(*              apply Vtrue_isnt_ptr]) *)
-(*         ]. *)
-(* Qed. *)
-Admitted.
+  intros. assert (J0:=H0). assert (J:=H).
+  apply gv_inject__val_inject with (TD:=TD) in H.
+  destruct H as [v1 [v1' [J1 [J2 J3]]]].
+  apply gv_inject__val_inject with (TD:=TD) in H0.
+  destruct H0 as [v2 [v2' [J1' [J2' J3']]]].
+  unfold mfcmp in *.
+  rewrite J1. rewrite J2. rewrite J1'. rewrite J2'.
+  rewrite J1 in H1. rewrite J1' in H1.
+  {
+    inv J3; inv J3';
+      des_ifs;
+      try (by left; split; ss; eauto using gv_inject_gundef; try unfold val2GV;
+           try apply inject_val_cmpf; repeat (econs; eauto));
+      try (by right; esplits; eauto; eapply gv_inject_gundef_val2GV; eauto; try solve_flatten_typ;
+           try eapply has_chunk__has_chunkb; try eapply Val.cmpf_has_Mint0
+          ).
+  }
+  (* inv J3; try solve [inv H1; eauto using gv_inject_gundef]. *)
+  (*   inv J3'; try solve [auto | inv H1; eauto using gv_inject_gundef]; *)
+  (*   destruct t; try solve [inv H1; eauto using gv_inject_gundef]. *)
+  (*     destruct c; inv H1; *)
+  (*       try solve [ *)
+  (*         eauto using gv_inject_gundef | *)
+  (*         (left; split; auto; *)
+  (*         apply gv_inject_nptr_val_refl; try solve *)
+  (*           [auto | apply val_of_bool_isnt_ptr | apply Vfalse_isnt_ptr | *)
+  (*            apply Vtrue_isnt_ptr]) *)
+  (*       ]. *)
+  (*     destruct c; inv H1; *)
+  (*       try solve [ *)
+  (*         eauto using gv_inject_gundef | *)
+  (*         (left; split; auto; *)
+  (*         apply gv_inject_nptr_val_refl; try solve *)
+  (*           [auto | apply val_of_bool_isnt_ptr | apply Vfalse_isnt_ptr | *)
+  (*            apply Vtrue_isnt_ptr]) *)
+  (*       ]. *)
+Qed.
 
 Lemma simulation__mfcmp : forall mi TD c t gv1 gv1' gv2 gv2' gv3,
   gv_inject mi gv1 gv1' ->
