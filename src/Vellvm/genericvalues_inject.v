@@ -23,6 +23,27 @@ Import LLVMgv.
 Import LLVMtd.
 Import LLVMtypings.
 
+
+(* TODO: location *)
+Lemma has_chunk__has_chunkb
+      v chk
+      (CHUNK: Val.has_chunk v chk)
+  :
+    <<CHUNK: Val.has_chunkb v chk = true>>
+.
+Proof.
+  unfold Val.has_chunk in *.
+  destruct v, chk; simpl; intros; try solve [auto | congruence];
+    des; clarify.
+  apply andb_true_iff.
+  split.
+  + apply andb_true_iff.
+    destruct (eq_nat_dec n n); ss. split; ss.
+    destruct (zle 0 (Int.unsigned n i0)); ss.
+  + destruct (zlt (Int.unsigned n i0) (Int.modulus n)); ss.
+Qed.
+
+
 (* The file proves the injection between generic values in terms of memory
    injection. *)
 Inductive gv_inject (mi: meminj) : GenericValue -> GenericValue -> Prop :=
@@ -165,32 +186,94 @@ Proof.
   eapply gv_inject_mc2undefs'; eauto.
 Qed.
 
-Lemma gv_inject_gundef_val2GV_int
+Lemma gv_inject_gundef_val2GV
+      TD gv0 mi ty
+      (UNDEF: gundef TD ty = ret gv0)
+      v mc
+      (TY: flatten_typ TD ty = ret [mc])
+      (CHUNK: Val.has_chunkb v mc)
+  :
+    gv_inject mi gv0 (val2GV TD v mc)
+.
+Proof.
+  unfold gundef in *. des_ifs.
+  unfold flatten_typ in *. des_ifs.
+  unfold val2GV.
+  econs; eauto.
+Qed.
+
+(* Lemma has_chunkb_int_zero_ext *)
+(*       sz0 *)
+(*       wz i0 *)
+(*   : *)
+(*     <<CHUNK: Val.has_chunkb *)
+(*                (Vint (sz0 - 1) *)
+(*                      (Int.zero_ext (sz0 - 1) (Z.of_nat wz) (Int.repr (sz0 - 1) (Int.unsigned wz i0)))) *)
+(*                (AST.Mint (sz0 - 1))>> *)
+(* . *)
+(* Proof. *)
+(*   eapply has_chunk__has_chunkb; eauto. *)
+(*   exploit Val.zero_ext'_has_chunk; eauto. *)
+(*   instantiate (1:= (sz0 - 1)%nat). unfold Val.zero_ext'. *)
+(*   instantiate (1:= Vint wz i0). ss. *)
+(* Qed. *)
+
+(* Lemma has_chunkb_int_sign_ext *)
+(*       sz0 (* tt *) *)
+(*       wz i0 *)
+(*   : *)
+(*     <<CHUNK: Val.has_chunkb *)
+(*                (Vint (sz0 - 1) *)
+(*                      (Int.sign_ext (sz0 - 1) (Z.of_nat wz) (Int.repr (sz0 - 1) (Int.unsigned wz i0))) *)
+(*                (* tt *) *)
+(*                ) *)
+(*                (AST.Mint (sz0 - 1))>> *)
+(* . *)
+(* Proof. *)
+(*   red. ss. *)
+(*   exploit Int.Z_mod_modulus_range; eauto. *)
+(*   instantiate (1:= (sz0 - 1)%nat). *)
+(*   instantiate (1:= (Int.Zsign_ext (Z.of_nat wz) (Int.Z_mod_modulus (sz0 - 1) (Int.unsigned wz i0)))). *)
+(*   i. des. *)
+(*   destruct (Nat.eq_dec _ _); ss; try omega. *)
+(*   apply andb_true_iff. split. *)
+(*   - destruct (zle _ _); ss; try omega. *)
+(*   - destruct (zlt _ _); ss; try omega. *)
+(* Qed. *)
+
+Lemma has_chunkb_trunc_int
+      sz0 wz i0
+  :
+    <<CHUNK: Val.has_chunkb (Val.trunc (Vint wz i0) (sz0 - 1)) (AST.Mint (sz0 - 1))>>
+.
+Proof.
+  red. ss.
+  exploit Int.Z_mod_modulus_range; eauto.
+  instantiate (1:= (sz0 - 1)%nat).
+  instantiate (1:= (Int.unsigned wz i0)).
+  i. des.
+  des_ifs. ss.
+  destruct (Nat.eq_dec _ _); ss; try omega.
+  apply andb_true_iff. split.
+  - destruct (zle _ _); ss; try omega.
+  - destruct (zlt _ _); ss; try omega.
+Qed.
+
+Lemma gv_inject_gundef_trunc_int
       TD sz0 gv0 wz i0 mi
       (UNDEF: gundef TD (typ_int sz0) = ret gv0)
   :
     gv_inject mi gv0 (val2GV TD (Val.trunc (Vint wz i0) (sz0 - 1)) (AST.Mint (sz0 - 1)))
 .
 Proof.
-  unfold gundef in *. des_ifs.
-  unfold flatten_typ in *. des_ifs.
-  ginduction l0; ii; ss; clarify; ss.
-  - econs; eauto.
-    i. des_ifs.
-    ss.
-    exploit Int.Z_mod_modulus_range; eauto.
-    instantiate (1:= (sz0 - 1)%nat).
-    instantiate (1:= (Int.unsigned wz i0)).
-    i.
-    repeat (apply andb_true_iff; split); try omega.
-    + destruct (Nat.eq_dec _ _); ss.
-    + destruct (zle _ _); ss. exfalso.
-      omega.
-    + destruct (zlt _ _); ss. exfalso.
-      omega.
+  dup UNDEF.
+  unfold gundef in UNDEF. des_ifs.
+  eapply gv_inject_gundef_val2GV; eauto.
+  { compute. des_ifs. }
+  { apply has_chunkb_trunc_int. }
 Qed.
 
-Lemma gv_inject_gundef_val2GV_float
+Lemma gv_inject_gundef_trunc_float
       TD gv0 mi
       fp f
       (UNDEF: gundef TD (typ_floatpoint fp) = ret gv0)
@@ -199,10 +282,7 @@ Lemma gv_inject_gundef_val2GV_float
     gv_inject mi gv0 (val2GV TD (Vsingle (Floats.Float.to_single f)) AST.Mfloat32)
 .
 Proof.
-  unfold gundef in *. des_ifs.
-  unfold flatten_typ in *. des_ifs. ss.
-  des_ifs.
-  - econs; eauto.
+  eapply gv_inject_gundef_val2GV; eauto. compute. des_ifs.
 Qed.
 
 Ltac chunk_simpl := i; clarify.
@@ -390,22 +470,22 @@ Proof.
       des_ifs; try (by (right; esplits; eauto using gv_inject_gundef)).
       - right.
         esplits; eauto.
-        eapply gv_inject_gundef_val2GV_int; eauto.
+        eapply gv_inject_gundef_trunc_int; eauto.
       - right.
         esplits; eauto.
-        eapply gv_inject_gundef_val2GV_int; eauto.
+        eapply gv_inject_gundef_trunc_int; eauto.
       - right.
         esplits; eauto.
-        eapply gv_inject_gundef_val2GV_int; eauto.
+        eapply gv_inject_gundef_trunc_int; eauto.
       - right.
         esplits; eauto.
-        eapply gv_inject_gundef_val2GV_float; eauto.
+        eapply gv_inject_gundef_trunc_float; eauto.
       - right.
         esplits; eauto.
-        eapply gv_inject_gundef_val2GV_float; eauto.
+        eapply gv_inject_gundef_trunc_float; eauto.
       - right.
         esplits; eauto.
-        eapply gv_inject_gundef_val2GV_float; eauto.
+        eapply gv_inject_gundef_trunc_float; eauto.
     }
 Qed.
 
@@ -433,38 +513,56 @@ Lemma simulation__mext_aux : forall mi TD eop t1 gv1 t2 gv1' gv2,
     mext TD eop t1 t2 gv1' = Some gv2' /\
     gv_inject mi gv2 gv2'.  
 Proof.
-  (* intros. assert (J0:=H). *)
-  (* apply gv_inject__val_inject with (TD:=TD) in H. *)
-  (* destruct H as [v1 [v2 [J1 [J2 J3]]]]. *)
-  (* unfold mext in *. *)
-  (* rewrite J1. rewrite J2. rewrite J1 in H0. *)
-  (* inv J3; try solve [ *)
-  (*   auto | *)
-  (*   destruct t1; destruct t2; inv H0; simpl; eauto using gv_inject_gundef; *)
-  (*     match goal with *)
-  (*     | H: context [floating_point_order ?f ?f0] |- _ =>  *)
-  (*       destruct (floating_point_order f f0); inv H; eauto using gv_inject_gundef *)
-  (*     end *)
-  (*   ]. *)
+  intros. assert (J0:=H).
+  apply gv_inject__val_inject with (TD:=TD) in H.
+  destruct H as [v1 [v2 [J1 [J2 J3]]]].
+  unfold mext in *.
+  rewrite J1. rewrite J2. rewrite J1 in H0.
+  inv J3; try solve [
+    auto |
+    destruct t1; destruct t2; inv H0; simpl; eauto using gv_inject_gundef;
+      match goal with
+      | H: context [floating_point_order ?f ?f0] |- _ =>
+        destruct (floating_point_order f f0); inv H; eauto using gv_inject_gundef
+      end
+    ].
 
-  (*   destruct t1; destruct t2; inv H0; simpl; eauto using gv_inject_gundef. *)
-  (*     destruct eop; inv H1;  *)
-  (*       try solve [unfold val2GV; simpl; eauto using gv_inject_gundef]. *)
-  (*     match goal with *)
-  (*     | H: context [floating_point_order ?f1 ?f0] |- _ =>  *)
-  (*        destruct (floating_point_order f1 f0); inv H; eauto using gv_inject_gundef *)
-  (*     end. *)
+  {
+    destruct t1; destruct t2; inv H0; simpl; eauto using gv_inject_gundef.
+      destruct eop; inv H1;
+        try solve [unfold val2GV; simpl; eauto using gv_inject_gundef].
+      { left. split; ss. econs; eauto. chunk_simpl. }
+      { left. split; ss. econs; eauto. chunk_simpl. }
+      match goal with
+      | H: context [floating_point_order ?f1 ?f0] |- _ =>
+         destruct (floating_point_order f1 f0); inv H; eauto using gv_inject_gundef
+      end.
+  }
 
-  (*   destruct t1; destruct t2; inv H0; simpl; eauto using gv_inject_gundef. *)
-  (*     match goal with *)
-  (*     | H: context [floating_point_order ?f0 ?f1] |- _ =>  *)
-  (*       destruct (floating_point_order f0 f1); inv H1; simpl;  *)
-  (*         eauto using gv_inject_gundef; *)
-  (*       destruct eop; inv H0; simpl; eauto using gv_inject_gundef; *)
-  (*       destruct f1; inv H1; simpl; unfold val2GV; auto *)
-  (*     end. *)
-(* Qed. *)
-Admitted.
+    destruct t1; destruct t2; inv H0; simpl; eauto using gv_inject_gundef.
+      match goal with
+      | H: context [floating_point_order ?f0 ?f1] |- _ =>
+        destruct (floating_point_order f0 f1); inv H1; simpl;
+          eauto using gv_inject_gundef;
+        destruct eop; inv H0; simpl; eauto using gv_inject_gundef;
+        destruct f1; inv H1; simpl; unfold val2GV; auto
+      end; eauto using gv_inject_gundef.
+
+  { Local Opaque Val.zero_ext' Val.sign_ext'.
+    des_ifs; ss; try (by (right; esplits; eauto using gv_inject_gundef)).
+    - right. esplits; eauto. eapply gv_inject_gundef_val2GV; eauto.
+      { compute. des_ifs. }
+      eapply has_chunk__has_chunkb; eauto.
+      eapply Val.zero_ext'_has_chunk.
+    - right. esplits; eauto. eapply gv_inject_gundef_val2GV; eauto.
+      { compute. des_ifs. }
+      eapply has_chunk__has_chunkb; eauto.
+      eapply Val.sign_ext'_has_chunk.
+    - right. esplits; eauto. compute in Heq. des_ifs.
+      eapply gv_inject_gundef_val2GV; eauto.
+      compute; des_ifs.
+  }
+Qed.
 
 Lemma simulation__mext : forall mi TD eop t1 gv1 t2 gv1' gv2,
   gv_inject mi gv1 gv1' ->
@@ -900,26 +998,7 @@ Proof.
     rewrite HeqR. rewrite H2. eauto using gv_inject_gundef.
 Qed.
 
-(* TODO: location *)
-Lemma has_chunk__has_chunkb
-      v chk 
-      (CHUNK: Val.has_chunk v chk)
-  :
-    <<CHUNK: Val.has_chunkb v chk = true>>
-.
-Proof.
-  unfold Val.has_chunk in *.
-  destruct v, chk; simpl; intros; try solve [auto | congruence];
-    des; clarify.
-  apply andb_true_iff.
-  split.
-  + apply andb_true_iff.
-    destruct (eq_nat_dec n n); ss. split; ss.
-    destruct (zle 0 (Int.unsigned n i0)); ss.
-  + destruct (zlt (Int.unsigned n i0) (Int.modulus n)); ss.
-Qed.
-
-(* TODO: move position *)
+(* TODO: move location *)
 Lemma load_implies_has_chunkb
       mc Mem0 b0 ofs v0
       (LOAD: Mem.load mc Mem0 b0 ofs = ret v0)
