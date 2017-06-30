@@ -9,27 +9,6 @@ Require Import Classical.
 
 Require Import sflib.
 
-(* TODO: location *)
-Ltac des_ifs_safe_aux TAC :=
-  TAC;
-  repeat
-    multimatch goal with
-    | |- context[match ?x with _ => _ end] =>
-      match (type of x) with
-      | { _ } + { _ } => destruct x; TAC; []
-      | _ => let Heq := fresh "Heq" in destruct x as [] eqn: Heq; TAC; []
-      end
-    | H: context[ match ?x with _ => _ end ] |- _ =>
-      match (type of x) with
-      | { _ } + { _ } => destruct x; TAC; []
-      | _ => let Heq := fresh "Heq" in destruct x as [] eqn: Heq; TAC; []
-      end
-    end.
-Tactic Notation "des_ifs_safe" := des_ifs_safe_aux clarify.
-Tactic Notation "des_ifs_safe" tactic(TAC) := des_ifs_safe_aux TAC.
-
-
-
 Module MoreMem.
 
 Export Mem.
@@ -37,14 +16,6 @@ Export Mem.
 Transparent load alloc.
 
 Definition meminj : Type := block -> option (block * Z).
-
-Inductive val_public_tgt (mi: meminj) (v2: val): Prop :=
-| val_public_tgt_intro
-    (PUBLIC: (forall b2 ofs2, v2 = Vptr b2 ofs2 ->
-                              exists b1 ofs1 delta, mi b1 = Some (b2, delta) /\
-                                                    ofs2 = Int.add 31 ofs1 (Int.repr 31 delta)))
-.
-Ltac public_auto := econs; eauto; i; clarify.
 
 (** A memory injection defines a relation between values that is the
   identity relation, except for pointer values which are shifted
@@ -64,10 +35,7 @@ Inductive val_inject (mi: meminj): val -> val -> Prop :=
       val_inject mi (Vptr b1 ofs1) (Vptr b2 ofs2)
   | val_inject_inttoptr:
       forall i, val_inject mi (Vinttoptr i) (Vinttoptr i)
-  | val_inject_undef: forall v
-                             (PUBLIC: val_public_tgt mi v)
-    ,
-      val_inject mi Vundef v.
+  | val_inject_undef: forall v, val_inject mi Vundef v.
 
 Hint Resolve val_inject_int val_inject_float val_inject_single val_inject_ptr val_inject_inttoptr 
              val_inject_undef.
@@ -87,12 +55,9 @@ Lemma val_load_result_inject:
   val_inject f v1 v2 ->
   val_inject f (Val.load_result chunk v1) (Val.load_result chunk v2).
 Proof.
-  intros. inv H; destruct chunk; simpl; try econstructor; eauto; try (by public_auto).
-    destruct (eq_nat_dec _ _); try econstructor; eauto. public_auto.
-    destruct (eq_nat_dec _ n); try econstructor; eauto. public_auto.
-    { des_ifs. }
-    { des_ifs. }
-    { des_ifs. }
+  intros. inv H; destruct chunk; simpl; try econstructor; eauto.
+    destruct (eq_nat_dec _ _); try econstructor; eauto.
+    destruct (eq_nat_dec _ n); try econstructor; eauto.
 Qed.
 
 Lemma val_load_result_inject_2: forall (f : block -> option (block * Z))
@@ -127,8 +92,6 @@ Lemma val_inject_incr:
   val_inject f2 v v'.
 Proof.
   intros. inv H0; eauto.
-  public_auto. inv PUBLIC. econs; eauto. i; ss.
-  exploit PUBLIC0; eauto. i; des. esplits; eauto.
 Qed.
 
 Lemma val_list_inject_incr:
@@ -142,12 +105,6 @@ Qed.
 
 Hint Resolve inject_incr_refl val_inject_incr val_list_inject_incr.
 
-Inductive memval_public_tgt (mi: meminj) (v2: memval): Prop :=
-| memval_public_tgt_intro
-    (PUBLIC: (forall b2 ofs2 q n, v2 = Fragment (Vptr b2 ofs2) q n ->
-                              exists b1 ofs1 delta, mi b1 = Some (b2, delta) /\
-                                                    ofs2 = Int.add 31 ofs1 (Int.repr 31 delta)))
-.
 Inductive memval_inject (f: meminj): memval -> memval -> Prop :=
   | memval_inject_byte:
       forall n, memval_inject f (Byte n) (Byte n)
@@ -158,16 +115,13 @@ Inductive memval_inject (f: meminj): memval -> memval -> Prop :=
       memval_inject f (Fragment (Vptr b1 ofs1) Q32 n) (Fragment (Vptr b2 ofs2) Q32 n)
   | memval_inject_inttoptr:
       forall i n, memval_inject f (Fragment (Vinttoptr i) Q32 n) (Fragment (Vinttoptr i) Q32 n)
-  | memval_inject_undef: forall v (PUBLIC: memval_public_tgt f v), memval_inject f Undef v.
+  | memval_inject_undef: forall v, memval_inject f Undef v.
 
 (* Properties of memval_inject. *)
 Lemma memval_inject_incr: forall f f' v1 v2, 
   memval_inject f v1 v2 -> inject_incr f f' -> memval_inject f' v1 v2.
 Proof.
   intros. inv H; econstructor. rewrite (H0 _ _ _ H1). reflexivity. auto.
-  inv PUBLIC. econs; eauto.
-  i; clarify.
-  exploit PUBLIC0; eauto. i; des. esplits; eauto.
 Qed.
 
 Lemma inj_bytes_inject:
@@ -181,19 +135,18 @@ Lemma repeat_Undef_inject_self:
   forall f n,
   list_forall2 (memval_inject f) (list_repeat n Undef) (list_repeat n Undef).
 Proof.
-  induction n; simpl; constructor; auto. constructor. public_auto.
+  induction n; simpl; constructor; auto. constructor.
 Qed.  
 
 Lemma repeat_Undef_inject:
   forall f n xs,
     length xs = n ->
-    List.Forall (memval_public_tgt f) xs ->
     list_forall2 (memval_inject f) (list_repeat n Undef) xs.
 Proof.
   ii.
   ginduction n; ii; ss.
   - destruct xs; ss. econs; eauto.
-  - destruct xs; ss. inv H0. econs; eauto. econs; eauto.
+  - destruct xs; ss. econs; eauto. econs; eauto.
 Qed.  
 
 (* Properties of proj_bytes. *)
@@ -401,39 +354,10 @@ Proof.
     exploit proj_value_undef; eauto.
     { eapply nth_error_in; eauto. }
     i. rewrite x0. econs; eauto.
-    public_auto.
-    destruct vl2; ss. des_ifs_safe.
-    destruct (Val.eq _ _); ss.
-    destruct (quantity_eq Q32 q0); ss.
-    destruct n1; ss.
-    destruct n1; ss.
-    destruct n1; ss.
-    destruct n1; ss.
-    clarify.
-    des_ifs_safe.
-    destruct (Val.eq _ _); ss.
-    destruct (quantity_eq _ _); ss. clarify.
-    destruct n1; ss.
-    destruct n1; ss.
-    destruct n1; ss.
-    des_ifs_safe.
-    destruct (Val.eq _ _); ss.
-    destruct (quantity_eq _ _); ss. clarify.
-    destruct n1; ss.
-    destruct n1; ss.
-    des_ifs_safe.
-    destruct (Val.eq _ _); ss.
-    destruct (quantity_eq _ _); ss. clarify.
-    des_ifs. ss.
-    inv H. inv H6. inv H7. inv H8. inv H9.
-    clear - H7.
-    inv H7.
-    - esplits; eauto.
-    - inv PUBLIC. exploit PUBLIC0; eauto.
   }
   rename H0 into UNDEF.
   intros. unfold proj_value.
-  inversion H; subst; auto. { public_auto. } inversion H0; subst; auto. { public_auto. }
+  inversion H; subst; auto. inversion H0; subst; auto.
   case_eq (check_value (size_quantity_nat Q32) (Vptr b0 ofs1) Q32
         (Fragment (Vptr b0 ofs1) Q32 n :: al)); intros.
   exploit check_value_ptr_inject_true. eexact H. eauto. eauto.
@@ -442,7 +366,7 @@ Proof.
   exploit check_value_ptr_inject_false. eexact H. eauto. eauto. eauto. eauto. eauto.
   intro H4. rewrite H4. econstructor; eauto.
 
-  inversion H; subst; auto. inversion H0; subst; auto. { public_auto. }
+  inversion H; subst; auto. inversion H0; subst; auto.
   case_eq (check_value (size_quantity_nat Q32) (Vinttoptr i) Q32
         (Fragment (Vinttoptr i) Q32 n :: al)); intros.
   exploit check_value_iptr_inject_true. eexact H. eauto. eauto.
@@ -450,14 +374,6 @@ Proof.
 
   {
     des_ifs.
-    - econs; eauto. public_auto.
-    - econs; eauto. public_auto.
-  }
-  {
-    econs; eauto.
-    public_auto.
-    des_ifs.
-    inv PUBLIC. exploit PUBLIC0; eauto.
   }
 Qed.
 
@@ -500,56 +416,6 @@ Proof.
   apply memval_inject_implies; eauto.
 Qed.
 
-Lemma repeat_forall
-      X
-      (f: X -> Prop) len v
-      (PROP: f v)
-  :
-    <<FORALL: Forall f (list_repeat len v)>>
-.
-Proof.
-  ginduction len; ii; ss.
-  econs; eauto.
-  eapply IHlen; eauto.
-Qed.
-
-Lemma map_constant
-      X Y (cnst: Y) (xs: list X)
-  :
-    <<MAP: map (fun _ => cnst) xs = list_repeat (length xs) cnst>>
-.
-Proof.
-  ginduction xs; ii; ss.
-  red. f_equal. eapply IHxs; eauto.
-Qed.
-
-Lemma encode_val_inject_public
-      chunk f v2
-      (PUBLIC: val_public_tgt f v2)
-  :
-  <<PUBLIC: Forall (memval_public_tgt f) (encode_val chunk v2)>>
-.
-Proof.
-  red.
-  unfold encode_val.
-  des_ifs; try apply repeat_forall; try (by public_auto); unfold inj_bytes.
-  - induction (encode_int (bytesize_chunk_nat n) (Int.unsigned wz i)); ii; ss.
-    econs; eauto. public_auto.
-  - induction (encode_int 8 (Int.unsigned 63 (Floats.Float.to_bits f0))); ii; ss.
-    econs; eauto. public_auto.
-  - induction (encode_int 4 (Int.unsigned 31 (Floats.Float32.to_bits f0))); ii; ss.
-    econs; eauto. public_auto.
-  - unfold inj_value.
-    induction (size_quantity_nat Q32); ii; ss.
-    econs; eauto.
-    public_auto.
-    inv PUBLIC. exploit PUBLIC0; eauto.
-  - unfold inj_value.
-    induction (size_quantity_nat Q32); ii; ss.
-    econs; eauto.
-    public_auto.
-Qed.
-
 (* Properties of encode/decode val *)
 Theorem encode_val_inject:
   forall f v1 v2 chunk,
@@ -578,9 +444,7 @@ Proof.
     destruct (eq_nat_dec _ _); subst; try apply repeat_Undef_inject_self.
       unfold inj_value; simpl; repeat econstructor; auto.
 
-    { apply repeat_Undef_inject. rewrite encode_val_length. ss.
-      eapply encode_val_inject_public; eauto.
-    }
+    { apply repeat_Undef_inject. rewrite encode_val_length. ss. }
 Qed.
 
 Notation "a # b" := (Maps.PMap.get b a) (at level 1).
@@ -679,23 +543,19 @@ Proof.
   }
   intros PB2. rewrite PB2.
   destruct chunk; constructor.
-  {
-    des_ifs; try (by econs; eauto).
-    - ss.
-      exploit proj_bytes_not_inject; eauto.
-      { rewrite Heq; ss. }
-      i; des.
-      des_ifs; try (by econs; eauto).
-      + erewrite proj_value_undef in Heq0; ss.
-      + erewrite proj_value_undef in Heq0; ss.
-      + erewrite proj_value_undef in Heq0; ss.
-    - ss.
-      exploit proj_value_inject; eauto. i; des.
-      des_ifs; inv x0; try (by econs; eauto).
-      apply inj_pair2 in H4.
-      apply inj_pair2 in H6. subst.
-      econs; eauto.
+  assert (A: forall fn,
+     val_inject f (Val.load_result chunk (proj_value Q32 vl1))
+                  (match proj_bytes vl2 with
+                   | Some bl => fn bl
+                   | None => Val.load_result chunk (proj_value Q32 vl2)
+                   end)).
+  { intros. destruct (proj_bytes vl2) as [bl2|] eqn:PB2.
+    rewrite proj_value_undef. destruct chunk; auto. eapply proj_bytes_not_inject; eauto. congruence.
+    apply val_load_result_inject. apply proj_value_inject; auto.
+    Print Memdata.memval_inject.
+    Print memval_inject.
   }
+  des_ifs; ss.
 Qed.
 
 Lemma load_inj:
