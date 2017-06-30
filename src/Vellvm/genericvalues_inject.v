@@ -1682,41 +1682,41 @@ Lemma mem_inj__free : forall mi Mem0 M2 Mem' mgb hi lo
     wf_sb_mi mgb mi Mem' Mem2' /\
     MoreMem.mem_inj mi Mem' Mem2'.
 Proof.
-(*   intros mi Mem0 M2 Mem' mgb hi lo b2 delta blk Hwfmi Hmsim1 H0 HeqR2 H4. *)
-(*   assert ({ Mem2':Mem.mem | Mem.free M2 b2 (lo+delta) (hi+delta) = ret Mem2'}) *)
-(*     as J. *)
-(*     apply Mem.range_perm_free. *)
-(*     apply Mem.free_range_perm in H0. *)
-(*     clear - H0 Hmsim1 H4. *)
-(*     unfold Mem.range_perm in *. *)
-(*     intros ofs J. *)
-(*     assert (lo <= ofs - delta < hi) as J'. *)
-(*       auto with zarith. *)
-(*     apply H0 in J'. *)
-(*     eapply MoreMem.perm_inj in J'; eauto. *)
-(*     assert (ofs - delta + delta = ofs) as EQ. auto with zarith. *)
-(*     rewrite EQ in J'. auto. *)
-(*   destruct J as [Mem2' J]. *)
-(*   exists Mem2'. split; auto. *)
-(*   SCase "wfmi". *)
-(*     clear - Hwfmi H0 J H4. *)
-(*     inversion_clear Hwfmi. *)
-(*     split; eauto with mem. *)
-(*     SSCase "Hmap3". *)
-(*       intros. erewrite Mem.nextblock_free in H; eauto. *)
-(*     SSCase "Hmap4". *)
-(*       intros. erewrite Mem.nextblock_free; eauto. *)
-(*     SSCase "bounds". *)
-(*       intros. apply mi_bounds0 in H. *)
-(*       erewrite Mem.bounds_free; eauto. *)
-(*       erewrite Mem.bounds_free with (m2:=Mem2'); eauto. *)
+  intros mi Mem0 M2 Mem' mgb hi lo b2 delta blk Hwfmi Hmsim1 H0 HeqR2 H4.
+  assert ({ Mem2':Mem.mem | Mem.free M2 b2 (lo+delta) (hi+delta) = ret Mem2'})
+    as J.
+    apply Mem.range_perm_free.
+    apply Mem.free_range_perm in H0.
+    clear - H0 Hmsim1 H4.
+    unfold Mem.range_perm in *.
+    intros ofs J.
+    assert (lo <= ofs - delta < hi) as J'.
+      auto with zarith.
+    apply H0 in J'.
+    eapply MoreMem.perm_inj in J'; eauto.
+    assert (ofs - delta + delta = ofs) as EQ. auto with zarith.
+    rewrite EQ in J'. auto.
+  destruct J as [Mem2' J].
+  exists Mem2'. split; auto.
+  split.
+  SCase "wfmi".
+    clear - Hwfmi H0 J H4.
+    inversion_clear Hwfmi.
+    split; eauto with mem.
+    SSCase "Hmap3".
+      intros. erewrite Mem.nextblock_free in H; eauto.
+    SSCase "Hmap4".
+      intros. erewrite Mem.nextblock_free; eauto.
+    SSCase "bounds".
+      intros. apply mi_bounds0 in H.
+      erewrite Mem.bounds_free; eauto.
+      erewrite Mem.bounds_free with (m2:=Mem2'); eauto.
 
-(*   SCase "msim". *)
-(*     clear - Hmsim1 Hwfmi H0 J H4. *)
-(*     inv Hwfmi. *)
-(*     eapply MoreMem.free_inj; eauto. *)
-(* Qed. *)
-Admitted.
+  SCase "msim".
+    clear - Hmsim1 Hwfmi H0 J H4.
+    inv Hwfmi.
+    eapply MoreMem.free_inj; eauto.
+Qed.
 
 (* The sb_ds_trans_lib.mem_simulation__free should use this lemma. *)
 Lemma mem_inj__unchecked_free : forall mi Mem0 M2 Mem' mgb hi lo
@@ -1740,12 +1740,25 @@ Proof.
 Qed.
 
 Lemma val_inject_has_chunk mi v1 v2 chk
-  (Hinj: MoreMem.val_inject mi v1 v2) :
+  (Hinj: MoreMem.val_inject mi v1 v2)
+  (UNDEF: v1 = Vundef -> v2 <> Vundef -> has_chunk_eq v2 chk)
+  :
   has_chunk_eq v1 chk = has_chunk_eq v2 chk.
 Proof.
-(*   destruct v1, v2; inv Hinj; auto. *)
-(* Qed. *)
-Admitted.
+  destruct v1, v2; inv Hinj; auto; try (by rewrite UNDEF; ss).
+Qed.
+
+Lemma has_chunkb_has_chunk_eq
+      v m
+      (CHUNK: Val.has_chunkb v m)
+  :
+    <<CHUNK: has_chunk_eq v m>>
+.
+Proof.
+  destruct v; ss; des_ifs; ss;
+    try (destruct (Nat.eq_dec _ _); ss; clarify);
+    try (apply Nat.eqb_eq; ss).
+Qed.
 
 (* sb_ds_trans_lib.simulation_mstore_aux should use this *)
 Lemma mem_inj_mstore_aux : forall b b2 delta mi mgb
@@ -1765,7 +1778,11 @@ Proof.
     inv Hinj; inv Hmstores; eauto.
     destruct p. inv Hinj.
     destruct (AST.memory_chunk_eq a m); simpl in *; tinv Hmstores.
-    rewrite <- (val_inject_has_chunk mi v v2 m H4).
+    rewrite <- (val_inject_has_chunk mi v v2 m H4); cycle 1.
+    { i. clarify.
+      exploit CHUNK; ss; try eassumption. i.
+      apply has_chunkb_has_chunk_eq; ss.
+    }
     destruct (has_chunk_eq v m); simpl in *; tinv Hmstores.
     remember (Mem.store m Mem0 b ofs v) as R1.
     destruct R1 as [M|]; tinv Hmstores.
