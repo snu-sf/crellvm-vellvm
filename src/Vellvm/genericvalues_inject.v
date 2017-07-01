@@ -1094,14 +1094,6 @@ Proof.
       simpl. rewrite J1'.
         erewrite <- simulation__gv_chunks_match_typb; eauto.
         destruct_if; eauto using gv_inject_gundef.
-        (* des_ifs; try (by esplits; eauto using gv_inject_gundef'). *)
-        (* - rename gv into __gv__. *)
-        (*   unfold gv_chunks_match_typb in *. unfold gundef. des_ifs. *)
-        (*   esplits; eauto. *)
-        (*   admit. *)
-        (* - unfold gundef in *. unfold gv_chunks_match_typb in *. des_ifs. *)
-        (*   esplits; eauto. *)
-        (*   apply gv_inject_mc2undefs. *)
     }
 
       symmetry in HeqR1.
@@ -1521,30 +1513,28 @@ Proof.
   apply gv_inject_app; auto.
 Qed.
 
-Lemma simulation__eq__GV2int : forall mi gn gn' TD sz,
+Lemma simulation__GV2int : forall mi gn gn' TD sz i,
   gv_inject mi gn gn' ->
-  GV2int TD sz gn = GV2int TD sz gn'.
+  GV2int TD sz gn = Some i ->
+  GV2int TD sz gn' = Some i.
 Proof.
-(*   intros mi gn gn' TD sz Hinj. *)
-(*   unfold GV2int. *)
-(*   destruct gn. *)
-(*     inv Hinj. subst. auto. *)
+  ii.
+  unfold GV2int in *.
+  inv H; ss.
+  inv H1; des_ifs; ss. inv H2; ss.
+Qed.
 
-(*     inv Hinj. *)
-(*     inv H1; auto. *)
-(*     destruct gn; inv H3; auto. *)
-(* Qed. *)
-Admitted.
-
-Lemma simulation__GVs2Nats : forall mi TD vidxs vidxs',
+Lemma simulation__GVs2Nats : forall mi TD vidxs vidxs' ns,
   gvs_inject mi vidxs vidxs' ->
-  GVs2Nats TD vidxs = GVs2Nats TD vidxs'.
+  GVs2Nats TD vidxs = Some ns ->
+  GVs2Nats TD vidxs' = Some ns.
 Proof.
-  induction vidxs; intros vidxs' Hinj.
-    destruct vidxs'; inv Hinj; simpl; auto.
-    destruct vidxs'; simpl in *; inv Hinj; auto.
-      erewrite simulation__eq__GV2int; eauto.      
-      erewrite IHvidxs; eauto.
+  i.
+  ginduction vidxs; ii; ss; clarify.
+  { des_ifs. }
+  des_ifs. ss. des.
+  erewrite simulation__GV2int; eauto.
+  erewrite IHvidxs; eauto.
 Qed.
 
 Lemma simulation__mgep' : forall mi TD v v' t0 l1,
@@ -1576,7 +1566,7 @@ Proof.
 (*   destruct p; tinv H. *)
 (*   inv H. inv H8. inv H3; tinv H0. *)
 (* Qed. *)
-Admitted.
+Abort.
 
 Lemma simulation__GEP : forall maxb mi TD Mem Mem2 inbounds0 vidxs vidxs' gvp1 
     gvp gvp' t t',
