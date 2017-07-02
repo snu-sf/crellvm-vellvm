@@ -1175,7 +1175,7 @@ Lemma nextblock_alloca: forall TD M tsz gn M' align0 mb,
 Proof.
   intros.
   apply alloca_inv in H.
-  unfold Datatypes.option_map, flip in *.
+  unfold Datatypes.option_map, flip in *. des.
   des_ifs; apply Mem.nextblock_alloc in Heq; apply Mem.nextblock_drop in Heq0;
     rewrite Heq0; rewrite Heq; rewrite Pplus_one_succ_r; auto.
 Qed.
@@ -1197,7 +1197,7 @@ Lemma alloca_result: forall TD M tsz gn M' align0 mb,
 Proof.
   intros.
   apply alloca_inv in H.
-  unfold Datatypes.option_map, flip in *.
+  unfold Datatypes.option_map, flip in *. des.
   des_ifs; apply Mem.alloc_result in Heq; ss.
   (* destruct H as [n [J1 [J2 J3]]]. *)
   (* apply Mem.alloc_result in J3; auto. *)

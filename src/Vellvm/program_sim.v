@@ -151,136 +151,136 @@ Proof.
   destruct Terminator; try congruence; destruct ECS; try congruence; inv J.
 Qed.
 
-Lemma undefined_state__stuck: forall St1 St2 cfg tr
-  (Hundef : OpsemPP.undefined_state cfg St1),
-  ~ Opsem.sInsn cfg St1 St2 tr.
-Proof.
-  intros.
-  unfold OpsemPP.undefined_state in Hundef.
-  destruct cfg; simpl in Hundef.
-  destruct St1; simpl in Hundef.
-  (* destruct ECS. *)
-  (* destruct Hundef as [J | [J | [J | [J | [J | [J | J]]]]]]; inv J. *)
-  destruct EC; tinv Hundef.
-  intro Hop.
-  destruct CurCmds.
-    destruct Hundef as
-      [Hundef | [Hundef | [Hundef | [J | [J | [J | J]]]]]];
-      try solve [inversion J].
-      destruct Terminator; tinv Hundef.
-      destruct ECS; tinv Hundef.
-      destruct e; tinv Hundef.
-      destruct CurCmds; tinv Hundef.
-      inv Hop. uniq_result.
+(* Lemma undefined_state__stuck: forall St1 St2 cfg tr *)
+(*   (Hundef : OpsemPP.undefined_state cfg St1), *)
+(*   ~ Opsem.sInsn cfg St1 St2 tr. *)
+(* Proof. *)
+(*   intros. *)
+(*   unfold OpsemPP.undefined_state in Hundef. *)
+(*   destruct cfg; simpl in Hundef. *)
+(*   destruct St1; simpl in Hundef. *)
+(*   (* destruct ECS. *) *)
+(*   (* destruct Hundef as [J | [J | [J | [J | [J | [J | J]]]]]]; inv J. *) *)
+(*   destruct EC; tinv Hundef. *)
+(*   intro Hop. *)
+(*   destruct CurCmds. *)
+(*     destruct Hundef as *)
+(*       [Hundef | [Hundef | [Hundef | [J | [J | [J | J]]]]]]; *)
+(*       try solve [inversion J]. *)
+(*       destruct Terminator; tinv Hundef. *)
+(*       destruct ECS; tinv Hundef. *)
+(*       destruct e; tinv Hundef. *)
+(*       destruct CurCmds; tinv Hundef. *)
+(*       inv Hop. uniq_result. *)
 
-      destruct Terminator; tinv Hundef.
-      destruct ECS; tinv Hundef.
-      destruct e; tinv Hundef.
-      destruct CurCmds; tinv Hundef.
-      inv Hop.
-      destruct Hundef as [Hundef | Hundef].
-        uniq_result.
+(*       destruct Terminator; tinv Hundef. *)
+(*       destruct ECS; tinv Hundef. *)
+(*       destruct e; tinv Hundef. *)
+(*       destruct CurCmds; tinv Hundef. *)
+(*       inv Hop. *)
+(*       destruct Hundef as [Hundef | Hundef]. *)
+(*         uniq_result. *)
 
-        remember (getCallerReturnID c) as R.
-        destruct R; tinv Hundef.
-          congruence.
+(*         remember (getCallerReturnID c) as R. *)
+(*         destruct R; tinv Hundef. *)
+(*           congruence. *)
 
-      destruct CurBB as [? [? ? t]]; tinv Hundef.
-      destruct t; tinv Hundef.
-      destruct Terminator; tinv Hundef.
-      inv Hop.
+(*       destruct CurBB as [? [? ? t]]; tinv Hundef. *)
+(*       destruct t; tinv Hundef. *)
+(*       destruct Terminator; tinv Hundef. *)
+(*       inv Hop. *)
 
-    destruct Hundef as
-      [Hundef | [Hundef | [Hundef | [Hundef |
-        [Hundef | [Hundef | Hundef]]]]]];
-      tinv Hundef.
-      destruct CurBB as [? [? ? t]]; tinv Hundef.
-      destruct t; tinv Hundef.
-      (* destruct_cmd c; tinv Hundef. *)
-        (* remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R. *)
-        (* destruct R; tinv Hundef. *)
-        (* remember (getTypeAllocSize CurTargetData t) as R. *)
-        (* destruct R; tinv Hundef. *)
-        (* destruct Hundef as [gn [Hinst Hundef]]. *)
-        (* remember (malloc CurTargetData Mem s gn a) as R. *)
-        (* destruct R; tinv Hundef. *)
-        (* inv Hop. symmetry_ctx. uniq_result.  *)
+(*     destruct Hundef as *)
+(*       [Hundef | [Hundef | [Hundef | [Hundef | *)
+(*         [Hundef | [Hundef | Hundef]]]]]]; *)
+(*       tinv Hundef. *)
+(*       destruct CurBB as [? [? ? t]]; tinv Hundef. *)
+(*       destruct t; tinv Hundef. *)
+(*       (* destruct_cmd c; tinv Hundef. *) *)
+(*         (* remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R. *) *)
+(*         (* destruct R; tinv Hundef. *) *)
+(*         (* remember (getTypeAllocSize CurTargetData t) as R. *) *)
+(*         (* destruct R; tinv Hundef. *) *)
+(*         (* destruct Hundef as [gn [Hinst Hundef]]. *) *)
+(*         (* remember (malloc CurTargetData Mem s gn a) as R. *) *)
+(*         (* destruct R; tinv Hundef. *) *)
+(*         (* inv Hop. symmetry_ctx. uniq_result.  *) *)
 
-        (* remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R. *)
-        (* destruct R; tinv Hundef. *)
-        (* remember (getTypeAllocSize CurTargetData t) as R. *)
-        (* destruct R; tinv Hundef. *)
-        (* destruct Hundef as [gn [Hinst Hundef]]. *)
-        (* remember (malloc CurTargetData Mem s gn a) as R. *)
-        (* destruct R; tinv Hundef. *)
-        (* inv Hop. symmetry_ctx. uniq_result.  *)
+(*         (* remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R. *) *)
+(*         (* destruct R; tinv Hundef. *) *)
+(*         (* remember (getTypeAllocSize CurTargetData t) as R. *) *)
+(*         (* destruct R; tinv Hundef. *) *)
+(*         (* destruct Hundef as [gn [Hinst Hundef]]. *) *)
+(*         (* remember (malloc CurTargetData Mem s gn a) as R. *) *)
+(*         (* destruct R; tinv Hundef. *) *)
+(*         (* inv Hop. symmetry_ctx. uniq_result.  *) *)
 
-      destruct_cmd c; tinv Hundef.
-        remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R.
-        destruct R; tinv Hundef.
-        remember (free CurTargetData Mem g) as R.
-        destruct R; tinv Hundef.
-        inv Hop. symmetry_ctx. uniq_result. 
+(*       destruct_cmd c; tinv Hundef. *)
+(*         remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R. *)
+(*         destruct R; tinv Hundef. *)
+(*         remember (free CurTargetData Mem g) as R. *)
+(*         destruct R; tinv Hundef. *)
+(*         inv Hop. symmetry_ctx. uniq_result.  *)
 
-      destruct_cmd c; tinv Hundef.
-        remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R.
-        destruct R; tinv Hundef.
-        remember (mload CurTargetData Mem g t a) as R.
-        destruct R; tinv Hundef.
-        inv Hop. symmetry_ctx. uniq_result. 
+(*       destruct_cmd c; tinv Hundef. *)
+(*         remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R. *)
+(*         destruct R; tinv Hundef. *)
+(*         remember (mload CurTargetData Mem g t a) as R. *)
+(*         destruct R; tinv Hundef. *)
+(*         inv Hop. symmetry_ctx. uniq_result.  *)
 
-      destruct_cmd c; tinv Hundef.
-        remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R.
-        destruct R; tinv Hundef.
-        remember (Opsem.getOperandValue CurTargetData v0 Locals Globals) as R.
-        destruct R; tinv Hundef.
-        remember (mstore CurTargetData Mem g0 t g a) as R.
-        destruct R; tinv Hundef.
-        inv Hop. symmetry_ctx. uniq_result. 
+(*       destruct_cmd c; tinv Hundef. *)
+(*         remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R. *)
+(*         destruct R; tinv Hundef. *)
+(*         remember (Opsem.getOperandValue CurTargetData v0 Locals Globals) as R. *)
+(*         destruct R; tinv Hundef. *)
+(*         remember (mstore CurTargetData Mem g0 t g a) as R. *)
+(*         destruct R; tinv Hundef. *)
+(*         inv Hop. symmetry_ctx. uniq_result.  *)
 
-      destruct_cmd c; tinv Hundef.
-        remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R.
-        destruct R; tinv Hundef.
-        remember (OpsemAux.lookupFdefViaPtr CurProducts FunTable g) as R.
-        destruct R; tinv Hundef.
-        remember (OpsemAux.lookupExFdecViaPtr CurProducts FunTable g) as R.
-        destruct R as [f|].
-          destruct f as [[fnattrs5 typ5 id5 args5 varg5] bs].
-          remember (Opsem.params2GVs CurTargetData p Locals Globals) as R.
-          destruct R; tinv Hundef.
-          match goal with
-          | _: match ?ef with
-               | Some _ => _
-               | None => _
-               end |- _ => remember ef as R
-          end.
-          destruct R as [[[o ?]]|].
-            remember (Opsem.exCallUpdateLocals CurTargetData t0 n i0 o Locals)
-              as R.
-            destruct R; tinv Hundef.
-            inv Hop.
-              symmetry_ctx. uniq_result. 
-              symmetry_ctx. uniq_result.
+(*       destruct_cmd c; tinv Hundef. *)
+(*         remember (Opsem.getOperandValue CurTargetData v Locals Globals) as R. *)
+(*         destruct R; tinv Hundef. *)
+(*         remember (OpsemAux.lookupFdefViaPtr CurProducts FunTable g) as R. *)
+(*         destruct R; tinv Hundef. *)
+(*         remember (OpsemAux.lookupExFdecViaPtr CurProducts FunTable g) as R. *)
+(*         destruct R as [f|]. *)
+(*           destruct f as [[fnattrs5 typ5 id5 args5 varg5] bs]. *)
+(*           remember (Opsem.params2GVs CurTargetData p Locals Globals) as R. *)
+(*           destruct R; tinv Hundef. *)
+(*           match goal with *)
+(*           | _: match ?ef with *)
+(*                | Some _ => _ *)
+(*                | None => _ *)
+(*                end |- _ => remember ef as R *)
+(*           end. *)
+(*           destruct R as [[[o ?]]|]. *)
+(*             remember (Opsem.exCallUpdateLocals CurTargetData t0 n i0 o Locals) *)
+(*               as R. *)
+(*             destruct R; tinv Hundef. *)
+(*             inv Hop. *)
+(*               symmetry_ctx. uniq_result.  *)
+(*               symmetry_ctx. uniq_result. *)
 
-            inv Hop.
-              symmetry_ctx. uniq_result. 
-              symmetry_ctx. uniq_result. 
+(*             inv Hop. *)
+(*               symmetry_ctx. uniq_result.  *)
+(*               symmetry_ctx. uniq_result.  *)
 
-          inv Hop.
-            symmetry_ctx. uniq_result. 
-            symmetry_ctx. uniq_result. 
-Qed.
+(*           inv Hop. *)
+(*             symmetry_ctx. uniq_result.  *)
+(*             symmetry_ctx. uniq_result.  *)
+(* Qed. *)
 
-Lemma undefined_state__stuck': forall St cfg
-  (Hundef : OpsemPP.undefined_state cfg St),
-  Opsem.stuck_state cfg St.
-Proof.
-  intros.
-  unfold Opsem.stuck_state.
-  intro J. destruct J as [St' [tr J]].
-  revert J.
-  apply undefined_state__stuck; auto.
-Qed.
+(* Lemma undefined_state__stuck': forall St cfg *)
+(*   (Hundef : OpsemPP.undefined_state cfg St), *)
+(*   Opsem.stuck_state cfg St. *)
+(* Proof. *)
+(*   intros. *)
+(*   unfold Opsem.stuck_state. *)
+(*   intro J. destruct J as [St' [tr J]]. *)
+(*   revert J. *)
+(*   apply undefined_state__stuck; auto. *)
+(* Qed. *)
 
 Lemma stuck__undefined_state: forall St cfg
   (HwfCfg: OpsemPP.wf_Config cfg) (Hst: OpsemPP.wf_State cfg St) 

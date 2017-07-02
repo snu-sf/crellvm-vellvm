@@ -1234,14 +1234,13 @@ Definition malloc (TD:TargetData) (M:mem) (bsz:sz) (gn:GenericValue) (al:align)
 
 Definition alloca (TD:TargetData) (M:mem) (bsz:sz) (gn:GenericValue) (al:align)
   : option (mem * mblock)%type :=
-  let hi :=
-      (match GV2int TD Size.ThirtyTwo gn with
-       | Some n => (Size.to_Z bsz) * n
-       | None => 0
-       end)%Z
-  in
-  let (M', nb) := (Mem.alloc M 0 hi) in
-  option_map ((flip pair) nb) (Mem.drop_perm M' nb 0 hi Writable)
+  match GV2int TD Size.ThirtyTwo gn with
+  | Some n =>
+    let hi := (Size.to_Z bsz * n)%Z in
+    let (M', nb) := (Mem.alloc M 0 hi) in
+    option_map ((flip pair) nb) (Mem.drop_perm M' nb 0 hi Writable)
+  | None => None
+  end
 .
 
 Definition malloc_one (TD:TargetData) (M:mem) (bsz:sz) (al:align)
@@ -2282,16 +2281,15 @@ Qed.
 
 Lemma alloca_inv : forall TD Mem0 tsz gn align0 Mem' mb,
   alloca TD Mem0 tsz gn align0 = ret (Mem', mb) ->
-  let hi :=
-  match GV2int TD Size.ThirtyTwo gn with
-  | ret n => (Size.to_Z tsz * n)%Z
-  | merror => 0%Z
-  end in
-  let (M', nb) := Mem.alloc Mem0 0 hi in
-  option_map (flip pair nb) (Mem.drop_perm M' nb 0 hi Writable) = ret (Mem', mb)
+  exists z, (GV2int TD Size.ThirtyTwo gn) = Some z /\
+            let hi := (Size.to_Z tsz * z)%Z in
+            let (M', nb) := Mem.alloc Mem0 0 hi in
+            option_map (flip pair nb) (Mem.drop_perm M' nb 0 hi Writable) = ret (Mem', mb)
 .
 Proof.
-  intros. unfold alloca in *. eauto.
+  intros. unfold alloca in *.
+  destruct (GV2int TD Size.ThirtyTwo gn) eqn:T; simpl in *; subst; eauto.
+  inv H.
 Qed.
 
 Lemma store_inv : forall TD Mem0 gvp t gv align Mem',
