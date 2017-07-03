@@ -971,6 +971,64 @@ Proof.
     exists gv3. split; auto.
 Qed.
 
+Lemma simulation__GV2int : forall mi gn gn' TD sz i,
+  gv_inject mi gn gn' ->
+  GV2int TD sz gn = Some i ->
+  GV2int TD sz gn' = Some i.
+Proof.
+  ii.
+  unfold GV2int in *.
+  inv H; ss.
+  inv H1; des_ifs; ss. inv H2; ss.
+Qed.
+
+Lemma simulation__mselect
+      TD ty gv0 gv1 gv2 gv3
+      (SEL: mselect TD ty gv0 gv1 gv2 = Some gv3)
+      mi gv0' gv1' gv2'
+      (INJ0: gv_inject mi gv0 gv0')
+      (INJ1: gv_inject mi gv1 gv1')
+      (INJ2: gv_inject mi gv2 gv2')
+  :
+    exists gv3',
+      <<SEL: mselect TD ty gv0' gv1' gv2' = Some gv3'>> /\
+             <<INJ3: gv_inject mi gv3 gv3'>>
+.
+Proof.
+  unfold mselect, fit_chunk_gv in SEL.
+  des_ifs.
+  - unfold mselect, fit_chunk_gv.
+    erewrite simulation__GV2int; eauto.
+    rewrite Heq0.
+    exploit simulation__gv_chunks_match_typb; try exact INJ1; eauto.
+    intro CHUNK. rewrite <- CHUNK.
+    des_ifs; esplits; eauto.
+  - unfold mselect, fit_chunk_gv.
+    erewrite simulation__GV2int; eauto.
+    rewrite Heq0.
+    exploit simulation__gv_chunks_match_typb; try exact INJ1; eauto.
+    intro CHUNK. rewrite <- CHUNK.
+    des_ifs; esplits; eauto.
+    eapply gv_inject_gundef; eauto.
+  - unfold mselect, fit_chunk_gv.
+    erewrite simulation__GV2int; eauto.
+    rewrite Heq0.
+    exploit simulation__gv_chunks_match_typb; try exact INJ2; eauto.
+    intro CHUNK. rewrite <- CHUNK.
+    des_ifs; esplits; eauto.
+  - unfold mselect, fit_chunk_gv.
+    erewrite simulation__GV2int; eauto.
+    rewrite Heq0.
+    exploit simulation__gv_chunks_match_typb; try exact INJ2; eauto.
+    intro CHUNK. rewrite <- CHUNK.
+    des_ifs; esplits; eauto.
+    eapply gv_inject_gundef; eauto.
+  - unfold mselect, fit_chunk_gv.
+    des_ifs; esplits; eauto; try (by eapply gv_inject_gundef; eauto).
+    + eapply gv_inject_gundef'; eauto.
+    + eapply gv_inject_gundef'; eauto.
+Qed.
+
 Lemma simulation__GV2ptr : forall mi TD gv1 gv1' v,
   gv_inject mi gv1 gv1' ->
   GV2ptr TD (getPointerSize TD) gv1 = Some v ->
@@ -1439,17 +1497,6 @@ Proof.
   destruct_if; eauto using gv_inject_gundef.
   apply gv_inject_app; auto.
   apply gv_inject_app; auto.
-Qed.
-
-Lemma simulation__GV2int : forall mi gn gn' TD sz i,
-  gv_inject mi gn gn' ->
-  GV2int TD sz gn = Some i ->
-  GV2int TD sz gn' = Some i.
-Proof.
-  ii.
-  unfold GV2int in *.
-  inv H; ss.
-  inv H1; des_ifs; ss. inv H2; ss.
 Qed.
 
 Lemma simulation__GVs2Nats : forall mi TD vidxs vidxs' ns,

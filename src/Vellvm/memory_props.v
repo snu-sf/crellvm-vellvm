@@ -1148,7 +1148,7 @@ Proof.
             | ret n => Size.to_Z tsz * n
             | merror => 0
             end) as hi. clear Heqhi.
-  des_ifs. unfold Datatypes.option_map, flip in *.
+  des_ifs. unfold option_map, flip in *.
   des_ifs.
   unfold mload in *. des_ifs.
   exploit alloc_drop_preserves_mload_aux_inv; try exact H; eauto; []; i.
@@ -1175,7 +1175,7 @@ Lemma nextblock_alloca: forall TD M tsz gn M' align0 mb,
 Proof.
   intros.
   apply alloca_inv in H.
-  unfold Datatypes.option_map, flip in *. des.
+  unfold option_map, flip in *. des.
   des_ifs; apply Mem.nextblock_alloc in Heq; apply Mem.nextblock_drop in Heq0;
     rewrite Heq0; rewrite Heq; rewrite Pplus_one_succ_r; auto.
 Qed.
@@ -1197,7 +1197,7 @@ Lemma alloca_result: forall TD M tsz gn M' align0 mb,
 Proof.
   intros.
   apply alloca_inv in H.
-  unfold Datatypes.option_map, flip in *. des.
+  unfold option_map, flip in *. des.
   des_ifs; apply Mem.alloc_result in Heq; ss.
   (* destruct H as [n [J1 [J2 J3]]]. *)
   (* apply Mem.alloc_result in J3; auto. *)
@@ -1224,7 +1224,7 @@ Proof.
   rewrite MLOAD_AUX1. ss.
 Qed.
 
-Ltac u_alloca := unfold alloca, Datatypes.option_map, flip in *.
+Ltac u_alloca := unfold alloca, option_map, flip in *.
 
 Lemma alloca_preserves_wf_Mem : forall maxb TD M tsz gn align0 M' mb
   (Hmlc: alloca TD M tsz gn align0 = ret (M', mb))

@@ -2204,15 +2204,17 @@ Case "sSelect".
   apply wf_State__inv in J; auto.
   destruct J as [Hwftd [Hwfg [Hwflc Hwfc]]].
   inv Hwfc.
-  eapply getOperandValue__wf_gvs in H0; eauto.
-  eapply getOperandValue__wf_gvs in H1; eauto.
-  inversion H2.
-  eapply preservation_cmd_updated_case in HwfS1; simpl; eauto;
-    destruct z; simpl in RESULT; rewrite RESULT; auto.   
-  eapply preservation_cmd_updated_case in HwfS1. simpl. eauto. eauto. simpl.
-  instantiate (1:=t). auto. rewrite RESULT. eapply gundef_cgv2gvs__wf_gvs; eauto.
-  inv H15. instantiate (1:=S); auto. auto. auto.
-
+  unfold SELECT in *.
+  des_ifs; try (by eapply preservation_cmd_updated_case in HwfS1; simpl; eauto;
+                eapply gundef_cgv2gvs__wf_gvs; eauto;
+                eapply wf_value__wf_typ; eauto).
+  eapply getOperandValue__wf_gvs in Heq; eauto.
+  eapply getOperandValue__wf_gvs in Heq0; eauto.
+  eapply getOperandValue__wf_gvs in Heq1; eauto.
+  unfold mselect, fit_chunk_gv in *.
+  des_ifs; try (by eapply preservation_cmd_updated_case in HwfS1; simpl; eauto;
+                eapply gundef_cgv2gvs__wf_gvs; eauto;
+                eapply wf_value__wf_typ; eauto).
 Focus.
 Case "sCall".
   destruct_wfCfgState HwfCfg HwfS1.
@@ -2946,7 +2948,7 @@ Proof.
   des_ifs.
   { left.
     unfold flip.
-    unfold Datatypes.option_map.
+    unfold option_map.
     hexploit Mem.range_perm_drop_2; eauto; revgoals.
     { i; des. inv X. rewrite H. esplits; eauto. }
     ii.
@@ -3804,46 +3806,39 @@ Proof.
      exists events.E0. eauto.
 
   SCase "select".
-    assert (exists gv, getOperandValue (los, nts) v lc gl = Some gv) as J.
-      eapply getOperandValue_inCmdOps_isnt_stuck; eauto.
-      simpl; auto.
-    destruct J as [c J].
-    assert (exists gv0, getOperandValue (los, nts) v0 lc gl = Some gv0) as J0.
-      eapply getOperandValue_inCmdOps_isnt_stuck; eauto.
-      simpl; auto.
-    destruct J0 as [gv0 J0].
-    assert (exists gv1, getOperandValue (los, nts) v1 lc gl = Some gv1)
-      as J1.
-      eapply getOperandValue_inCmdOps_isnt_stuck; eauto.
-      simpl; auto.
-    destruct J1 as [gv1 J1].
-    assert (U:exists vundef, gundef (los,nts) t = Some vundef).
-      eapply gundef__total. inv Hwfc. inv H10. instantiate (1:=s). auto. auto.
-    destruct U as [gvundef U].
+  {
     left.
-    assert (exists gvresult, calc_select (los,nts) t c gv0 gv1 gvresult)
-      as J2.
-      destruct (GV2int (los,nts) Size.One c) eqn:Hcint.
-      destruct z.
-      exists gv1. eapply select_cond_def; eauto.
-      exists gv0. eapply select_cond_def; eauto.
-      exists gv0. eapply select_cond_def; eauto.
-      exists gvundef. eapply select_cond_undef; eauto.
+    rename v1 into v2.
+    rename v0 into v1.
+    rename v into v0.
+    assert(exists gvresult, SELECT (los, nts) lc gl v0 v1 v2 t = ret gvresult).
+    {
+      assert(GV0: exists gv0, getOperandValue (los, nts) v0 lc gl = Some gv0).
+      { eapply getOperandValue_inCmdOps_isnt_stuck; eauto.
+        simpl; auto.
+      }
+      assert(GV1: exists gv1, getOperandValue (los, nts) v1 lc gl = Some gv1).
+      { eapply getOperandValue_inCmdOps_isnt_stuck; eauto.
+        simpl; auto.
+      }
+      assert(GV2: exists gv2, getOperandValue (los, nts) v2 lc gl = Some gv2).
+      { eapply getOperandValue_inCmdOps_isnt_stuck; eauto.
+        simpl; auto.
+      }
+      assert(UNDEF: exists vundef, gundef (los,nts) t = Some vundef).
+      { eapply gundef__total. inv Hwfc. inv H10. instantiate (1:=s). auto. auto.
+      }
 
-    destruct J2 as [gvresult J2].
-    exists
-          {|
-          EC := {|
-                 CurFunction := f;
-                 CurBB := (l1, stmts_intro ps1
-                            (cs1 ++ insn_select i0 v t v0 v1 :: cs) tmn);
-                 CurCmds := cs;
-                 Terminator := tmn;
-                 Locals := updateAddAL GenericValue lc i0 gvresult;
-                 Allocas := als |};
-          ECS := ecs;
-          Mem := M |}.
-      exists events.E0. eauto.
+      des.
+      unfold SELECT.
+      des_ifs.
+      unfold mselect, fit_chunk_gv.
+      des_ifs; esplits; eauto.
+    }
+    des.
+    esplits; eauto.
+    econs; eauto.
+  }
   SCase "call".
     assert (exists gvs, params2GVs (los, nts) p lc gl = Some gvs) as G.
       eapply params2GVs_isnt_stuck; eauto.
