@@ -378,20 +378,6 @@ Proof.
 Qed.
 
 Lemma memval_inject_implies
-      f vl1 vl2
-      (INJ: list_forall2 (Memdata.memval_inject f) vl1 vl2)
-  :
-    <<INJ: list_forall2 (memval_inject f) vl1 vl2>>
-.
-Proof.
-  red.
-  ginduction INJ; ii; ss.
-  { econs; eauto. }
-  econs; eauto.
-  inv H; try (by econs; eauto).
-Abort.
-
-Lemma memval_inject_implies
       f v1 v2
       (INJ: (memval_inject f) v1 v2)
   :

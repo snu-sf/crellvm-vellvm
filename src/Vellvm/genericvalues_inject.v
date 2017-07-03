@@ -1479,23 +1479,6 @@ Proof.
 (* Qed. *)
 Admitted.
 
-Lemma simulation__GV2ptr' : forall mi TD gv1 gv1',
-  gv_inject mi gv1 gv1' ->
-  GV2ptr TD (getPointerSize TD) gv1 = None ->
-  GV2ptr TD (getPointerSize TD) gv1' = None.
-Proof.
-(*   intros. *)
-(*   unfold GV2ptr in *. *)
-(*   destruct gv1'; auto. *)
-(*   destruct p. *)
-(*   destruct v; auto. *)
-(*   destruct gv1'; auto. *)
-(*   destruct gv1; tinv H. *)
-(*   destruct p; tinv H. *)
-(*   inv H. inv H8. inv H3; tinv H0. *)
-(* Qed. *)
-Abort.
-
 Lemma simulation__GEP : forall maxb mi TD Mem Mem2 inbounds0 vidxs vidxs' gvp1 
     gvp gvp' t t',
   wf_sb_mi maxb mi Mem Mem2 ->
