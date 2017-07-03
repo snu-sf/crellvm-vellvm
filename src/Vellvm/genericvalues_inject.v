@@ -1465,20 +1465,6 @@ Proof.
   erewrite IHvidxs; eauto.
 Qed.
 
-Lemma simulation__mgep' : forall mi TD v v' t0 l1,
-  MoreMem.val_inject mi v v' ->
-  mgep TD t0 v l1 = None -> 
-  mgep TD t0 v' l1 = None.
-Proof.
-(*   intros. *)
-(*   unfold mgep in *. *)
-(*   inv H; auto. *)
-(*   destruct l1; auto. *)
-(*   destruct (mgetoffset TD (typ_array 0%nat t0) (z :: l1)) as [[i1 ?]|];  *)
-(*     try solve [inv H0 | auto]. *)
-(* Qed. *)
-Admitted.
-
 Lemma simulation__GEP : forall maxb mi TD Mem Mem2 inbounds0 vidxs vidxs' gvp1 
     gvp gvp' t t',
   wf_sb_mi maxb mi Mem Mem2 ->
@@ -1489,41 +1475,67 @@ Lemma simulation__GEP : forall maxb mi TD Mem Mem2 inbounds0 vidxs vidxs' gvp1
     GEP TD t gvp' vidxs' inbounds0 t' = ret gvp2 /\
     gv_inject mi gvp1 gvp2.
 Proof.
-(*   intros maxb mi TD Mem Mem2 inbounds0 vidxs vidxs' gvp1 gvp gvp' t t' H H0 H1  *)
-(*     H2. *)
-(*   unfold GEP in *. *)
-(*   remember (GV2ptr TD (getPointerSize TD) gvp) as R. *)
-(*   destruct R; inv H2. *)
-(*     symmetry in HeqR. *)
-(*     eapply simulation__GV2ptr in HeqR; eauto. *)
-(*     destruct HeqR as [v' [J1 J2]]. *)
-(*     rewrite J1.  *)
-(*     assert (GVs2Nats TD vidxs = GVs2Nats TD vidxs') as EQ. *)
-(*       eapply simulation__GVs2Nats; eauto. *)
-(*     rewrite <- EQ. *)
-(*     destruct (GVs2Nats TD vidxs). *)
-(*       remember (mgep TD t v l0) as R1. *)
-(*       destruct R1; inv H4. *)
-(*         symmetry in HeqR1. *)
-(*         eapply simulation__mgep in HeqR1; eauto. *)
-(*         destruct HeqR1 as [v0' [J11 J12]]. *)
-(*         rewrite J11. exists (ptr2GV TD v0'). *)
-(*         unfold ptr2GV, val2GV. *)
-(*         simpl. eauto. *)
-
-(*         symmetry in HeqR1. *)
-(*         eapply simulation__mgep' in HeqR1; eauto. *)
-(*         rewrite HeqR1. simpl.  *)
-(*         unfold gundef. simpl. *)
-(*         eauto using gv_inject_gundef. *)
-
-(*       rewrite H4. eauto using gv_inject_gundef. *)
-
-(*     erewrite simulation__GV2ptr'; eauto. *)
-(*     unfold gundef. simpl. *)
-(*     eauto using gv_inject_gundef. *)
-(* Qed. *)
-Admitted.
+  {
+    i.
+    unfold GEP in *.
+    destruct (GV2ptr TD (getPointerSize TD) gvp) eqn:T; cycle 1.
+    { des_ifs; esplits; eauto.
+      - eapply gv_inject_gundef'; try eassumption.
+        unfold gv_chunks_match_typb, gundef in *. des_ifs.
+        unfold flatten_typ in *. des_ifs. ss. des_ifs. ss.
+        exploit mgep_has_chunk; try eassumption.
+        i. erewrite has_chunk__has_chunkb; eauto.
+      - eapply gv_inject_gundef'; try eassumption.
+        unfold gv_chunks_match_typb, gundef in *. des_ifs.
+        unfold flatten_typ in *. des_ifs. ss. des_ifs.
+      - eapply gv_inject_gundef'; try eassumption.
+        unfold gv_chunks_match_typb, gundef in *. des_ifs.
+        unfold flatten_typ in *. des_ifs. ss. des_ifs.
+      - eapply gv_inject_gundef'; try eassumption.
+        unfold gv_chunks_match_typb, gundef in *. des_ifs.
+        unfold flatten_typ in *. des_ifs. ss. des_ifs.
+    }
+    exploit simulation__GV2ptr; eauto. intro PTR; des.
+    rewrite PTR.
+    destruct (GVs2Nats TD vidxs) eqn:T1; cycle 1.
+    { des_ifs; esplits; eauto.
+      - eapply gv_inject_gundef'; try eassumption.
+        unfold gv_chunks_match_typb, gundef in *. des_ifs.
+        unfold flatten_typ in *. des_ifs. ss. des_ifs. ss.
+        exploit mgep_has_chunk; try eassumption.
+        i. erewrite has_chunk__has_chunkb; eauto.
+      - eapply gv_inject_gundef'; try eassumption.
+        unfold gv_chunks_match_typb, gundef in *. des_ifs.
+        unfold flatten_typ in *. des_ifs. ss. des_ifs.
+      - eapply gv_inject_gundef'; try eassumption.
+        unfold gv_chunks_match_typb, gundef in *. des_ifs.
+        unfold flatten_typ in *. des_ifs. ss. des_ifs.
+    }
+    exploit simulation__GVs2Nats; eauto.
+    intro NATS. des.
+    rewrite NATS.
+    destruct (mgep TD t v l0) eqn:T2; cycle 1.
+    { des_ifs; esplits; eauto.
+      - eapply gv_inject_gundef'; try eassumption.
+        unfold gv_chunks_match_typb, gundef in *. des_ifs.
+        unfold flatten_typ in *. des_ifs. ss. des_ifs. ss.
+        exploit mgep_has_chunk; try eassumption.
+        i. erewrite has_chunk__has_chunkb; eauto.
+      - eapply gv_inject_gundef'; try eassumption.
+        unfold gv_chunks_match_typb, gundef in *. des_ifs.
+        unfold flatten_typ in *. des_ifs. ss. des_ifs.
+    }
+    clarify.
+    exploit simulation__mgep; try eassumption.
+    intro MGEP; des.
+    rewrite MGEP. esplits; eauto. 
+    econs; eauto.
+    chunk_simpl.
+    exploit mgep_has_chunk; eauto. i.
+    erewrite has_chunk__has_chunkb; eauto.
+    ss. unfold getPointerSize. unfold getPointerSize0. des_ifs.
+  }
+Qed.
 
 Lemma simulation_mload_aux : forall Mem0 Mem2 b b2 delta mi mgb
   (Hwfmi : wf_sb_mi mgb mi Mem0 Mem2)
