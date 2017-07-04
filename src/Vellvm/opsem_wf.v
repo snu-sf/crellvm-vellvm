@@ -268,13 +268,17 @@ Proof.
 
         rewrite NoDup_lookupTypViaIDFromPhiNodes in J; auto.
         inv J. inv_mbind.
+        destruct (gv_chunks_match_typb (los, nts) g t).
         exists g. simpl.
         destruct (id1 == id1) as [e' | n]; try solve [contradict n; auto].
           split; auto.
+        inv H1. simpl.
+        destruct (@eq_dec atom (EqDec_eq_of_EqDec atom EqDec_atom) id1 id1).
+        auto. apply n in e'. inv e'.
         eapply getOperandValue__wf_gvs; eauto.
         find_wf_value_list.
         eapply wf_value_list__getValueViaBlockFromValuels__wf_value; eauto.
-
+        inv H1.
 
       remember (getValueViaBlockFromValuels l0 b) as R0.
       destruct R0; try solve [inversion H].
@@ -282,6 +286,7 @@ Proof.
         destruct R; tinv H.
         remember (getIncomingValuesForBlockFromPHINodes (los,nts) ps2 b gl lc)
           as R.
+        destruct (gv_chunks_match_typb (los, nts) g t0).
         destruct R; inversion H; subst.
         simpl.
         destruct (id1==i0); subst.
@@ -292,6 +297,7 @@ Proof.
           inv Huniq'. congruence.
 
           eapply IHps2 with (ps1:=ps1 ++ [insn_phi i0 t0 l0]); simpl_env; eauto.
+          destruct R; inversion H.
 Qed.
 
 Lemma getIncomingValuesForBlockFromPHINodes_spec1 : forall s Ps los nts f b
@@ -343,7 +349,9 @@ Proof.
     destruct a as [i0 t l0].
     remember (getValueViaBlockFromValuels l0 b) as R1.
     inv_mbind.
-    inv Hwfps. simpl in Hin. destruct Hin as [Hin | Hin].
+    inv Hwfps. simpl in Hin.
+    destruct (gv_chunks_match_typb (los, nts) g t); inv H1.
+    destruct Hin as [Hin | Hin].
       inv Hin.
       match goal with
         | H5: wf_insn _ _ _ _ _ |- _ => inv H5
@@ -2515,6 +2523,49 @@ Proof.
       rewrite app_assoc. simpl. trivial.
 Qed.
 
+  Lemma has_chunk__has_chunkb
+        v
+        m
+        (HASCHUNKS: Val.has_chunk v m):
+    <<HASCHUNKSB: Val.has_chunkb v m>>.
+  Proof.
+    unfold Val.has_chunkb.
+    destruct v; destruct m; inv HASCHUNKS; eauto.
+    apply andb_true_intro. split. apply andb_true_intro; split;
+    inv H0; unfold is_true.
+    destruct (Nat.eq_dec n n); auto.
+    destruct (zle 0 (Int.unsigned n i0)); auto.
+    inv H0. clear H.
+    destruct (zlt (Int.unsigned n i0) (Int.modulus n)); auto.
+  Qed.
+  
+    Lemma gv_chunks_match_typ__gv_chunks_match_typb
+        TD
+        gv
+        ty
+        (CHUNKS : gv_chunks_match_typ TD gv ty):
+    <<CHUNKSB: gv_chunks_match_typb TD gv ty>>.
+  Proof.
+    unfold gv_chunks_match_typ in CHUNKS.
+    unfold gv_chunks_match_typb.
+    destruct (flatten_typ TD ty).
+    - revert CHUNKS.
+      revert l0.
+      induction gv.
+      intros. induction l0. auto. inv CHUNKS.
+      induction l0. intros. inv CHUNKS.
+      intros. inv CHUNKS. apply IHgv in H4. destruct a.
+      simpl.
+      apply andb_true_intro. split. apply andb_true_intro. split.
+      inv H2. simpl.
+      unfold memory_chunk_eq.
+      destruct m; auto.
+      clear IHgv IHl0 H0 H4. induction n; auto.
+      inv H2. simpl in H0. apply has_chunk__has_chunkb. auto.
+      auto.
+    - inv CHUNKS.
+  Qed.
+  
 Lemma wf_phinodes__getIncomingValuesForBlockFromPHINodes : forall
   (s : system)
   (los : layouts)
@@ -2527,6 +2578,7 @@ Lemma wf_phinodes__getIncomingValuesForBlockFromPHINodes : forall
   (t : list atom)
   l1 ps1 cs1 tmn1
   (Hwfg : wf_global (los,nts) s gl)
+  (Hwfl : wf_lc (los, nts) f lc)
   (HeqR : ret t = inscope_of_tmn f (l1, stmts_intro ps1 cs1 tmn1) tmn1)
   (Hinscope : wf_defs (los,nts) f lc t)
   (HuniqF : uniqFdef f)
@@ -2551,7 +2603,6 @@ Proof.
   intros.
   induction ps2; simpl.
     exists nil. auto.
-
     destruct a as [i0 t0 l2].
     match goal with | H8: wf_phinodes _ _ _ _ _ |- _ => inv H8 end.
     match goal with | H5: wf_insn _ _ _ _ _ |- _ => inv H5 end.
@@ -2579,13 +2630,23 @@ Proof.
         apply wf_defs_elim with (id1:=vid) in Hinscope; auto.
         destruct Hinscope as [? [? [gv1 [? [Hinscope ?]]]]].
         exists gv1. auto.
-
       destruct J1 as [gv1 J1].
       simpl. rewrite J1.
       apply IHps2 in H6.
         destruct H6 as [RVs H6]; rewrite H6.
         exists ((i0, gv1) :: RVs). auto.
-
+        
+        exploit getOperandValue__wf_gvs; eauto.
+        apply getValueViaLabelFromValuels__InValueList in J.
+        assert(In (value_id vid) (List.map (fun pat_ : value * l => let (value_0, _) := pat_ in value_0) l2)).
+          clear Hwfg Hwfl HeqR Hinscope HuniqF Hreach HbInF HwfB Hsucc Hin IHps2 H6 H8 H9 H10 J1.
+          induction l2. inv J. simpl in J. inv J. simpl. left. auto. apply IHl2 in H. simpl. right. auto.
+        eauto.
+        assert (getOperandValue (los,nts) (value_id vid) lc gl= Some gv1).
+          simpl. auto.
+        eauto. intros.
+        inv H. apply gv_chunks_match_typ__gv_chunks_match_typb in H2.
+        inv H2. rewrite H3. eauto.
         destruct Hin as [ps3 Hin]. subst.
         exists (ps3++[insn_phi i0 t0 l2]).
         simpl_env. auto.
@@ -2611,6 +2672,16 @@ Proof.
         simpl_env; auto
       ]
       end.
+      destruct H6. rewrite H0.
+      exploit getOperandValue__wf_gvs; eauto.
+      eapply wf_value_const. eauto. eauto.
+      assert (getOperandValue (los,nts) (value_const vc) lc gl= Some x).
+        simpl. auto.
+        eauto. intros.
+     
+      inv H1. apply gv_chunks_match_typ__gv_chunks_match_typb in H4.
+      rewrite H4. eauto.
+      Unshelve. unfold products. apply nil.
 Qed.
 
 Lemma params2GVs_isnt_stuck : forall
