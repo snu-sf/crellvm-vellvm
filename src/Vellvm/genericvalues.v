@@ -15,6 +15,8 @@ Require Import ZArith.
 Require Import Floats.
 Require Import vellvm_tactics.
 Require Import util.
+Require Import Coqlib.
+Local Open Scope nat_scope.
 
 (* The file defines generic values that represent values at runtime. *)
 Module LLVMgv.
@@ -238,15 +240,17 @@ match gv with
 | _ => Some Vundef
 end.
 
-Definition GV2int (TD:TargetData) (bsz:sz) (gv:GenericValue) : option Z :=
-match gv with
-| (Vint wz i,c)::nil =>
-  if eq_nat_dec (wz+1) (Size.to_nat bsz)
-  then Some (Int.signed wz i)
-  else None
-| _ => None
-end.
-
+Definition GV2int (TD: TargetData) (bsz: sz) (gv: GenericValue) :=
+  match gv with
+  | ((Values.Vint wz i, (AST.Mint sz))) :: nil =>
+    if Nat.eq_dec (wz + 1) (Size.to_nat bsz)
+    then if (Nat.eq_dec wz sz)
+         then Some (Int.signed wz i)
+         else None
+    else None
+  | _ => None
+  end
+.
 Definition GV2ptr (TD:TargetData) (bsz:sz) (gv:GenericValue) : option val :=
 match gv with
 | (Vptr a b,c)::nil => Some (Vptr a b)
@@ -702,6 +706,27 @@ match (GV2val TD gv1, GV2val TD gv2) with
    end
 | _ => gundef TD (typ_int 1%nat)
 end.
+
+(* chunks_match_or_undef *)
+(* why not fit_gv? (-- harsher than needed, opsem_wf harder ++ already defined function) *)
+(* Actually, for --, see "wf_GVs" and "getOperandValue__wf_gvs", fit_gv is ok too. *)
+(* I just follow convention (like insertGenericValue-mset's case) here. *)
+(* fit_gv haven't used in defining mbop, blah. *)
+Definition fit_chunk_gv (TD: TargetData) (ty: typ) (gv: GenericValue): option GenericValue :=
+  if (gv_chunks_match_typb TD gv ty)
+  then Some gv
+  else gundef TD ty
+.
+
+Definition mselect (TD: TargetData) (ty: typ) (gv0 gv1 gv2: GenericValue): option GenericValue :=
+  match (GV2int TD Size.One gv0) with
+  | Some z =>
+    if (negb (Coqlib.zeq z 0))
+    then fit_chunk_gv TD ty gv1
+    else fit_chunk_gv TD ty gv2
+  | None => gundef TD ty
+  end
+.
 
 (* Convert constants to generic values *)
 Fixpoint repeatGV (gv:GenericValue) (n:nat) : GenericValue :=
@@ -1207,6 +1232,13 @@ match (getOperandValue TD v1 lc gl, getOperandValue TD v2 lc gl) with
 | (Some gv1, Some gv2) => mfcmp TD c fp gv1 gv2
 | _ => None
 end.
+
+Definition SELECT (TD:TargetData) (lc gl:GVMap) (v0 v1 v2:value) (t: typ): option GenericValue :=
+  match (getOperandValue TD v0 lc gl, getOperandValue TD v1 lc gl, getOperandValue TD v2 lc gl) with
+  | (Some gv0, Some gv1, Some gv2) => mselect TD t gv0 gv1 gv2
+  | _ => gundef TD t
+  end
+.
 
 (* t' is from getGEPtyp that always returns Some t'* or None *)
 Definition GEP (TD:TargetData) (t:typ) (ma:GenericValue)

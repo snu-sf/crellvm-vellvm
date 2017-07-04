@@ -330,12 +330,15 @@ match PNs with
   match (getValueViaBlockFromPHINode (insn_phi id0 t vls) b) with
   | None => None
   | Some v =>
-      match (getOperandValue TD v locals globals,
-             getIncomingValuesForBlockFromPHINodes TD PNs b globals locals)
-      with
-      | (Some gv1, Some idgvs) => Some ((id0,gv1)::idgvs)
-      | _ => None
-      end
+    match (getOperandValue TD v locals globals,
+           getIncomingValuesForBlockFromPHINodes TD PNs b globals locals)
+    with
+    | (Some gv1, Some idgvs) =>
+      if (gv_chunks_match_typb TD gv1 t)
+      then Some ((id0,gv1)::idgvs)
+      else None
+    | _ => None
+    end
   end
 end.
 
@@ -488,6 +491,14 @@ match (getOperandValue TD v1 lc gl, getOperandValue TD v2 lc gl) with
 end
 .
 
+Definition SELECT (TD:TargetData) (lc gl:GVMap) (v0 v1 v2:value) (t: typ): option GenericValue :=
+  match (getOperandValue TD v0 lc gl, getOperandValue TD v1 lc gl, getOperandValue TD v2 lc gl) with
+  | (Some gv0, Some gv1, Some gv2) => mselect TD t gv0 gv1 gv2
+  | _ => None (* gundef TD t *)
+           (* for unity *)
+  end
+.
+
 Definition CAST (TD:TargetData) (lc:GVsMap) (gl:GVMap) (op:castop)
   (t1:typ) (v1:value) (t2:typ) : option GenericValue:=
 match (getOperandValue TD v1 lc gl) with
@@ -545,6 +556,15 @@ Inductive decide_nonzero (TD:TargetData) (gv:GenericValue) (decision:bool): Prop
     (INT: GV2int TD Size.One gv = Some z)
     (DECISION: decision = negb (zeq z 0))
 .
+
+Lemma decide_nonzero_implies_gvzero 
+      TD gv decision (IS_ZERO : decide_nonzero TD gv decision) :
+  negb decision = (isGVZero TD gv).
+Proof.
+  inversion IS_ZERO.
+  unfold isGVZero. rewrite INT.
+  destruct (zeq z 0); simpl in DECISION; rewrite DECISION; auto.
+Qed.
 
 Definition intConst2Z c :=
   match c with
@@ -823,15 +843,11 @@ Inductive sInsn : Config -> State -> State -> trace -> Prop :=
     (mkState (mkEC F B cs tmn (updateAddAL _ lc id gvs3) als) (ECS) Mem)
     E0
 
-| sSelect : forall S TD Ps F B lc gl fs id v0 t v1 v2 c ECS cs tmn Mem als decision
-                    gvs1 gvs2,
-  getOperandValue TD v0 lc gl = Some c ->
-  getOperandValue TD v1 lc gl = Some gvs1 ->
-  getOperandValue TD v2 lc gl = Some gvs2 ->
-  decide_nonzero TD c decision ->
+| sSelect : forall S TD Ps F B lc gl fs id v0 t v1 v2 ECS cs tmn Mem als gvresult,
+    SELECT TD lc gl v0 v1 v2 t = Some gvresult ->
   sInsn (mkCfg S TD Ps gl fs)
     (mkState (mkEC F B ((insn_select id v0 t v1 v2)::cs) tmn lc als) (ECS) Mem)
-    (mkState (mkEC F B cs tmn (updateAddAL _ lc id (if decision then gvs1 else gvs2)) als) (ECS) Mem)
+    (mkState (mkEC F B cs tmn (updateAddAL _ lc id gvresult) als) (ECS) Mem)
     E0
 
 | sCall : forall S TD Ps F B lc gl fs rid noret ca fid fv lp cs tmn fptr

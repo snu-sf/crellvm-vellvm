@@ -428,7 +428,10 @@ Proof.
 
     destruct a. destruct b. simpl in *.
     inv_mbind. inv HeqR1.
-    destruct Hin as [Hin | Hin]; subst; simpl; auto.
+    destruct (gv_chunks_match_typb TD g typ5).
+    destruct Hin as [Hin | Hin]; subst. inv H0. simpl. auto.
+    inv H0. simpl. auto.
+    inv H0.
 Qed.
 
 Lemma getIncomingValuesForBlockFromPHINodes_spec7 : forall TD b gl lc ps' rs id1
@@ -441,7 +444,11 @@ Proof.
 
     destruct a as [i0 ?]. destruct b as [l2 ? ? ?]. simpl in *.
     inv_mbind. inv HeqR1. simpl in *.
-    assert (id1 = i0 \/ id1 `in` dom l1) as J. fsetdec.
+    assert (id1 = i0 \/ id1 `in` dom l1) as J.
+    destruct (gv_chunks_match_typb TD g typ5).
+    inv H0. simpl in Hin.
+    fsetdec.
+    inv H0.
     destruct J as [J | J]; subst; eauto.
 Qed.
 
@@ -453,6 +460,49 @@ Proof.
   intros.
   intro J. apply Hnotin.
   eapply getIncomingValuesForBlockFromPHINodes_spec7 in HeqR1; eauto.
+Qed.
+
+Lemma getIncomingValuesForBlockFromPHINodes_spec9: forall TD gl lc b id0 gvs0
+  ps' l0,
+  ret l0 = Opsem.getIncomingValuesForBlockFromPHINodes TD ps' b gl lc ->
+  id0 `in` dom l0 ->
+  lookupAL _ l0 id0 = ret gvs0 ->
+  exists id1, exists t1, exists vls1, exists v, exists n,
+    In (insn_phi id1 t1 vls1) ps' /\
+    nth_error vls1 n = Some (v, getBlockLabel b) /\
+    Opsem.getOperandValue TD v lc gl= Some gvs0.
+Proof.
+  induction ps' as [|[i0 t l0]]; simpl; intros.
+    inv H. fsetdec.
+
+    inv_mbind. simpl in *.
+    destruct (id0 == i0); subst.
+      destruct b. simpl in *.
+      symmetry in HeqR.
+      apply getValueViaLabelFromValuels__nth_list_value_l in HeqR; auto.
+      destruct HeqR as [n HeqR].
+      destruct (@eq_dec atom (EqDec_eq_of_EqDec atom EqDec_atom) i0 i0);
+        try congruence.
+      destruct (gv_chunks_match_typb TD g t).
+      inv H3.
+      
+      exists i0. exists t. exists l0. exists v. exists n.
+      split; auto. split. auto. auto. simpl in H1.
+      destruct (@eq_dec atom (EqDec_eq_of_EqDec atom EqDec_atom) i0 i0).
+      inv H1. eauto. apply n0 in e. inv e.
+      inv H3.
+      destruct (gv_chunks_match_typb TD g t).
+      inv H3. simpl in H1.
+      destruct (@eq_dec atom (EqDec_eq_of_EqDec atom EqDec_atom) id0 i0).
+      apply n in e. inv e.
+      apply IHps' in H1; auto; try fsetdec.
+      destruct H1 as [id1 [t1 [vls1 [v' [n' [J1 [J2 J3]]]]]]].
+      exists id1. exists t1. exists vls1. exists v'. exists n'.
+      split; auto.
+      apply in_dom_cons_inv in H0.
+      inv H0. assert (i0 = i0). auto. apply n in H. inv H.
+      auto.
+      inv H3.
 Qed.
 
 Lemma getIncomingValuesForBlockFromPHINodes_spec9': forall TD gl lc b id0 gvs0
@@ -473,13 +523,28 @@ Proof.
       destruct b. simpl in *.
       symmetry in HeqR.
       inv H1.
+      destruct (gv_chunks_match_typb TD g t).
+      inv H3.
       exists t. exists l0. exists v. 
-      split; auto.
+      simpl in H2.
+      inv H2. split; auto. split. auto. simpl.
+      destruct (@eq_dec atom (EqDec_eq_of_EqDec atom EqDec_atom) i0 i0).
+      auto. assert (i0 = i0). auto. apply n in H. inv H.
+      inv H3.
+      
+      destruct (gv_chunks_match_typb TD g t).
+      inv H3. simpl in H1.
+      destruct (@eq_dec atom (EqDec_eq_of_EqDec atom EqDec_atom) id0 i0).
+      apply n in e. inv e.
 
       apply IHps' in H1; auto; try fsetdec.
       destruct H1 as [t1 [vls1 [v' [J1 [J2 J3]]]]].
       exists t1. exists vls1. exists v'.
       split; auto.
+      apply in_dom_cons_inv in H0.
+      inv H0. assert (i0 = i0). auto. apply n in H. inv H.
+      auto.
+      inv H3.
 Qed.
 
 End OpsemProps. End OpsemProps.
