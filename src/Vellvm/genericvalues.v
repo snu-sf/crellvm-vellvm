@@ -407,9 +407,9 @@ match GV2val TD gv1 with
           match fp1 with
           | fp_double => 
                Some (val2GV TD (Vsingle (Float.to_single f)) Mfloat32)
-          | _ => None (* FIXME: not supported 80 and 128 yet. *)
+          | _ => gundef TD t2 (* FIXME: not supported 80 and 128 yet. *)
           end
-        else None
+        else gundef TD t2
     | _ => gundef TD t2
     end
 | Some (Vsingle f) =>
@@ -489,7 +489,7 @@ match (GV2val TD gv1, GV2val TD gv2) with
   match fp with
   | fp_double => Some (val2GV TD v Mfloat64)
   | fp_float => gundef TD (typ_floatpoint fp)
-  | _ => None
+  | _ => gundef TD (typ_floatpoint fp)
   end
 | (Some (Vsingle f1), Some (Vsingle f2)) =>
   let v :=
@@ -503,7 +503,7 @@ match (GV2val TD gv1, GV2val TD gv2) with
   match fp with
   | fp_float => Some (val2GV TD v Mfloat32)
   | fp_double => gundef TD (typ_floatpoint fp)
-  | _ => None
+  | _ => gundef TD (typ_floatpoint fp)
   end
 | _ => gundef TD (typ_floatpoint fp)
 end.
@@ -600,7 +600,7 @@ match (t1, t2) with
                         (Mint (sz2-1)))
      | extop_s => Some (val2GV TD (Val.sign_ext' (sz2-1) (Vint wz1 i1))
                         (Mint (sz2-1)))
-     | _ => None
+     | _ => gundef TD t2
      end
    | _ => gundef TD t2
    end
@@ -613,14 +613,14 @@ match (t1, t2) with
       | extop_fp =>
          match fp2 with
          | fp_double => Some (val2GV TD (Vfloat f1) Mfloat64)
-         | _ => None (* FIXME: not supported 80 and 128 yet. *)
+         | _ => gundef TD t2 (* FIXME: not supported 80 and 128 yet. *)
          end
-      | _ => None
+      | _ => gundef TD t2
       end
     | _ => gundef TD t2
     end
-  else None
-| (_, _) => None
+  else gundef TD t2
+| (_, _) => gundef TD t2
 end.
 
 Definition micmp_int TD c gv1 gv2 : option GenericValue :=
@@ -656,7 +656,7 @@ Definition micmp (TD:TargetData) (c:cond) (t:typ) (gv1 gv2:GenericValue)
 match t with
 | typ_int sz => micmp_int TD c gv1 gv2
 | typ_pointer _ => gundef TD (typ_int 1%nat)
-| _ => None
+| _ => gundef TD (typ_int 1%nat)
 end.
 
 (* TODO: issue. Single vs Float. *)
@@ -679,7 +679,7 @@ match (GV2val TD gv1, GV2val TD gv2) with
          Some (val2GV TD (Val.cmpf Cle (Vfloat f1) (Vfloat f2)) (Mint 0))
      | fcond_one =>
          Some (val2GV TD (Val.cmpf Cne (Vfloat f1) (Vfloat f2)) (Mint 0))
-     | fcond_ord => None (*FIXME: not supported yet. *)
+     | fcond_ord => gundef TD (typ_int 1%nat) (*FIXME: not supported yet. *)
      | fcond_ueq =>
          Some (val2GV TD (Val.cmpf Ceq (Vfloat f1) (Vfloat f2)) (Mint 0))
      | fcond_ugt =>
@@ -692,13 +692,13 @@ match (GV2val TD gv1, GV2val TD gv2) with
          Some (val2GV TD (Val.cmpf Cle (Vfloat f1) (Vfloat f2)) (Mint 0))
      | fcond_une =>
          Some (val2GV TD (Val.cmpf Cne (Vfloat f1) (Vfloat f2)) (Mint 0))
-     | fcond_uno => None (*FIXME: not supported yet. *)
+     | fcond_uno => gundef TD (typ_int 1%nat) (*FIXME: not supported yet. *)
      | fcond_true => Some (val2GV TD Vtrue (Mint 0))
      end in
    match fp with
    | fp_float => ov
    | fp_double => ov
-   | _ => None (*FIXME: not supported 80 and 128 yet. *)
+   | _ => gundef TD (typ_int 1%nat) (*FIXME: not supported 80 and 128 yet. *)
    end
 | _ => gundef TD (typ_int 1%nat)
 end.
@@ -1234,14 +1234,13 @@ Definition malloc (TD:TargetData) (M:mem) (bsz:sz) (gn:GenericValue) (al:align)
 
 Definition alloca (TD:TargetData) (M:mem) (bsz:sz) (gn:GenericValue) (al:align)
   : option (mem * mblock)%type :=
-  let hi :=
-      (match GV2int TD Size.ThirtyTwo gn with
-       | Some n => (Size.to_Z bsz) * n
-       | None => 0
-       end)%Z
-  in
-  let (M', nb) := (Mem.alloc M 0 hi) in
-  option_map ((flip pair) nb) (Mem.drop_perm M' nb 0 hi Writable)
+  match GV2int TD Size.ThirtyTwo gn with
+  | Some n =>
+    let hi := (Size.to_Z bsz * n)%Z in
+    let (M', nb) := (Mem.alloc M 0 hi) in
+    option_map ((flip pair) nb) (Mem.drop_perm M' nb 0 hi Writable)
+  | None => None
+  end
 .
 
 Definition malloc_one (TD:TargetData) (M:mem) (bsz:sz) (al:align)
@@ -2282,16 +2281,15 @@ Qed.
 
 Lemma alloca_inv : forall TD Mem0 tsz gn align0 Mem' mb,
   alloca TD Mem0 tsz gn align0 = ret (Mem', mb) ->
-  let hi :=
-  match GV2int TD Size.ThirtyTwo gn with
-  | ret n => (Size.to_Z tsz * n)%Z
-  | merror => 0%Z
-  end in
-  let (M', nb) := Mem.alloc Mem0 0 hi in
-  option_map (flip pair nb) (Mem.drop_perm M' nb 0 hi Writable) = ret (Mem', mb)
+  exists z, (GV2int TD Size.ThirtyTwo gn) = Some z /\
+            let hi := (Size.to_Z tsz * z)%Z in
+            let (M', nb) := Mem.alloc Mem0 0 hi in
+            option_map (flip pair nb) (Mem.drop_perm M' nb 0 hi Writable) = ret (Mem', mb)
 .
 Proof.
-  intros. unfold alloca in *. eauto.
+  intros. unfold alloca in *.
+  destruct (GV2int TD Size.ThirtyTwo gn) eqn:T; simpl in *; subst; eauto.
+  inv H.
 Qed.
 
 Lemma store_inv : forall TD Mem0 gvp t gv align Mem',

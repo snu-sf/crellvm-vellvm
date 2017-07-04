@@ -2770,6 +2770,19 @@ match cfg with
      |} => True
   | _ => False
   end \/
+  match S with
+  | {| EC := {| CurCmds := insn_alloca _ _ v _ :: _ ;
+                             Locals := lc|} |} =>
+    match getOperandValue td v lc gl with
+    | Some gn =>
+      match GV2int td Size.ThirtyTwo gn with
+      | Some z => False
+      | None => True
+      end
+    | None => False
+    end
+  | _ => False
+  end \/
   (* match S with *)
   (* | {| ECS := *)
   (*        {| CurCmds := insn_malloc _ t v a::_ ; *)
@@ -2877,14 +2890,16 @@ Ltac undefbehave := unfold undefined_state; simpl;
     right; right; right; right; right; auto |
     right; right; right; right; right; right; auto |
     right; right; right; right; right; right; right; auto |
-    right; right; right; right; right; right; right; right; auto
+    right; right; right; right; right; right; right; right; auto |
+    right; right; right; right; right; right; right; right; right; auto
   ].
 
-Lemma alloca_no_fail
+Lemma alloca_defined_or
       TD m0 s gv al
   :
-    exists m1 nb,
-      <<ALLOCA: alloca TD m0 s gv al = Some (m1, nb)>>
+    (exists m1 nb,
+      <<ALLOCA: alloca TD m0 s gv al = Some (m1, nb)>>) \/
+    GV2int TD Size.ThirtyTwo gv = None
 .
 Proof.
   unfold alloca.
@@ -2893,12 +2908,15 @@ Proof.
             | merror => 0
             end) as hi. clear Heqhi.
   des_ifs.
-  unfold flip.
-  unfold Datatypes.option_map.
-  hexploit Mem.range_perm_drop_2; eauto; revgoals.
-  { i; des. inv X. rewrite H. esplits; eauto. }
-  ii.
-  eapply Mem.perm_alloc_2; eauto.
+  { left.
+    unfold flip.
+    unfold Datatypes.option_map.
+    hexploit Mem.range_perm_drop_2; eauto; revgoals.
+    { i; des. inv X. rewrite H. esplits; eauto. }
+    ii.
+    eapply Mem.perm_alloc_2; eauto.
+  }
+  { right. ss. }
 Qed.
 
 Lemma progress : forall cfg S1 (HwfCfg: wf_Config cfg),
@@ -3402,7 +3420,7 @@ Proof.
       eauto.
 
       unfold undefined_state.
-      right. rewrite J. right. right. right. left.
+      right. rewrite J. right. right. right. right. left.
       rewrite <- HeqR0. undefbehave.
 
   SCase "alloca".
@@ -3437,12 +3455,14 @@ Proof.
       exists events.E0.
       eauto.
 
-      exfalso.
-      exploit alloca_no_fail; eauto; []; i; des. rewrite ALLOCA in *. clarify.
-      (* right. *)
-      (* unfold undefined_state. *)
-      (* right. rewrite J. rewrite J2. right. right. left. exists gn. *)
-      (* rewrite <- HeqR0. undefbehave. *)
+      { right. ss. right. right. right. left.
+        clear HwfCall. des_ifs.
+        unfold alloca in *. des_ifs.
+        unfold Datatypes.option_map, flip in *. des_ifs.
+        hexploit Mem.range_perm_drop_2; eauto.
+        { ii. eapply Mem.perm_alloc_2; try eassumption. }
+        i. inv X. rewrite H in *. ss.
+      }
 
   SCase "load".
     assert (exists gvs, getOperandValue (los, nts) v lc gl = Some gvs)
@@ -3470,7 +3490,7 @@ Proof.
 
       right.
       unfold undefined_state.
-      right. rewrite J. right. right. right. left.
+      right. rewrite J. right. right. right. right. left.
       rewrite <- HeqR0. undefbehave.
 
   SCase "store".
@@ -3505,7 +3525,7 @@ Proof.
 
       right.
       unfold undefined_state.
-      right. rewrite J. rewrite J0. right. right. right. right. left.
+      right. rewrite J. rewrite J0. right. right. right. right. right. left.
       rewrite <- HeqR0. undefbehave.
 
   SCase "gep".
@@ -3815,7 +3835,7 @@ Proof.
    SSCase "stuck".
      right.
      unfold undefined_state.
-     right. rewrite J'. rewrite G. right. right. right. right. right.
+     right. rewrite J'. rewrite G. right. right. right. right. right. right.
      rewrite <- HeqHlk. rewrite <- HeqHelk. split; auto.
 Admitted.
 
