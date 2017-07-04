@@ -240,15 +240,17 @@ match gv with
 | _ => Some Vundef
 end.
 
-Definition GV2int (TD:TargetData) (bsz:sz) (gv:GenericValue) : option Z :=
-match gv with
-| (Vint wz i,c)::nil =>
-  if eq_nat_dec (wz+1) (Size.to_nat bsz)
-  then Some (Int.signed wz i)
-  else None
-| _ => None
-end.
-
+Definition GV2int (TD: TargetData) (bsz: sz) (gv: GenericValue) :=
+  match gv with
+  | ((Values.Vint wz i, (AST.Mint sz))) :: nil =>
+    if Nat.eq_dec (wz + 1) (Size.to_nat bsz)
+    then if (Nat.eq_dec wz sz)
+         then Some (Int.signed wz i)
+         else None
+    else None
+  | _ => None
+  end
+.
 Definition GV2ptr (TD:TargetData) (bsz:sz) (gv:GenericValue) : option val :=
 match gv with
 | (Vptr a b,c)::nil => Some (Vptr a b)
