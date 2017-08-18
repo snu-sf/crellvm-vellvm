@@ -2987,6 +2987,24 @@ match cfg with
     | _ => False
     end
   | _ => False
+  end \/
+  match S with
+  | {| EC := {|
+                CurCmds := nil;
+                Terminator := insn_return _ _ v;
+                Locals := lc;
+            |};
+       ECS := nil;
+       Mem := _ |} =>
+    match (getOperandValue td v lc gl) with
+    | Some gv =>
+      match GV2Vint gv with
+      | Some retval => False
+      | _ => True
+      end
+    | _ => True
+    end
+  | _ => False
   end
 end.
 
@@ -3000,7 +3018,8 @@ Ltac undefbehave := unfold undefined_state; simpl;
     right; right; right; right; right; right; auto |
     right; right; right; right; right; right; right; auto |
     right; right; right; right; right; right; right; right; auto |
-    right; right; right; right; right; right; right; right; right; auto
+    right; right; right; right; right; right; right; right; right; auto |
+    right; right; right; right; right; right; right; right; right; right; auto
   ].
 
 Lemma alloca_defined_or
@@ -3030,7 +3049,7 @@ Qed.
 
 Lemma progress : forall cfg S1 (HwfCfg: wf_Config cfg),
   wf_State cfg S1 ->
-  s_isFinialState cfg S1 <> None \/
+  s_isFinalState cfg S1 <> None \/
   (exists S2, exists tr, sInsn cfg S1 S2 tr) \/
   undefined_state cfg S1.
 Proof.
@@ -3059,8 +3078,12 @@ Proof.
          simpl. auto.
       destruct H as [gv H].
       destruct ecs.
-        simpl. rewrite H. left. congruence.
-
+        simpl. unfold s_isFinalState. simpl. rewrite H.
+        {
+          destruct (GV2Vint gv) eqn:T.
+          - left. congruence.
+          - undefbehave.
+        }
         right.
         destruct e as [f' b' cs' tmn' lc' als'].
         assert (J:=HbInF).
@@ -3107,7 +3130,7 @@ Proof.
     SCase "tmn=ret void".
       simpl in HwfCall.
       destruct ecs.
-        simpl. unfold const2GV. simpl. left. congruence.
+        simpl. unfold const2GV. simpl. unfold s_isFinalState. simpl. left. congruence.
 
         right.
         destruct e as [f' b' cs' tmn' lc' als'].
