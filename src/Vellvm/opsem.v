@@ -940,21 +940,31 @@ match (lookupFdefViaIDFromSystem S main) with
   end
 end.
 
-(* Return the final result if state is a final state. *)
-Definition s_isFinialState (cfg:Config) (state:State) : option GenericValue :=
-match state with
-| (mkState (mkEC _ _ nil (insn_return_void _) _ _) nil Mem ) => 
-    (* This case cannot be None at any context. *)
-    const2GV (OpsemAux.CurTargetData cfg) (OpsemAux.Globals cfg) 
-      (const_int Size.One (INTEGER.of_Z 1%Z 1%Z false))
-| (mkState (mkEC _ _ nil (insn_return _ _ v) lc _) nil Mem ) => 
-    (* This case cannot be None at well-formed context. 
+Definition GV2Vint (gv: GenericValue): option val :=
+  match gv with
+  | (Vint wz i, _) :: nil => Some (Vint wz i)
+  | _ => None
+  end
+.
+
+Definition s_isFinalState (cfg: Config) (state: State): option val :=
+  match (match state with
+   | (mkState (mkEC _ _ nil (insn_return_void _) _ _) nil Mem ) => 
+     (* This case cannot be None at any context. *)
+     const2GV (OpsemAux.CurTargetData cfg) (OpsemAux.Globals cfg) 
+              (const_int Size.One (INTEGER.of_Z 1%Z 1%Z false))
+   | (mkState (mkEC _ _ nil (insn_return _ _ v) lc _) nil Mem ) => 
+     (* This case cannot be None at well-formed context. 
        In other words, if a program reaches here, but returns None, 
        the program is stuck. *)
-    getOperandValue (OpsemAux.CurTargetData cfg) v lc 
-       (OpsemAux.Globals cfg)
-| _ => None
-end.
+     getOperandValue (OpsemAux.CurTargetData cfg) v lc 
+                     (OpsemAux.Globals cfg)
+   | _ => None
+   end) with
+  | Some gv => GV2Vint gv
+  | None => None
+  end
+.
 
 (* >=0 small steps *)
 Inductive sop_star (cfg:Config) : State -> State -> trace -> Prop :=
@@ -1009,12 +1019,12 @@ CoInductive sop_wf_diverges (cfg:Config): Measure -> State -> traceinf -> Prop:=
 End SOP_WF_DIVERGES.
 
 (* A program terminates if its initial state reaches a final state. *)
-Inductive s_converges : system -> id -> list GenericValue -> trace -> GenericValue -> Prop :=
+Inductive s_converges : system -> id -> list GenericValue -> trace -> val -> Prop :=
 | s_converges_intro : forall (s:system) (main:id) (VarArgs:list GenericValue)    
                               cfg (IS FS:Opsem.State) r tr,
   s_genInitState s main VarArgs Mem.empty = Some (cfg, IS) ->
   sop_star cfg IS FS tr ->
-  s_isFinialState cfg FS = Some r ->
+  s_isFinalState cfg FS = Some r ->
   s_converges s main VarArgs tr r
 .
 
@@ -1038,7 +1048,7 @@ Inductive s_goeswrong : system -> id -> list GenericValue -> trace -> State -> P
   s_genInitState s main VarArgs Mem.empty = Some (cfg, IS) ->
   sop_star cfg IS FS tr ->
   stuck_state cfg FS ->
-  s_isFinialState cfg FS = None ->
+  s_isFinalState cfg FS = None ->
   s_goeswrong s main VarArgs tr FS
 .
 
