@@ -990,10 +990,10 @@ end.
 
 Definition lookupTypViaGIDFromProduct (p:product) (id0:id) : option typ :=
 match p with
-| product_fdef fd => Some (getFdefTyp fd)
+| product_fdef fd => if id0==(getFdefID fd) then Some (getFdefTyp fd) else None
 | product_gvar (gvar_intro id1 _ spec t _ _) => if id0==id1 then Some t else None
 | product_gvar (gvar_external id1 spec t) => if id0==id1 then Some t else None
-| product_fdec fc => Some (getFdecTyp fc)
+| product_fdec fc => if id0==(getFdecID fc) then Some (getFdecTyp fc) else None
 end.
 
 Fixpoint lookupTypViaGIDFromProducts (lp:products) (id0:id) : option typ :=

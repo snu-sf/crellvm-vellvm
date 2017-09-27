@@ -33,14 +33,6 @@ Export Opsem.
 
 (***********************************************************)
 (* Properties of sop_star *)
-Lemma sInsn__implies__sop_star : forall cfg state state' tr,
-  sInsn cfg state state' tr ->
-  sop_star cfg state state' tr.
-Proof.
-  intros cfg state state' tr HdsInsn.
-  rewrite <- E0_right.
-  eauto.
-Qed.
 
 Lemma sop_star_trans : forall cfg state1 state2 state3 tr12 tr23,
   sop_star cfg state1 state2 tr12 ->
@@ -56,15 +48,6 @@ Qed.
 
 (***********************************************************)
 (* Properties of sop_plus *)
-Lemma sInsn__implies__sop_plus : forall cfg state state' tr,
-  sInsn cfg state state' tr ->
-  sop_plus cfg state state' tr.
-Proof.
-  intros cfg state state' tr HdsInsn.
-  rewrite <- E0_right.
-  eauto.
-Qed.
-
 Lemma sop_plus__implies__sop_star : forall cfg state state' tr,
   sop_plus cfg state state' tr ->
   sop_star cfg state state' tr.
@@ -73,193 +56,10 @@ Proof.
   inversion Hdsop_plus; subst; eauto.
 Qed.
 
-Hint Resolve sInsn__implies__sop_star sInsn__implies__sop_plus
-  sop_plus__implies__sop_star.
-
-Lemma sop_plus_star__implies__sop_plus: forall cfg S1 S2 S3 tr1 tr2,
-  sop_plus cfg S1 S2 tr1 ->
-  sop_star cfg S2 S3 tr2 ->
-  sop_plus cfg S1 S3 (tr1 ** tr2).
-Proof.
-  induction 1; intros; auto.
-    rewrite Eapp_assoc; auto. 
-    econstructor; eauto.
-    eapply sop_star_trans; eauto.
-Qed.
-
-Lemma sop_star_plus__implies__sop_plus: forall cfg S1 S2 S3 tr1 tr2,
-  sop_star cfg S1 S2 tr1 ->
-  sop_plus cfg S2 S3 tr2 ->
-  sop_plus cfg S1 S3 (tr1 ** tr2).
-Proof.
-  induction 1; intros; auto.
-    apply IHsop_star in H1.
-    rewrite Eapp_assoc; auto. 
-    econstructor; eauto.
-Qed.
-
-Lemma sop_step_plus__implies__sop_plus: forall cfg S1 S2 S3 tr1 tr2,
-  sInsn cfg S1 S2 tr1 ->
-  sop_plus cfg S2 S3 tr2 ->
-  sop_plus cfg S1 S3 (tr1 ** tr2).
-Proof.
-  intros. inv H0.
-  econstructor; eauto.
-Qed.
+Hint Resolve sop_plus__implies__sop_star.
 
 (***********************************************************)
 (* Properties of sop_diverges *)
-Lemma sop_diverging_trans : forall cfg state tr1 state' tr2,
-  sop_star cfg state state' tr1 ->
-  sop_diverges cfg state' tr2 ->
-  sop_diverges cfg state (Eappinf tr1 tr2).
-Proof.
-  intros cfg state tr1 state' tr2 state_dsop_state' state'_dsop_diverges.
-  generalize dependent tr2.
-  (sop_star_cases (induction state_dsop_state') Case); intros; auto.
-  Case "sop_star_cons".
-    rewrite Eappinf_assoc. eauto.
-Qed.
-
-Lemma sop_star_diverges'__sop_diverges': forall cfg IS1 IS2 tr1 tr2,
-  sop_star cfg IS1 IS2 tr1 ->
-  sop_diverges' cfg IS2 tr2 ->
-  sop_diverges' cfg IS1 (Eappinf tr1 tr2).
-Proof.
-  induction 1; intros; auto.
-    apply IHsop_star in H1.
-    rewrite Eappinf_assoc.
-    econstructor; eauto.
-Qed.
-
-Lemma sop_plus_diverges'__sop_diverges': forall cfg IS1 IS2 tr1 tr2,
-  sop_plus cfg IS1 IS2 tr1 ->
-  sop_diverges' cfg IS2 tr2 ->
-  sop_diverges' cfg IS1 (Eappinf tr1 tr2).
-Proof.
-  intros. inv H.
-  eapply sop_star_diverges'__sop_diverges' in H2; eauto.
-  rewrite Eappinf_assoc.
-  econstructor; eauto.
-Qed.
-
-Lemma sop_star_diverges__sop_diverges: forall cfg IS1 IS2 tr1 tr2,
-  sop_star cfg IS1 IS2 tr1 ->
-  sop_diverges cfg IS2 tr2 ->
-  sop_diverges cfg IS1 (Eappinf tr1 tr2).
-Proof.
-  induction 1; intros; auto.
-    apply IHsop_star in H1.
-    rewrite Eappinf_assoc.
-    rewrite <- E0_right at 1.
-    econstructor; eauto.
-Qed.
-
-Lemma sop_diverges__sop_diverges': forall cfg IS tr,
-  sop_diverges cfg IS tr -> sop_diverges' cfg IS tr.
-Proof.
-  cofix CIH.
-  intros.
-  inv H.
-  inv H0.
-  assert (sop_diverges cfg state0 (tr3***tr2)) as J.
-    clear CIH. 
-    eapply sop_star_diverges__sop_diverges; eauto.
-  apply CIH in J. clear CIH.
-  rewrite Eappinf_assoc.
-  econstructor; eauto.
-Qed.
-
-Lemma sop_diverges'__sop_diverges: forall cfg IS tr,
-  sop_diverges' cfg IS tr -> sop_diverges cfg IS tr.
-Proof.
-  cofix CIH.
-  intros.
-  inv H.
-  apply CIH in H1. clear CIH.
-  econstructor; eauto.
-Qed.
-
-Lemma sop_star_diverges__sop_diverges_coind: forall cfg IS1 IS2 tr1 tr2,
-  Opsem.sop_star cfg IS1 IS2 tr1 ->
-  Opsem.sop_diverges cfg IS2 tr2 ->
-  Opsem.sop_diverges cfg IS1 (Eappinf tr1 tr2).
-Proof.
-  intros.
-  inv H0.
-  rewrite <- Eappinf_assoc.
-  eapply sop_diverges_intro; eauto.
-  eapply sop_star_plus__implies__sop_plus; eauto.
-Qed.
-
-Lemma sop_star_diverges'__sop_diverges'_coind: forall cfg IS1 IS2 tr1 tr2,
-  Opsem.sop_star cfg IS1 IS2 tr1 ->
-  Opsem.sop_diverges' cfg IS2 tr2 ->
-  Opsem.sop_diverges' cfg IS1 (Eappinf tr1 tr2).
-Proof.
-  cofix CIH.
-  intros.
-  inv H0.
-  inv H.
-    clear CIH.
-    rewrite <- Eappinf_assoc.
-    econstructor; eauto.
-
-    assert (sop_diverges' cfg state0 (tr4 *** tr0 *** tr3)) as J.
-      rewrite <- Eappinf_assoc.
-      eapply CIH; eauto.
-      eapply sop_star_trans; eauto. 
-    clear CIH.
-    rewrite Eappinf_assoc.
-    eapply sop_diverges_intro'; eauto.
-Qed.
-
-Section SOP_WF_DIVERGES.
-
-Context `{Measure: Type}.
-Context `{R:Measure -> Measure -> Prop}.
-Context `{Hwf_founded_R: well_founded R}.
-
-Lemma sop_wf_diverges__inv: forall m1 cfg S1 Tr
-  (Hdiv: sop_wf_diverges Measure R cfg m1 S1 Tr),
-  exists S2, exists m2, exists tr, exists Tr',
-    sop_plus cfg S1 S2 tr /\
-    sop_wf_diverges Measure R cfg m2 S2 Tr' /\
-    Tr = Eappinf tr Tr'.
-Proof.
-  intro m1. pattern m1.
-  apply (well_founded_ind Hwf_founded_R); intros.
-  inv Hdiv.
-    exists state2. exists m2. exists tr1. exists tr2. 
-    split; auto.
-
-    apply H in H2; auto.
-    destruct H2 as [S2 [m2' [tr [Tr' [J1 [J2 J3]]]]]]; subst.
-    exists S2. exists m2'. exists (Eapp tr1 tr). exists Tr'.
-    split.
-      eapply sop_star_plus__implies__sop_plus; eauto.
-    split; auto.
-      rewrite Eappinf_assoc; auto.
-Qed.
-
-Lemma sop_wf_diverges__sop_diverges: forall cfg m IS tr,
-  sop_wf_diverges Measure R cfg m IS tr ->sop_diverges cfg IS tr.
-Proof.
-  cofix CIH.
-  intros.
-  inv H.
-    apply sop_wf_diverges__inv in H1; auto.
-    destruct H1 as [S2 [m2' [tr [Tr' [J1 [J2 J3]]]]]]; subst.
-    econstructor; eauto.
-
-    apply sop_wf_diverges__inv in H2; auto.
-    destruct H2 as [S2 [m2' [tr [Tr' [J1 [J2 J3]]]]]]; subst.
-    rewrite <- Eappinf_assoc.
-    econstructor; eauto using sop_star_plus__implies__sop_plus.
-Qed.
-
-End SOP_WF_DIVERGES.
-
 Ltac app_inv :=
   match goal with
   | [ H: ?f _ _ _ _ _ _ = ?f _ _ _ _ _ _ |- _ ] => inv H
@@ -468,182 +268,8 @@ Proof.
     erewrite IHl0; eauto.
 Qed.
 
-Lemma eqAL_getIncomingValuesForBlockFromPHINodes : forall TD ps B gl lc lc',
-  eqAL _ lc lc' ->
-  getIncomingValuesForBlockFromPHINodes TD ps B gl lc =
-  getIncomingValuesForBlockFromPHINodes TD ps B gl lc'.
-Proof.
-  induction ps; intros; simpl; auto.
-    destruct a; auto.
-    destruct (getValueViaBlockFromValuels l0 B); auto.
-    destruct v; simpl; erewrite IHps; eauto.
-      rewrite H. auto.
-Qed.
-
-Lemma eqAL_updateValuesForNewBlock : forall vs lc lc',
-  eqAL _ lc lc' ->
-  eqAL _ (updateValuesForNewBlock vs lc)(updateValuesForNewBlock vs lc').
-Proof.
-  induction vs; intros; simpl; auto.
-    destruct a; auto using eqAL_updateAddAL.
-Qed.
-
-Lemma eqAL_switchToNewBasicBlock : forall TD B1 B2 gl lc lc',
-  eqAL _ lc lc' ->
-  match (switchToNewBasicBlock TD B1 B2 gl lc,
-         switchToNewBasicBlock TD B1 B2 gl lc') with
-  | (Some lc1, Some lc1') => eqAL _ lc1 lc1'
-  | (None, None) => True
-  | _ => False
-  end.
-Proof.
-  intros.
-  unfold switchToNewBasicBlock.
-  erewrite eqAL_getIncomingValuesForBlockFromPHINodes; eauto.
-  destruct
-    (getIncomingValuesForBlockFromPHINodes TD (getPHINodesFromBlock B1) B2 gl
-    lc'); auto using eqAL_updateValuesForNewBlock.
-Qed.
-
-Lemma eqAL_switchToNewBasicBlock' : forall TD B1 B2 gl lc lc' lc1,
-  eqAL _ lc lc' ->
-  switchToNewBasicBlock TD B1 B2 gl lc = Some lc1 ->
-  exists lc1', switchToNewBasicBlock TD B1 B2 gl lc' = Some lc1' /\
-               eqAL _ lc1 lc1'.
-Proof.
-  intros.
-  assert (J:=eqAL_switchToNewBasicBlock TD B1 B2 gl lc lc' H).
-  rewrite H0 in J.
-  destruct (switchToNewBasicBlock TD B1 B2 gl lc'); try solve [inversion J].
-  exists g. auto.
-Qed.
-
-Lemma eqAL_params2GVs : forall lp TD lc gl lc',
-  eqAL _ lc lc' ->
-  params2GVs TD lp lc gl = params2GVs TD lp lc' gl.
-Proof.
-  induction lp; intros; simpl; auto.
-    destruct a.
-    destruct v; simpl.
-      rewrite H. erewrite IHlp; eauto.
-      erewrite IHlp; eauto.
-Qed.
-
-Lemma eqAL_exCallUpdateLocals : forall TD noret0 rid oResult lc lc' rt,
-  eqAL _ lc lc' ->
-  match (exCallUpdateLocals TD rt noret0 rid oResult lc,
-         exCallUpdateLocals TD rt noret0 rid oResult lc') with
-  | (Some lc1, Some lc1') => eqAL _ lc1 lc1'
-  | (None, None) => True
-  | _ => False
-  end.
-Proof.
-  intros TD noret0 rid oResult lc lc' rt H1.
-    unfold exCallUpdateLocals.
-    destruct noret0; auto.
-    destruct oResult; auto.
-    destruct (fit_gv TD rt g); auto using eqAL_updateAddAL.
-Qed.
-
-Lemma eqAL_exCallUpdateLocals' : forall TD ft noret0 rid oResult lc lc' lc0,
-  eqAL _ lc lc' ->
-  exCallUpdateLocals TD ft noret0 rid oResult lc = Some lc0 ->
-  exists lc0', exCallUpdateLocals TD ft noret0 rid oResult lc' = Some lc0' /\
-               eqAL _ lc0 lc0'.
-Proof.
-  intros TD ft noret0 rid oResult lc lc' lc0 H H0.
-  assert (J:=eqAL_exCallUpdateLocals TD noret0 rid oResult lc lc' ft H).
-  rewrite H0 in J.
-  destruct (exCallUpdateLocals TD ft noret0 rid oResult lc');
-    try solve [inversion J].
-  exists g. auto.
-Qed.
-
-Lemma getIncomingValuesForBlockFromPHINodes_eq :
-  forall ps TD l1 ps1 cs1 tmn1 ps2 cs2 tmn2,
-  getIncomingValuesForBlockFromPHINodes TD ps
-    (l1, stmts_intro ps1 cs1 tmn1) =
-  getIncomingValuesForBlockFromPHINodes TD ps (l1, stmts_intro ps2 cs2 tmn2).
-Proof.
-  induction ps; intros; auto.
-    simpl.
-    erewrite IHps; eauto.
-Qed.
-
-Lemma switchToNewBasicBlock_eq :
-  forall TD B l1 ps1 cs1 tmn1 ps2 cs2 tmn2 gl lc,
-  switchToNewBasicBlock TD B (l1, stmts_intro ps1 cs1 tmn1) gl lc =
-  switchToNewBasicBlock TD B (l1, stmts_intro ps2 cs2 tmn2) gl lc.
-Proof.
-  intros.
-  unfold switchToNewBasicBlock.
-  erewrite getIncomingValuesForBlockFromPHINodes_eq; eauto.
-Qed.
-
 (***********************************************************)
 (* Uniqueness of operations *)
-Lemma exCallUpdateLocals_uniq : forall TD rt noret0 rid oresult lc lc',
-  uniq lc ->
-  exCallUpdateLocals TD rt noret0 rid oresult lc = Some lc' ->
-  uniq lc'.
-Proof.
-  intros.
-  unfold exCallUpdateLocals in H0.
-  destruct noret0; auto.
-    inversion H0; subst; auto.
-
-    destruct oresult; try solve [inversion H0].
-    destruct (fit_gv TD rt g); inversion H0; subst.
-      apply updateAddAL_uniq; auto.
-Qed.
-
-Lemma updateValuesForNewBlock_uniq : forall l0 lc,
-  uniq lc ->
-  uniq (updateValuesForNewBlock l0 lc).
-Proof.
-  induction l0; intros lc Uniqc; simpl; auto.
-    destruct a; apply updateAddAL_uniq; auto.
-Qed.
-
-Lemma switchToNewBasicBlock_uniq : forall TD B1 B2 gl lc lc',
-  uniq lc ->
-  switchToNewBasicBlock TD B1 B2 gl lc = Some lc' ->
-  uniq lc'.
-Proof.
-  intros TD B1 B2 gl lc lc' Uniqc H.
-  unfold switchToNewBasicBlock in H.
-  destruct (getIncomingValuesForBlockFromPHINodes TD (getPHINodesFromBlock B1)
-    B2 gl lc); inversion H; subst.
-  apply updateValuesForNewBlock_uniq; auto.
-Qed.
-
-Lemma initializeFrameValues_init : forall TD la l0 lc,
-  _initializeFrameValues TD la l0 nil = Some lc ->
-  uniq lc.
-Proof.
-  induction la; intros; simpl in *; auto.
-    inv H. auto.
-
-    destruct a as [[t ?] id0].
-    destruct l0.
-      remember (_initializeFrameValues TD la nil nil) as R.
-      destruct R; tinv H.
-      destruct (gundef TD t); inv H; eauto using updateAddAL_uniq.
-
-      remember (_initializeFrameValues TD la l0 nil) as R.
-      destruct R; tinv H.
-      destruct ((fit_gv TD t) g); inv H;
-        eauto using updateAddAL_uniq.
-Qed.
-
-Lemma initLocals_uniq : forall TD la ps lc,
-  initLocals TD la ps = Some lc -> uniq lc.
-Proof.
-  intros la ps.
-  unfold initLocals.
-  apply initializeFrameValues_init; auto.
-Qed.
-
 Lemma updateValuesForNewBlock_spec4 : forall rs lc id1 gv,
   lookupAL _ rs id1 = Some gv ->
   lookupAL _ (updateValuesForNewBlock rs lc) id1 = Some gv.
@@ -715,111 +341,6 @@ Proof.
           rewrite <- lookupAL_updateAddAL_neq; eauto.
 Qed.
 
-Lemma In_initializeFrameValues__In_getArgsIDs: forall
-  (TD : TargetData) (la : args) (gvs : list GenericValue) (id1 : atom)
-  (lc : Opsem.GVsMap) (gv : GenericValue) acc,
-  Opsem._initializeFrameValues TD la gvs acc = ret lc ->
-  lookupAL GenericValue lc id1 = ret gv ->
-  In id1 (getArgsIDs la) \/ id1 `in` dom acc.
-Proof.
-  induction la as [|[]]; simpl; intros.
-    inv H.
-    right. apply lookupAL_Some_indom in H0; auto.
-
-    destruct p.
-    destruct gvs.
-      inv_mbind. 
-      destruct (id_dec i0 id1); subst; auto.
-      rewrite <- lookupAL_updateAddAL_neq in H0; auto.
-      eapply IHla in H0; eauto.
-      destruct H0 as [H0 | H0]; auto.
-
-      inv_mbind.
-      destruct (id_dec i0 id1); subst; auto.
-      rewrite <- lookupAL_updateAddAL_neq in H0; auto.
-      eapply IHla in H0; eauto.
-      destruct H0 as [H0 | H0]; auto.
-Qed.
-
-Lemma In_initLocals__In_getArgsIDs : forall TD la gvs id1 lc gv,
-  Opsem.initLocals TD la gvs = Some lc ->
-  lookupAL _ lc id1 = Some gv ->
-  In id1 (getArgsIDs la).
-Proof.
-  unfold Opsem.initLocals.
-  intros.
-  eapply In_initializeFrameValues__In_getArgsIDs in H; eauto.
-  destruct H as [H | H]; auto.
-    fsetdec.
-Qed.
-
-Lemma dom_initializeFrameValues: forall
-  (TD : TargetData) (la : args) gvs lc acc,
-  Opsem._initializeFrameValues TD la gvs acc = ret lc ->
-  (forall i0, i0 `in` dom lc -> i0 `in` dom acc \/ In i0 (getArgsIDs la)).
-Proof.
-  induction la as [|[[]]]; simpl; intros.
-    inv H. auto.
-
-    destruct gvs.
-      inv_mbind'.
-      rewrite updateAddAL_dom_eq in H0.
-      assert (i1 `in` (dom g) \/ i1 = i0) as J.
-        fsetdec.
-      destruct J as [J | J]; subst; auto.
-        symmetry in HeqR.
-        apply IHla with (i0:=i1) in HeqR; auto.
-        destruct HeqR as [HeqR | HeqR]; auto.
-
-      inv_mbind'.
-      rewrite updateAddAL_dom_eq in H0.
-      assert (i1 `in` (dom g0) \/ i1 = i0) as J.
-        fsetdec.
-      destruct J as [J | J]; subst; auto.
-        symmetry in HeqR.
-        apply IHla with (i0:=i1) in HeqR; auto.
-        destruct HeqR as [HeqR | HeqR]; auto.
-Qed.
-
-Lemma NotIn_getArgsIDs__NotIn_initializeFrameValues: forall
-  (TD : TargetData) (la : args) gvs (id1 : atom) lc acc,
-  Opsem._initializeFrameValues TD la gvs acc = ret lc ->
-  ~ In id1 (getArgsIDs la) /\ id1 `notin` dom acc ->
-  lookupAL _ lc id1 = None.
-Proof.
-  induction la as [|[]]; simpl; intros.
-    inv H.
-    destruct H0.
-    apply notin_lookupAL_None; auto.
-
-    destruct H0 as [H1 H2].
-    assert (i0 <> id1 /\ ~ In id1 (getArgsIDs la)) as J.
-      split; intro; subst; contradict H1; auto.
-    destruct J as [J1 J2].
-    destruct p.
-    destruct gvs.
-      inv_mbind'.
-      rewrite <- lookupAL_updateAddAL_neq; auto.
-      apply notin_lookupAL_None; auto.
-      intro J. symmetry in HeqR.
-      apply dom_initializeFrameValues with (i0:=id1) in HeqR; auto.
-      destruct HeqR; auto.
-
-      inv_mbind'.
-      rewrite <- lookupAL_updateAddAL_neq; auto.
-      eapply IHla; eauto.
-Qed.
-
-Lemma NotIn_getArgsIDs__NotIn_initLocals : forall TD la gvs id1 lc,
-  Opsem.initLocals TD la gvs = Some lc ->
-  ~ In id1 (getArgsIDs la) ->
-  lookupAL _ lc id1 = None.
-Proof.
-  unfold Opsem.initLocals.
-  intros.
-  eapply NotIn_getArgsIDs__NotIn_initializeFrameValues in H; eauto.
-Qed.
-
 (***********************************************************)
 (* Properties of updateValuesForNewBlock *)
 Lemma updateValuesForNewBlock_spec6 : forall lc rs id1 gvs
@@ -884,41 +405,6 @@ Proof.
     rewrite <- lookupAL_updateAddAL_neq; eauto.
 Qed.
 
-Lemma updateValuesForNewBlock_sim : forall id0 lc lc'
-  (Heq : forall id' : id,
-        id' <> id0 ->
-        lookupAL _ lc id' = lookupAL GenericValue lc' id')
-  g0 g
-  (EQ : forall id' : id,
-       id' <> id0 ->
-       lookupAL _ g0 id' = lookupAL _ g id'),
-  forall id', id' <> id0 ->
-   lookupAL _ (updateValuesForNewBlock g0 lc) id' =
-   lookupAL _ (updateValuesForNewBlock g lc') id'.
-Proof.
-  intros.
-  destruct (AtomSetProperties.In_dec id' (dom g0)).
-    rewrite updateValuesForNewBlock_spec6'; auto.
-    destruct (AtomSetProperties.In_dec id' (dom g)).
-      rewrite updateValuesForNewBlock_spec6'; auto.
-
-      apply notin_lookupAL_None in n.
-      erewrite <- EQ in n; eauto.
-      apply indom_lookupAL_Some in i0.
-      destruct i0 as [gv0 i0].
-      rewrite i0 in n. congruence.
-
-    rewrite updateValuesForNewBlock_spec7'; auto.
-    destruct (AtomSetProperties.In_dec id' (dom g)).
-      apply notin_lookupAL_None in n.
-      erewrite EQ in n; eauto.
-      apply indom_lookupAL_Some in i0.
-      destruct i0 as [gv0 i0].
-      rewrite i0 in n. congruence.
-
-      rewrite updateValuesForNewBlock_spec7'; auto.
-Qed.
-
 Lemma updateValuesForNewBlock_spec5: forall lc1' lc2' i0
   (Hlk: lookupAL _ lc1' i0 = lookupAL _ lc2' i0) lc2
   (Hlk: merror = lookupAL _ lc2 i0),
@@ -942,7 +428,10 @@ Proof.
 
     destruct a. destruct b. simpl in *.
     inv_mbind. inv HeqR1.
-    destruct Hin as [Hin | Hin]; subst; simpl; auto.
+    destruct (gv_chunks_match_typb TD g typ5).
+    destruct Hin as [Hin | Hin]; subst. inv H0. simpl. auto.
+    inv H0. simpl. auto.
+    inv H0.
 Qed.
 
 Lemma getIncomingValuesForBlockFromPHINodes_spec7 : forall TD b gl lc ps' rs id1
@@ -955,7 +444,11 @@ Proof.
 
     destruct a as [i0 ?]. destruct b as [l2 ? ? ?]. simpl in *.
     inv_mbind. inv HeqR1. simpl in *.
-    assert (id1 = i0 \/ id1 `in` dom l1) as J. fsetdec.
+    assert (id1 = i0 \/ id1 `in` dom l1) as J.
+    destruct (gv_chunks_match_typb TD g typ5).
+    inv H0. simpl in Hin.
+    fsetdec.
+    inv H0.
     destruct J as [J | J]; subst; eauto.
 Qed.
 
@@ -990,14 +483,26 @@ Proof.
       destruct HeqR as [n HeqR].
       destruct (@eq_dec atom (EqDec_eq_of_EqDec atom EqDec_atom) i0 i0);
         try congruence.
-      inv H1.
+      destruct (gv_chunks_match_typb TD g t).
+      inv H3.
+      
       exists i0. exists t. exists l0. exists v. exists n.
-      split; auto.
-
+      split; auto. split. auto. auto. simpl in H1.
+      destruct (@eq_dec atom (EqDec_eq_of_EqDec atom EqDec_atom) i0 i0).
+      inv H1. eauto. apply n0 in e. inv e.
+      inv H3.
+      destruct (gv_chunks_match_typb TD g t).
+      inv H3. simpl in H1.
+      destruct (@eq_dec atom (EqDec_eq_of_EqDec atom EqDec_atom) id0 i0).
+      apply n in e. inv e.
       apply IHps' in H1; auto; try fsetdec.
       destruct H1 as [id1 [t1 [vls1 [v' [n' [J1 [J2 J3]]]]]]].
       exists id1. exists t1. exists vls1. exists v'. exists n'.
       split; auto.
+      apply in_dom_cons_inv in H0.
+      inv H0. assert (i0 = i0). auto. apply n in H. inv H.
+      auto.
+      inv H3.
 Qed.
 
 Lemma getIncomingValuesForBlockFromPHINodes_spec9': forall TD gl lc b id0 gvs0
@@ -1018,13 +523,28 @@ Proof.
       destruct b. simpl in *.
       symmetry in HeqR.
       inv H1.
+      destruct (gv_chunks_match_typb TD g t).
+      inv H3.
       exists t. exists l0. exists v. 
-      split; auto.
+      simpl in H2.
+      inv H2. split; auto. split. auto. simpl.
+      destruct (@eq_dec atom (EqDec_eq_of_EqDec atom EqDec_atom) i0 i0).
+      auto. assert (i0 = i0). auto. apply n in H. inv H.
+      inv H3.
+      
+      destruct (gv_chunks_match_typb TD g t).
+      inv H3. simpl in H1.
+      destruct (@eq_dec atom (EqDec_eq_of_EqDec atom EqDec_atom) id0 i0).
+      apply n in e. inv e.
 
       apply IHps' in H1; auto; try fsetdec.
       destruct H1 as [t1 [vls1 [v' [J1 [J2 J3]]]]].
       exists t1. exists vls1. exists v'.
       split; auto.
+      apply in_dom_cons_inv in H0.
+      inv H0. assert (i0 = i0). auto. apply n in H. inv H.
+      auto.
+      inv H3.
 Qed.
 
 End OpsemProps. End OpsemProps.

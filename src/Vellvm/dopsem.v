@@ -50,56 +50,6 @@ exists l0, exists ps0, exists cs0,
 Definition wfECs_inv s m (ECs: list Opsem.ExecutionContext) : Prop :=
 List.Forall (wfEC_inv s m) ECs.
 
-Lemma wf_EC__wfEC_inv: forall S los nts Ps EC
-  (HwfS : wf_system S) 
-  (HMinS : moduleInSystemB (module_intro los nts Ps) S = true)
-  (Hwfec : OpsemPP.wf_ExecutionContext (los, nts) Ps EC),
-  wfEC_inv S (module_intro los nts Ps) EC.
-Proof.
-  destruct EC; simpl.
-  intros.
-  destruct Hwfec as [J1 [J2 [J3 [J4 [J5 J6]]]]].
-  unfold wfEC_inv. simpl.
-  split; eauto 2 using wf_system__uniqFdef.
-  split; auto.
-  split; auto.
-    destruct J6 as [l1 [ps1 [cs1 J6]]]; subst.
-    destruct CurCmds.
-      eapply wf_system__wf_tmn in J2; eauto.
-      eapply wf_system__wf_cmd in J2; eauto using in_middle.
-Qed.
-
-Lemma wf_ECStack__wfECs_inv: forall S los nts Ps ECs
-  (HwfS : wf_system S) 
-  (HMinS : moduleInSystemB (module_intro los nts Ps) S = true)
-  (Hwf : OpsemPP.wf_ECStack (los, nts) Ps ECs),
-  wfECs_inv S (module_intro los nts Ps) ECs.
-Proof.
-  unfold wfECs_inv.
-  induction ECs as [|]; simpl; intros; auto.
-  destruct Hwf as [J1 [J2 J3]].
-  constructor; eauto using wf_EC__wfEC_inv.
-Qed.
-
-Lemma wf_State__wfECs_inv: forall cfg St (Hwfc: OpsemPP.wf_Config cfg) 
-  (Hwfst: OpsemPP.wf_State cfg St), 
-  wfECs_inv (OpsemAux.CurSystem cfg) 
-    (module_intro (fst (OpsemAux.CurTargetData cfg))
-                  (snd (OpsemAux.CurTargetData cfg))
-                  (OpsemAux.CurProducts cfg) )
-    (Opsem.EC St :: 
-    Opsem.ECS St).
-Proof.
-  intros.
-  destruct cfg as [? [? ?] ? ?].
-  destruct St.
-  destruct Hwfc as [? [? [? ?]]].
-  destruct Hwfst. simpl.
-  eapply wf_ECStack__wfECs_inv; eauto.
-  destruct H4; auto.
-  simpl; split; auto.
-Qed.
-
 Definition uniqEC (EC: Opsem.ExecutionContext) : Prop :=
 uniqFdef (Opsem.CurFunction EC) /\ 
 blockInFdefB (Opsem.CurBB EC) (Opsem.CurFunction EC) = true /\
@@ -109,35 +59,6 @@ exists l0, exists ps0, exists cs0,
 
 Definition uniqECs (ECs: list Opsem.ExecutionContext) : Prop :=
 List.Forall uniqEC ECs.
-
-Lemma wfEC_inv__uniqEC: forall s m EC (Hwf: wfEC_inv s m EC), uniqEC EC.
-Proof.
-  intros.
-  destruct Hwf as [J1 [J3 [_ J2]]]. split; auto.
-Qed.
-
-Lemma wfECs_inv__uniqECs: forall s m EC ECs (Hwf: wfECs_inv s m (EC::ECs)), uniqECs (EC::ECs).
-Proof.
-  unfold wfECs_inv, uniqECs.
-  intros.
-  induction Hwf; auto.
-    constructor; auto.
-      apply wfEC_inv__uniqEC in H; auto.
-Qed.
-
-Lemma wf_State__uniqECs: forall cfg St (Hwfc: OpsemPP.wf_Config cfg) 
-  (Hwfst: OpsemPP.wf_State cfg St), uniqECs ((Opsem.EC St) :: (Opsem.ECS St)).
-Proof.
-  intros.
-  destruct cfg as [? [? ?] ? ?].
-  destruct St.
-  destruct Hwfc as [? [? [? ?]]].
-  destruct Hwfst as [? [? ?]]. simpl.
-  assert(H6 : OpsemPP.wf_ECStack (l0, n) CurProducts (EC :: ECS)).
-  simpl. split; auto.
-  eapply wf_ECStack__wfECs_inv in H6; eauto.
-  eapply wfECs_inv__uniqECs; eauto.
-Qed.
 
 Ltac find_uniqEC :=
 repeat match goal with
@@ -182,29 +103,3 @@ Proof.
   eauto.
 Qed.
 
-Lemma wf__getTypeStoreSize_eq_sizeGenericValue: forall (gl2 : GVMap)
-  (lc2 : Opsem.GVsMap) (S : system) (los : layouts) (nts : namedts)
-  (Ps : list product) (v1 : value) (gv1 : GenericValue)
-  (Hwfg : LLVMgv.wf_global (los, nts) S gl2) (n : nat) t
-  (HeqR : ret n = getTypeStoreSize (los, nts) t) F
-  (H24 : Opsem.getOperandValue (los, nts) v1 lc2 gl2 = ret gv1)
-  (Hwflc1 : OpsemPP.wf_lc (los, nts) F lc2)
-  (Hwfv : wf_value S (module_intro los nts Ps) F v1 t),
-  n = sizeGenericValue gv1.
-Proof.
-  intros.
-  eapply OpsemPP.getOperandValue__wf_gvs in Hwflc1; eauto.
-  inv Hwflc1.
-  unfold gv_chunks_match_typ in H1.
-  clear - H1 HeqR Hwfv. inv_mbind.
-  apply wf_value__wf_typ in Hwfv. destruct Hwfv as [J1 J2].
-  symmetry in HeqR0.
-  eapply flatten_typ__getTypeSizeInBits in HeqR0; eauto.
-  destruct HeqR0 as [sz [al [A B]]].          
-  unfold getTypeAllocSize, getTypeStoreSize, getABITypeAlignment,
-         getTypeSizeInBits, getAlignment, 
-         getTypeSizeInBits_and_Alignment in HeqR.
-  rewrite A in HeqR.
-  inv HeqR. rewrite B.
-  eapply vm_matches_typ__sizeMC_eq_sizeGenericValue; eauto.
-Qed.
