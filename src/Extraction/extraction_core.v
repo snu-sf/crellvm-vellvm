@@ -38,6 +38,7 @@ Extract Inlined Constant Fcalc_bracket.inbetween_loc => "fun _ -> assert false".
 Extract Constant AtomImpl.atom => "String.t".
 Extract Constant AtomImpl.eq_atom_dec => "fun a b -> a = b".
 Extract Constant AtomImpl.atom_fresh_for_list => "Camlcoq.atom_fresh_for_list".
+Extract Constant AtomImpl.atom_compare => "fun a b -> if compare a b < 0 then Lt else if compare a b > 0 then Gt else Eq".
 
 Extract Constant LLVMsyntax_base.id => "String.t".
 Extract Constant LLVMsyntax_base.l => "String.t".
@@ -97,6 +98,8 @@ Extract Constant INTEGER.of_Z => "Camlcoq.z2llapint".
 
 Extract Constant FLOAT.t => "Llvm.APFloat.t".
 Extract Constant FLOAT.dec => "Llvm.APFloat.bcompare".
+Extract Constant FLOAT.compare =>
+"fun x y -> match Llvm.APFloat.compare_ord x y with Llvm.APFloat.CmpResult.LessThan -> Lt | Llvm.APFloat.CmpResult.GreaterThan -> Gt | Llvm.APFloat.CmpResult.Equal -> Eq | _ -> failwith ""Unreachable: Float.compare""".
 
 Extract Constant LLVMinfra.inbounds_dec => "(=)".
 Extract Constant LLVMinfra.tailc_dec => "(=)".
