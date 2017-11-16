@@ -38,7 +38,11 @@ Extract Inlined Constant Fcalc_bracket.inbetween_loc => "fun _ -> assert false".
 Extract Constant AtomImpl.atom => "String.t".
 Extract Constant AtomImpl.eq_atom_dec => "fun a b -> a = b".
 Extract Constant AtomImpl.atom_fresh_for_list => "Camlcoq.atom_fresh_for_list".
-Extract Constant AtomImpl.atom_compare => "fun a b -> if compare a b < 0 then Lt else if compare a b > 0 then Gt else Eq".
+Extract Constant AtomImpl.atom_compare => "fun x y ->
+    let comp = String.compare x y in
+    if(comp < 0) then Lt
+    else if (comp > 0) then Gt
+    else Eq".
 
 Extract Constant LLVMsyntax_base.id => "String.t".
 Extract Constant LLVMsyntax_base.l => "String.t".
