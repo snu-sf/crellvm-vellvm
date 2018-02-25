@@ -3,6 +3,7 @@ Require Import ListSet.
 Require Import Coqlib.
 Require Import Metatheory.
 Require Import Maps.
+Require Import maps_ext.
 Require Import Lattice.
 Require Import Kildall.
 Require Import Iteration.
@@ -64,7 +65,7 @@ Axiom sdom_in_bound: forall fh bs l5,
 Axiom dom_successors : forall
   (l3 : l) (l' : l) f
   (contents3 contents': ListSet.set atom)
-  (Hinscs : l' `in` (successors f) !!! l3)
+  (Hinscs : l' `in` XATree.successors_list (successors f) l3)
   (Heqdefs3 : contents3 = sdom f l3)
   (Heqdefs' : contents' = sdom f l'),
   contents' {<=} (l3 {+} contents3).
@@ -187,7 +188,8 @@ Lemma sdom_is_sound : forall
   (HBinF : blockInFdefB (l3, s3) f = true)
   (Hin : l' `in` (adom.sdom f l3)),
   f |= l' >> l3.
-Proof. 
+Proof.
+  pose proof dom_is_sound as aux_dom_is_sound.
   intros.
   eapply dom_is_sound with (l':=l') in HBinF; simpl; eauto.
   unfold strict_domination, domination in *.
@@ -218,9 +220,7 @@ Proof.
           destruct f. eapply adom.dom_successors; eauto.
         simpl in Hin.
         apply Hinc; auto.
-      eapply dom_is_sound in J; try solve [eauto 1 | congruence].
-      unfold domination in J.
-      rewrite <- HeqR in J.
+      eapply aux_dom_is_sound in J; try solve [eauto 1 | congruence].
       assert (Hw:=H).
       apply D_path_isa_walk in Hw.
       apply J in Hw.
@@ -295,7 +295,7 @@ Axiom dtree_edge_iff_idom: forall (f:fdef)
   (dt: @DTree l)
   (Hcreate: create_dom_tree f = Some dt)
   (le:l) (Hentry: getEntryLabel f = Some le)
-  (Hnopreds: (XATree.make_predecessors (successors f)) !!! le = nil)
+  (Hnopreds: XATree.successors_list (XATree.make_predecessors (successors f)) le = nil)
   (Hwfcfg: branchs_in_fdef f)
   (Huniq: uniqFdef f),
   forall p0 ch0,
@@ -306,7 +306,7 @@ Axiom create_dom_tree__wf_dtree: forall (f:fdef)
   (dt: @DTree l)
   (Hcreate: create_dom_tree f = Some dt)
   (le:l) (Hentry: getEntryLabel f = Some le)
-  (Hnopreds: (XATree.make_predecessors (successors f)) !!! le = nil)
+  (Hnopreds: XATree.successors_list (XATree.make_predecessors (successors f)) le = nil)
   (Hwfcfg: branchs_in_fdef f)
   (Huniq: uniqFdef f),
   ADProps.wf_dtree (successors f) le eq_atom_dec dt.

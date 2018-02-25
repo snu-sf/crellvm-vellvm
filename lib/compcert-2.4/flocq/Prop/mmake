@@ -1,0 +1,8 @@
+coq_makefile \
+*.v \
+-I ../Appli \
+-I ../Calc \
+-I ../Core \
+-I ./ \
+-I ../ \
+> Makefile

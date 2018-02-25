@@ -20,7 +20,6 @@ Require Export static.
 Require Export opsem.
 Require Export opsem_wf.
 Require Export dopsem.
-Require Export ndopsem.
 Require Export external_intrinsics.
 Require Export vellvm_tactics.
 
@@ -49,7 +48,8 @@ let p := fresh "p" in
 let n := fresh "n" in
 let c := fresh "c" in
 let e := fresh "e" in
-destruct cmd as [i0 b s0 v v0|i0 f0 f1 v v0|i0 t v l2 t0|i0 t v t0 v0 l2|
+destruct cmd as [i0|
+                 i0 b s0 v v0|i0 f0 f1 v v0|i0 t v l2 t0|i0 t v t0 v0 l2|
                  i0 t v a|i0 t v|i0 t v a|i0 t v a|i0 t v v0 a|i0 i1 t v l2 t0|
                  i0 t t0 v t1|i0 e t v t0|i0 c t v t0|i0 c t v v0|
                  i0 f0 f1 v v0|i0 v t v0 v1|i0 n c t0 v0 v p].
@@ -94,7 +94,7 @@ Ltac repeat_bsplit :=
   repeat (bsplit; auto using eq_sumbool2bool_true).
 
 Ltac uniq_result :=
-repeat dgvs_instantiate_inv;
+subst;
 repeat match goal with
 | H1 : ?f ?a ?b ?c ?d = _,
   H2 : ?f ?a ?b ?c ?d = _ |- _ =>
@@ -108,7 +108,6 @@ repeat match goal with
 | H1 : ?f ?a = _,
   H2 : ?f ?a = _ |- _ =>
   rewrite H1 in H2; inv H2
-| H1 : _ @ _ |- _ => inv H1
 | H : ?f _ = ?f _ |- _ => inv H
 | H : ?f _ _ = ?f _ _ |- _ => inv H
 | H : ?f _ _ _ = ?f _ _ _ |- _ => inv H

@@ -23,6 +23,7 @@ Require Import dom_list.
 Require Import analysis.
 Require Import util.
 Require Import datatype_base.
+Require Import maps_ext.
 
 Import LLVMinfra.
 Import LLVMtd.
@@ -98,16 +99,61 @@ Lemma wf_tmn__in_successors: forall s m f l0 cs ps tmn l1
   (HuniqF : uniqFdef f)
   (Hwftmn : wf_insn s m f (l0, stmts_intro cs ps tmn) (insn_terminator tmn))
   (Hin : In l1 (successors_terminator tmn)),
-  exists s1, blockInFdefB (l1, s1) f.
+    exists s1, blockInFdefB (l1, s1) f.
 Proof.
   intros.
   inv Hwftmn; simpl in Hin; tinv Hin.
-    destruct Hin as [Hin | [Hin | Hin]]; tinv Hin; subst.
-      apply lookupBlockViaLabelFromFdef_inv in H2; eauto.
-      apply lookupBlockViaLabelFromFdef_inv in H3; eauto.
-
+  destruct Hin as [Hin | [Hin | Hin]]; tinv Hin; subst.
+  apply lookupBlockViaLabelFromFdef_inv in H2; eauto.
+  apply lookupBlockViaLabelFromFdef_inv in H3; eauto.
+  -
+    remember (List.map
+                (fun pat_ : const * l * stmts =>
+                   let (p, _) := pat_ in
+                   let (const_, l_) := p in (const_, l_))
+                const_l_stmts_list) as cls in *.
+    destruct (eq_atom_dec l1 l_5).
+    +
+      subst.
+      eexists.
+      apply lookupBlockViaLabelFromFdef_inv; eauto.
+    +
+      assert(In l1 (list_prj2 const l cls)).
+      {
+        destruct (in_dec eq_atom_dec l_5 (list_prj2 const l cls)).
+        - eapply nodup_In; eauto.
+        -
+          inversion Hin.
+          + exfalso; eauto.
+          + eapply nodup_In; eauto.
+      }
+      assert(exists s1, In (l1, s1)
+                           (List.map (fun pat_ : const * l * stmts =>
+                                        let (p, stmts_) := pat_ in
+                                        let (_, l_) := p in (l_, stmts_))
+                                     const_l_stmts_list)).
+      {
+        subst.
+        clear - H.
+        induction const_l_stmts_list; intros; simpl in *; eauto.
+        inv H.
+        destruct a, p.
+        simpl in *.
+        destruct H.
+        -
+          eexists. left. subst. eauto.
+        -
+          exploit IHconst_l_stmts_list; eauto.
+          intros.
+          inv H0.
+          eexists. right. eauto.
+      }
+      destruct H1.
+      exists x.
+      apply lookupBlockViaLabelFromFdef_inv; eauto.
+  -
     destruct Hin as [Hin | Hin]; tinv Hin; subst.
-      apply lookupBlockViaLabelFromFdef_inv in H0; eauto.
+    apply lookupBlockViaLabelFromFdef_inv in H0; eauto.
 Qed.
 
 (* Properties of wf_blocks *)
@@ -1079,14 +1125,14 @@ Proof.
   intros.
   inv_mbind. 
   symmetry in HeqR0.
-  set (P:=fun (pc:atom)(r:ReachDS.L.t) => 
+  set (P:=fun (pc:atom)(r:analysis.ReachDS.L.t) => 
           if r then reachable f pc else True).
-  assert (forall res : AMap.t ReachDS.L.t,
-       ReachDS.fixpoint (successors f) 
-         (fun (_ : atom) (r : ReachDS.L.t) => r) 
+  assert (forall res : AMap.t analysis.ReachDS.L.t,
+       analysis.ReachDS.fixpoint (successors f) 
+         (fun (_ : atom) (r : analysis.ReachDS.L.t) => r) 
          ((l0, true) :: nil) = ret res ->
        forall pc : atom, P pc res !! pc) as J.
-    apply ReachDS.fixpoint_inv; simpl; auto.
+    apply analysis.ReachDS.fixpoint_inv; simpl; auto.
       destruct x; auto.
 
       unfold P. intros pc sc x y Hin' H1 H2.
@@ -1110,7 +1156,7 @@ Proof.
   apply J with (pc:=a) in HeqR0.
   unfold P in HeqR0.
   apply get_reachable_labels__spec'' in Hin.
-  unfold ReachDS.L.t in *.
+  unfold analysis.ReachDS.L.t in *.
   rewrite Hin in HeqR0. auto.
 Qed.
 
@@ -1884,7 +1930,7 @@ Proof.
     eapply wf_fdef__wf_insn_base; eauto.
   destruct HwfI as [b1 HwfI].
   inv HwfI.
-  assert (exists n, nth_error id_list n = Some i0) as Hnth.
+  assert (exists n, nth_error (getInsnOperands (insn_cmd c1)) n = Some i0) as Hnth.
     eapply getCmdOperands__nth_list_id; eauto.
   destruct Hnth as [n Hnth].
   apply (wf_operand_list__wf_operand _ F b1 (insn_cmd c1)) in Hnth.
@@ -1923,6 +1969,7 @@ Proof.
   Case "wf_operand".
     unfold wf_operand_list.
     remove_irrelevant wf_operand.
+    remember (getInsnOperands (insn_cmd c1)). clear Heqi0. unfold ids in *.
     solve_forall_like_ind.
 Qed.
 
@@ -2378,7 +2425,7 @@ Proof.
     assert (J':=Hlkvb).
     apply lookupBlockViaIDFromFdef__blockInFdefB in Hlkvb.
     apply lookupBlockViaLabelFromFdef_inv in Hlkb1; auto.
-    eapply blockInFdefB_uniq in Hlkb1; eauto.
+    eapply blockInFdefB_uniq in Hlkvb; eauto.
     subst.
     apply lookupBlockViaIDFromFdef__InGetBlockIDs in J'.
     simpl in J'.
@@ -2809,7 +2856,7 @@ Proof.
           solve_in_list.
       inv EQ.
       apply lookupBlockViaLabelFromFdef_inv in J2; auto.
-      destruct J2; subst.
+      inv J2; subst.
       destruct Hdom2 as [Hdom2 | [sts2 [a2 [J4 [J5 J6]]]]].
       SCase "local".
         unfold init_scope in Hdom2.
@@ -3442,8 +3489,8 @@ Proof.
 Qed.
 
 (* Properties of CFGs. *)
-Lemma successors_codom__uniq: forall s m f 
-  (HwfF : wf_fdef s m f) l0, 
+Lemma successors_codom__uniq: forall s m f
+  (HwfF : wf_fdef s m f) l0,
   NoDup ((successors f) !!! l0).
 Proof.
   intros.
@@ -3454,9 +3501,32 @@ Proof.
   destruct HeqR as [ps0 [cs0 [tmn0 [HBinF Heq]]]]; subst.
   eapply wf_fdef__wf_tmn in HBinF; eauto.
   inv HBinF; simpl; auto.
+  {
     constructor; auto.
-      simpl. intro J.
-      destruct J as [J | J]; try solve [auto | congruence].
+    simpl. intro J.
+    destruct J as [J | J]; try solve [auto | congruence].
+  }
+  {
+    clear - H2 H3.
+    remember (list_prj2 const l
+                        (List.map
+                           (fun pat_ : const * l * stmts =>
+                              let (p, _) := pat_ in
+                              let (const_, l_) := p in (const_, l_))
+                           const_l_stmts_list)) as labels in *.
+    remember (List.map
+                (fun pat_ : const * l * stmts =>
+                   let (p, stmts_0) := pat_ in
+                   let (_, l_0) := p in (l_0, stmts_0))
+                const_l_stmts_list) as l_stmts in *.
+    destruct (in_dec eq_atom_dec l_5 labels).
+    apply NoDup_nodup.
+    econstructor; eauto; try apply NoDup_nodup.
+    clear - n.
+    intro.
+    apply n.
+    eapply nodup_In; eauto.
+  }
 Qed.
 
 Lemma predecessors_dom__uniq: forall s m f l0 pds

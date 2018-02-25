@@ -89,7 +89,7 @@ Definition range2list_1 (b e:nat) := _range2list (mkRange b e 1 one_gt_zero).
 Notation "'ret' x" := (@munit _ x) (at level 41).
 Notation "'Assert' x" := (@munit Prop x) (at level 41).
 Notation "x >>= f" := (@mbind _ _ f x) (at level 42, left associativity).
-Notation "e1 >> e2" := (e1 >>= (fun _ => e2)) (at level 42, left associativity).
+Local Notation "e1 >> e2" := (e1 >>= (fun _ => e2)) (at level 42, left associativity).
 Notation "'do' x <- a ; b" := ( a >>= (fun x => b) ) (at level 42, left associativity).
 Notation "'do' a ; b" := ( a >> b ) (at level 42, left associativity).
 Notation "'do' a 'enddo'" := ( a ) (at level 42, left associativity).

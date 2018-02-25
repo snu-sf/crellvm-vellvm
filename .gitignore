@@ -1,12 +1,38 @@
-**.vo
-**.v.d
-**.glob
+*.v.d
+*.vo
+*.vio
+*.glob
+*.aux
+
+# tag files
+tags
+TAGS
+GTAGS
+GRTAGS
+GPATH
+
+.dir-locals.el
+_CoqProject
+Makefile.coq
 
 /src/Vellvm/syntax_base.v
 /src/Vellvm/syntax_rules.v
 /src/Vellvm/typing_rules.v
 
-/lib/*
+/src/Extraction/*.ml
+/src/Extraction/*.mli
+!/src/Extraction/Floataux.ml
+!/src/Extraction/Memdataaux.ml
+!/src/Extraction/camlcoq.ml
+!/src/Extraction/coq2llvm.ml
+!/src/Extraction/coq_pretty_printer.ml
+!/src/Extraction/coqllvm.ml
+!/src/Extraction/globalstates.ml
+!/src/Extraction/llvm_aux.ml
+!/src/Extraction/llvm_pretty_printer.ml
+!/src/Extraction/llvmcaml.ml
+!/src/Extraction/llvm2coq.ml
 
-Makefile.coq
-
+/lib/cpdtlib
+/lib/metalib
+/lib/sflib

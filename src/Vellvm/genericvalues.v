@@ -15,6 +15,8 @@ Require Import ZArith.
 Require Import Floats.
 Require Import vellvm_tactics.
 Require Import util.
+Require Import Coqlib.
+Local Open Scope nat_scope.
 
 (* The file defines generic values that represent values at runtime. *)
 Module LLVMgv.
@@ -33,8 +35,7 @@ Definition GVMap := list (id*GenericValue).
 
 Definition mblock := Values.block.
 Definition mptr := GenericValue.
-Definition null : GenericValue :=
-  (Vptr Mem.nullptr (Int.repr 31 0), Mint 31)::nil.
+Definition null : GenericValue := (Vint 31 (Int.repr 31 0), Mint 31):: nil.
 
 (******************************************************************************)
 (* Predicate of generic values. *)
@@ -66,9 +67,10 @@ end.
 Fixpoint eq_gv (gv1 gv2:GenericValue) : bool :=
 match gv1, gv2 with
 | nil, nil => true
-| (v1,c1)::gv1', (v2,c2)::gv2' => Val.eq v1 v2 &&
-                                  memory_chunk_eq c1 c2 &&
-                                  eq_gv gv1' gv2'
+| (v1,c1)::gv1', (v2,c2)::gv2' => if Val.eq v1 v2
+                                  then memory_chunk_eq c1 c2 &&
+                                    eq_gv gv1' gv2'
+                                  else false
 | _, _ => false
 end.
 
@@ -238,15 +240,17 @@ match gv with
 | _ => Some Vundef
 end.
 
-Definition GV2int (TD:TargetData) (bsz:sz) (gv:GenericValue) : option Z :=
-match gv with
-| (Vint wz i,c)::nil =>
-  if eq_nat_dec (wz+1) (Size.to_nat bsz)
-  then Some (Int.signed wz i)
-  else None
-| _ => None
-end.
-
+Definition GV2int (TD: TargetData) (bsz: sz) (gv: GenericValue) :=
+  match gv with
+  | ((Values.Vint wz i, (AST.Mint sz))) :: nil =>
+    if Nat.eq_dec (wz + 1) (Size.to_nat bsz)
+    then if (Nat.eq_dec wz sz)
+         then Some (Int.signed wz i)
+         else None
+    else None
+  | _ => None
+  end
+.
 Definition GV2ptr (TD:TargetData) (bsz:sz) (gv:GenericValue) : option val :=
 match gv with
 | (Vptr a b,c)::nil => Some (Vptr a b)
@@ -406,10 +410,15 @@ match GV2val TD gv1 with
         then
           match fp1 with
           | fp_double => 
-               Some (val2GV TD (Val.singleoffloat (Vfloat f)) Mfloat32)
-          | _ => None (* FIXME: not supported 80 and 128 yet. *)
+               Some (val2GV TD (Vsingle (Float.to_single f)) Mfloat32)
+          | _ => gundef TD t2 (* FIXME: not supported 80 and 128 yet. *)
           end
-        else None
+        else gundef TD t2
+    | _ => gundef TD t2
+    end
+| Some (Vsingle f) =>
+    match (t1, t2) with
+    | (typ_floatpoint _, typ_floatpoint _) => gundef TD t2
     | _ => gundef TD t2
     end
 | _ => gundef TD t2
@@ -430,17 +439,32 @@ match (GV2val TD gv1, GV2val TD gv2) with
      | bop_mul =>
          Some (val2GV TD (Val.mul (Vint wz1 i1) (Vint wz2 i2)) (Mint (bsz'-1)))
      | bop_udiv =>
-         Some (val2GV TD (Val.divu (Vint wz1 i1) (Vint wz2 i2)) (Mint (bsz'-1)))
+         match Val.divu (Vint wz1 i1) (Vint wz2 i2) with
+         | Some vresult => Some (val2GV TD vresult (Mint (bsz'-1)))
+         | None => gundef TD (typ_int bsz')
+         end
      | bop_sdiv =>
-         Some (val2GV TD (Val.divs (Vint wz1 i1) (Vint wz2 i2)) (Mint (bsz'-1)))
+         match Val.divs (Vint wz1 i1) (Vint wz2 i2) with
+         | Some vresult => Some (val2GV TD vresult (Mint (bsz'-1)))
+         | None => gundef TD (typ_int bsz')
+         end
      | bop_urem =>
-         Some (val2GV TD (Val.modu (Vint wz1 i1) (Vint wz2 i2)) (Mint (bsz'-1)))
+         match Val.modu (Vint wz1 i1) (Vint wz2 i2) with
+         | Some vresult => Some (val2GV TD vresult (Mint (bsz'-1)))
+         | None => gundef TD (typ_int bsz')
+         end
      | bop_srem =>
-         Some (val2GV TD (Val.mods (Vint wz1 i1) (Vint wz2 i2)) (Mint (bsz'-1)))
+         match Val.mods (Vint wz1 i1) (Vint wz2 i2) with
+         | Some vresult => Some (val2GV TD vresult (Mint (bsz'-1)))
+         | None => gundef TD (typ_int bsz')
+         end
      | bop_shl =>
          Some (val2GV TD (Val.shl (Vint wz1 i1) (Vint wz2 i2)) (Mint (bsz'-1)))
      | bop_lshr =>
-         Some (val2GV TD (Val.shrx (Vint wz1 i1) (Vint wz2 i2)) (Mint (bsz'-1)))
+         match Val.shrx (Vint wz1 i1) (Vint wz2 i2) with
+         | Some vresult => Some (val2GV TD vresult (Mint (bsz'-1)))
+         | None => gundef TD (typ_int bsz')
+         end
      | bop_ashr =>
          Some (val2GV TD (Val.shr (Vint wz1 i1) (Vint wz2 i2)) (Mint (bsz'-1)))
      | bop_and =>
@@ -467,13 +491,28 @@ match (GV2val TD gv1, GV2val TD gv2) with
      | fbop_frem => Val.modf (Vfloat f1) (Vfloat f2)
      end in
   match fp with
-  | fp_float => Some (val2GV TD (Val.singleoffloat v) Mfloat32)
   | fp_double => Some (val2GV TD v Mfloat64)
-  | _ => None (* FIXME: not supported 80 and 128 yet. *)
+  | fp_float => gundef TD (typ_floatpoint fp)
+  | _ => gundef TD (typ_floatpoint fp)
+  end
+| (Some (Vsingle f1), Some (Vsingle f2)) =>
+  let v :=
+     match op with
+     | fbop_fadd => Val.addfs (Vsingle f1) (Vsingle f2)
+     | fbop_fsub => Val.subfs (Vsingle f1) (Vsingle f2)
+     | fbop_fmul => Val.mulfs (Vsingle f1) (Vsingle f2)
+     | fbop_fdiv => Val.divfs (Vsingle f1) (Vsingle f2)
+     | fbop_frem => Val.modfs (Vsingle f1) (Vsingle f2)
+     end in
+  match fp with
+  | fp_float => Some (val2GV TD v Mfloat32)
+  | fp_double => gundef TD (typ_floatpoint fp)
+  | _ => gundef TD (typ_floatpoint fp)
   end
 | _ => gundef TD (typ_floatpoint fp)
 end.
 
+(*
 Definition mptrtoint (TD:TargetData) (M:mem) (gv1:GenericValue) (sz2:nat)
  : option GenericValue :=
     match GV2val TD gv1 with
@@ -490,6 +529,7 @@ Definition mptrtoint (TD:TargetData) (M:mem) (gv1:GenericValue) (sz2:nat)
                (Mint (sz2-1)))
     | _ => gundef TD (typ_int sz2)
     end.
+*)
 
 Definition mbitcast (t1:typ) (gv1:GenericValue)(t2:typ) : option GenericValue :=
 match (t1, t2) with
@@ -498,6 +538,7 @@ match (t1, t2) with
 | _ => None
 end.
 
+(*
 Definition minttoptr (TD:TargetData) (M:mem) (gv1:GenericValue)
   : option GenericValue :=
   match GV2val TD gv1 with
@@ -509,6 +550,7 @@ Definition minttoptr (TD:TargetData) (M:mem) (gv1:GenericValue)
       end
   | _ => gundef TD (typ_pointer typ_void)
   end.
+*)
 
 (* Here is another idea to support inttoptr and ptrtoint. We should
    distinguish two kinds of ptr: at global spaces, and at heap or stack. The
@@ -562,7 +604,7 @@ match (t1, t2) with
                         (Mint (sz2-1)))
      | extop_s => Some (val2GV TD (Val.sign_ext' (sz2-1) (Vint wz1 i1))
                         (Mint (sz2-1)))
-     | _ => None
+     | _ => gundef TD t2
      end
    | _ => gundef TD t2
    end
@@ -575,14 +617,14 @@ match (t1, t2) with
       | extop_fp =>
          match fp2 with
          | fp_double => Some (val2GV TD (Vfloat f1) Mfloat64)
-         | _ => None (* FIXME: not supported 80 and 128 yet. *)
+         | _ => gundef TD t2 (* FIXME: not supported 80 and 128 yet. *)
          end
-      | _ => None
+      | _ => gundef TD t2
       end
     | _ => gundef TD t2
     end
-  else None
-| (_, _) => None
+  else gundef TD t2
+| (_, _) => gundef TD t2
 end.
 
 Definition micmp_int TD c gv1 gv2 : option GenericValue :=
@@ -594,13 +636,13 @@ Definition micmp_int TD c gv1 gv2 : option GenericValue :=
      | cond_ne =>
          Some (val2GV TD (Val.cmp Cne (Vint wz1 i1) (Vint wz2 i2)) (Mint 0))
      | cond_ugt =>
-         Some (val2GV TD (Val.cmpu Cgt (Vint wz1 i1) (Vint wz2 i2)) (Mint 0))
+         Some (val2GV TD (Val.cmpu_int Cgt (Vint wz1 i1) (Vint wz2 i2)) (Mint 0))
      | cond_uge =>
-         Some (val2GV TD (Val.cmpu Cge (Vint wz1 i1) (Vint wz2 i2)) (Mint 0))
+         Some (val2GV TD (Val.cmpu_int Cge (Vint wz1 i1) (Vint wz2 i2)) (Mint 0))
      | cond_ult =>
-         Some (val2GV TD (Val.cmpu Clt (Vint wz1 i1) (Vint wz2 i2)) (Mint 0))
+         Some (val2GV TD (Val.cmpu_int Clt (Vint wz1 i1) (Vint wz2 i2)) (Mint 0))
      | cond_ule =>
-         Some (val2GV TD (Val.cmpu Cle (Vint wz1 i1) (Vint wz2 i2)) (Mint 0))
+         Some (val2GV TD (Val.cmpu_int Cle (Vint wz1 i1) (Vint wz2 i2)) (Mint 0))
      | cond_sgt =>
          Some (val2GV TD (Val.cmp Cgt (Vint wz1 i1) (Vint wz2 i2)) (Mint 0))
      | cond_sge =>
@@ -613,22 +655,15 @@ Definition micmp_int TD c gv1 gv2 : option GenericValue :=
   | _ => gundef TD (typ_int 1%nat)
   end.
 
-Definition micmp_ptr (TD:TargetData) (M:mem) (c:cond) (gv1 gv2:GenericValue)
-  : option GenericValue :=
-  match (mptrtoint TD M gv1 Size.ThirtyTwo, mptrtoint TD M gv2 Size.ThirtyTwo)
-    with
-  | (Some gv1', Some gv2') => micmp_int TD c gv1' gv2'
-  | _ => None
-  end.
-
 Definition micmp (TD:TargetData) (c:cond) (t:typ) (gv1 gv2:GenericValue)
   : option GenericValue :=
 match t with
 | typ_int sz => micmp_int TD c gv1 gv2
 | typ_pointer _ => gundef TD (typ_int 1%nat)
-| _ => None
+| _ => gundef TD (typ_int 1%nat)
 end.
 
+(* TODO: issue. Single vs Float. *)
 Definition mfcmp (TD:TargetData) (c:fcond) (fp:floating_point)
   (gv1 gv2:GenericValue) : option GenericValue :=
 match (GV2val TD gv1, GV2val TD gv2) with
@@ -648,7 +683,7 @@ match (GV2val TD gv1, GV2val TD gv2) with
          Some (val2GV TD (Val.cmpf Cle (Vfloat f1) (Vfloat f2)) (Mint 0))
      | fcond_one =>
          Some (val2GV TD (Val.cmpf Cne (Vfloat f1) (Vfloat f2)) (Mint 0))
-     | fcond_ord => None (*FIXME: not supported yet. *)
+     | fcond_ord => gundef TD (typ_int 1%nat) (*FIXME: not supported yet. *)
      | fcond_ueq =>
          Some (val2GV TD (Val.cmpf Ceq (Vfloat f1) (Vfloat f2)) (Mint 0))
      | fcond_ugt =>
@@ -661,16 +696,37 @@ match (GV2val TD gv1, GV2val TD gv2) with
          Some (val2GV TD (Val.cmpf Cle (Vfloat f1) (Vfloat f2)) (Mint 0))
      | fcond_une =>
          Some (val2GV TD (Val.cmpf Cne (Vfloat f1) (Vfloat f2)) (Mint 0))
-     | fcond_uno => None (*FIXME: not supported yet. *)
+     | fcond_uno => gundef TD (typ_int 1%nat) (*FIXME: not supported yet. *)
      | fcond_true => Some (val2GV TD Vtrue (Mint 0))
      end in
    match fp with
    | fp_float => ov
    | fp_double => ov
-   | _ => None (*FIXME: not supported 80 and 128 yet. *)
+   | _ => gundef TD (typ_int 1%nat) (*FIXME: not supported 80 and 128 yet. *)
    end
 | _ => gundef TD (typ_int 1%nat)
 end.
+
+(* chunks_match_or_undef *)
+(* why not fit_gv? (-- harsher than needed, opsem_wf harder ++ already defined function) *)
+(* Actually, for --, see "wf_GVs" and "getOperandValue__wf_gvs", fit_gv is ok too. *)
+(* I just follow convention (like insertGenericValue-mset's case) here. *)
+(* fit_gv haven't used in defining mbop, blah. *)
+Definition fit_chunk_gv (TD: TargetData) (ty: typ) (gv: GenericValue): option GenericValue :=
+  if (gv_chunks_match_typb TD gv ty)
+  then Some gv
+  else gundef TD ty
+.
+
+Definition mselect (TD: TargetData) (ty: typ) (gv0 gv1 gv2: GenericValue): option GenericValue :=
+  match (GV2int TD Size.One gv0) with
+  | Some z =>
+    if (negb (Coqlib.zeq z 0))
+    then fit_chunk_gv TD ty gv1
+    else fit_chunk_gv TD ty gv2
+  | None => gundef TD ty
+  end
+.
 
 (* Convert constants to generic values *)
 Fixpoint repeatGV (gv:GenericValue) (n:nat) : GenericValue :=
@@ -705,7 +761,7 @@ match t with
   Some (val2GV TD (Vint wz (Int.repr wz 0)) (Mint wz))
 | typ_floatpoint fp =>
   match fp with
-  | fp_float => Some (val2GV TD (Vfloat Float.zero) Mfloat32)
+  | fp_float => Some (val2GV TD (Vsingle Float32.zero) Mfloat32)
   | fp_double => Some (val2GV TD (Vfloat Float.zero) Mfloat64)
   | _ => None (* FIXME: not supported 80 and 128 yet. *)
   end
@@ -818,7 +874,7 @@ match c with
                typ_int sz)
 | const_floatpoint fp f =>
          match fp with
-         | fp_float => Some (val2GV TD (Val.singleoffloat (Vfloat f)) Mfloat32, 
+         | fp_float => Some (val2GV TD (Vsingle (Float.to_single f)) Mfloat32, 
                              typ_floatpoint fp)
          | fp_double => Some (val2GV TD (Vfloat f) Mfloat64, typ_floatpoint fp)
          | _ => None (* FIXME: not supported 80 and 128 yet. *)
@@ -829,8 +885,7 @@ match c with
          | None => None
          end
 | const_null t =>
-         Some (val2GV TD (Vptr Mem.nullptr (Int.repr 31 0)) (Mint 31),
-               typ_pointer t)
+         Some (null, typ_pointer t)
 | const_arr t lc =>
          match _list_const_arr2GV_ _const2GV TD gl t lc with
          | Some gv =>
@@ -992,17 +1047,13 @@ Definition _list_const_arr2GV :=
 Definition cundef_gv gv t : GenericValue :=
 match t with
 | typ_int sz => (Vint (sz-1) (Int.zero (sz-1)), Mint (sz -1))::nil
-| typ_floatpoint fp_float => (Vfloat Float.zero, Mfloat32)::nil
+| typ_floatpoint fp_float => (Vsingle Float32.zero, Mfloat32)::nil
 | typ_floatpoint fp_double => (Vfloat Float.zero, Mfloat64)::nil
 | typ_pointer _ => null
 | _ => gv
 end.
 
-Definition cgv2gv (gv:GenericValue) (t:typ) : GenericValue :=
-match gv with
-| (Vundef, _)::nil => cundef_gv gv t
-| _ => gv
-end.
+Definition cgv2gv (gv:GenericValue) (t:typ) : GenericValue := gv.
 
 Notation "? gv # t ?" := (cgv2gv gv t) (at level 41).
 
@@ -1182,6 +1233,13 @@ match (getOperandValue TD v1 lc gl, getOperandValue TD v2 lc gl) with
 | _ => None
 end.
 
+Definition SELECT (TD:TargetData) (lc gl:GVMap) (v0 v1 v2:value) (t: typ): option GenericValue :=
+  match (getOperandValue TD v0 lc gl, getOperandValue TD v1 lc gl, getOperandValue TD v2 lc gl) with
+  | (Some gv0, Some gv1, Some gv2) => mselect TD t gv0 gv1 gv2
+  | _ => gundef TD t
+  end
+.
+
 (* t' is from getGEPtyp that always returns Some t'* or None *)
 Definition GEP (TD:TargetData) (t:typ) (ma:GenericValue)
   (vidxs:list GenericValue) (inbounds:bool) (t':typ) : option GenericValue :=
@@ -1200,19 +1258,26 @@ end.
 
 Definition malloc (TD:TargetData) (M:mem) (bsz:sz) (gn:GenericValue) (al:align)
   : option (mem * mblock)%type :=
-match GV2int TD Size.ThirtyTwo gn with
-| Some n =>
-    if (Coqlib.zlt 0 ((Size.to_Z bsz) * n)) then
-      Some (Mem.alloc M 0 ((Size.to_Z bsz) * n))
-    else None
-| None => None
-end.
+  Some (Mem.alloc M 0
+          match GV2int TD Size.ThirtyTwo gn with
+            | Some n => (Size.to_Z bsz) * n
+            | None => 0
+          end).
+
+Definition alloca (TD:TargetData) (M:mem) (bsz:sz) (gn:GenericValue) (al:align)
+  : option (mem * mblock)%type :=
+  match GV2int TD Size.ThirtyTwo gn with
+  | Some n =>
+    let hi := (Size.to_Z bsz * n)%Z in
+    let (M', nb) := (Mem.alloc M 0 hi) in
+    option_map ((flip pair) nb) (Mem.drop_perm M' nb 0 hi Writable)
+  | None => None
+  end
+.
 
 Definition malloc_one (TD:TargetData) (M:mem) (bsz:sz) (al:align)
   : option (mem * mblock)%type :=
-if (Coqlib.zlt 0 (Size.to_Z bsz)) then
-  Some (Mem.alloc M 0 (Size.to_Z bsz))
-else None.
+  Some (Mem.alloc M 0 (Size.to_Z bsz)).
 
 Definition free (TD:TargetData) (M:mem) (ptr:mptr) : option mem :=
 match GV2ptr TD (getPointerSize TD) ptr with
@@ -1231,10 +1296,8 @@ Fixpoint free_allocas (TD:TargetData) (Mem:mem) (allocas:list mblock)
 match allocas with
 | nil => Some Mem
 | alloca::allocas' =>
-  match (free TD Mem (blk2GV TD alloca)) with
-  | Some Mem' => free_allocas TD Mem' allocas'
-  | None => None
-  end
+  let (lo, hi) := Mem.bounds Mem alloca in
+  free_allocas TD (Mem.unchecked_free Mem alloca lo hi) allocas'
 end.
 
 Fixpoint mload_aux M (mc:list memory_chunk) b ofs : option GenericValue :=
@@ -1258,22 +1321,76 @@ match GV2ptr TD (getPointerSize TD) ptr with
 | _ => None
 end.
 
-Fixpoint mstore_aux M (gv:GenericValue) b ofs : option mem :=
-match gv with
-| nil => Some M
-| (v,c)::gv' =>
-    match (Mem.store c M b ofs v) with
-    | Some M' => mstore_aux M' gv' b (ofs+size_chunk c)%Z
-    | _ => None
-    end
-end.
+Definition has_chunk_eq (v : val) (chk : AST.memory_chunk) : bool :=
+  match v, chk with
+    | Vundef, _ => true
+    | Vint wz i0, AST.Mint wz' =>
+      beq_nat wz wz'
+    | Vsingle f, AST.Mfloat32 =>
+      true
+    | Vfloat f, AST.Mfloat64 =>
+      true
+    | Vptr _ _, AST.Mint wz =>
+      beq_nat wz 31%nat
+    | Vinttoptr _, AST.Mint wz =>
+      beq_nat wz 31%nat
+    | _, _ =>
+      false
+  end.
+
+Lemma has_chunk_eq_prop v chk (H: has_chunk_eq v chk) :
+  Val.has_chunk v chk.
+Proof.
+  destruct v, chk; simpl in *; auto;
+    repeat
+      match goal with
+        | [H: is_true false |- _] =>
+          unfold is_true in H; inversion H
+        | [H: is_true (beq_nat ?a ?b) |- _] =>
+          apply beq_nat_true in H; subst
+        | [H: context[Floats.Float.eq_dec ?a ?b] |- _] =>
+          destruct (Floats.Float.eq_dec a b); try inversion H
+      end;
+    auto.
+  split; [auto|].
+  apply Int.unsigned_range.
+Qed.
+
+Lemma memory_chunk_eq_prop a b
+  (H: AST.memory_chunk_eq a b) : a = b.
+Proof.
+  destruct a, b; unfold AST.memory_chunk_eq in H; simpl in *; auto;
+    try match goal with
+          | [H: is_true false |- _] =>
+            unfold is_true in H; inversion H
+        end.
+  apply beq_nat_true in H; subst; auto.
+Qed.
+
+Fixpoint mstore_aux M (mc:list memory_chunk) (gv:GenericValue) b ofs : option mem :=
+  match mc, gv with
+    | nil, nil => Some M
+    | c'::mc', (v,c)::gv' =>
+      if memory_chunk_eq c' c && has_chunk_eq v c
+      then
+        match (Mem.store c M b ofs v) with
+          | Some M' => mstore_aux M' mc' gv' b (ofs+size_chunk c)%Z
+          | _ => None
+        end
+      else None
+    | _, _ => None
+  end.
 
 Definition mstore (TD:TargetData) (M:mem) (ptr:mptr) (t:typ) (gv:GenericValue)
-  (a:align) : option mem :=
-match GV2ptr TD (getPointerSize TD) ptr with
-| Some (Vptr b ofs) => mstore_aux M gv b (Int.signed 31 ofs)
-| _ => None
-end.
+           (a:align) : option mem :=
+  match GV2ptr TD (getPointerSize TD) ptr with
+    | Some (Vptr b ofs) =>
+      match flatten_typ TD t with
+        | Some mc => mstore_aux M mc gv b (Int.signed 31 ofs)
+        | None => None
+      end
+    | _ => None
+  end.
 
 Definition gep (TD:TargetData) (ty:typ) (vidxs:list GenericValue) (inbounds:bool)
   (ty':typ) (ma:GenericValue) : option GenericValue :=
@@ -1661,14 +1778,15 @@ Proof.
   destruct v;
     try solve [inversion H | eapply mcmp_matches_chunks_helper; eauto].
   destruct TD.
-  Local Opaque Val.cmp Val.cmpu.
+  Local Opaque Val.cmp Val.cmpu Val.cmpu_int.
   destruct cond5; inv H; unfold gv_chunks_match_typ, vm_matches_typ, val2GV;
     simpl; constructor; try solve [
       auto |
       split; try solve [auto | apply Val.cmp_has_Mint0 | 
-                        apply Val.cmpu_has_Mint0]
+                        apply Val.cmpu_has_Mint0 |
+                        apply Val.cmpu_int_has_Mint0]
     ].
-  Transparent Val.cmp Val.cmpu.
+  Transparent Val.cmp Val.cmpu Val.cmpu_int.
 Qed.
 
 Lemma mfcmp_matches_chunks : forall TD fcond5 fp gv1 gv2 gv,
@@ -1702,7 +1820,7 @@ Proof.
         simpl; split; try solve [auto | apply Val.cmpf_has_Mint0 |
                                  simpl; split; try solve [
                                    auto |
-                                   apply Z_mod_lt; apply Int.modulus_pos
+                                   unfold Int.modulus, two_power_nat, shift_nat; simpl; omega
                                 ]
                       ]
         ]
@@ -1937,18 +2055,9 @@ Proof.
 
     apply H with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in H0;
     destruct H0;
-    rewrite H1; auto |
-
-    apply H with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in H0;
-    destruct H0;
-    rewrite H0; auto |
+    unfold _list_const_arr2GV in H0; rewrite H0; auto |
 
     rewrite H; auto |
-
-    assert (J:=H1);
-    apply H0 with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in H1;
-    destruct H1;
-    rewrite H2; rewrite H1; erewrite H; eauto |
 
     assert (J:=H1);
     apply H with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in H1;
@@ -1956,7 +2065,8 @@ Proof.
     assert (J':=J);
     apply H0 with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in J;
     rewrite J; auto
-  ]; fold _list_const_struct2GV.
+  ];
+  fold _list_const_struct2GV.
 
   apply H with (TD:=TD)(gl1:=gl1)(gl2:=gl2) in H0.
   rewrite (proj2 H0). auto.
@@ -2117,7 +2227,7 @@ Qed.
 
 Lemma intValues2Nats_eqAL : forall l0 lc1 gl lc2 TD,
   eqAL _ lc1 lc2 ->
-  intValues2Nats TD  l0 lc1 gl = intValues2Nats TD l0 lc2 gl.
+  intValues2Nats TD l0 lc1 gl = intValues2Nats TD l0 lc2 gl.
 Proof.
   induction l0; intros lc1 gl lc2 TD HeqAL; simpl; auto.
     destruct a.
@@ -2192,39 +2302,52 @@ Qed.
 
 Lemma malloc_inv : forall TD Mem0 tsz gn align0 Mem' mb,
   malloc TD Mem0 tsz gn align0 = ret (Mem', mb) ->
-  exists n, GV2int TD Size.ThirtyTwo gn = Some n /\
-    (0 < (Size.to_Z tsz) * n)%Z /\
-    Mem.alloc Mem0 0 (Size.to_Z tsz * n) = (Mem', mb).
+  Mem.alloc Mem0 0
+        match GV2int TD Size.ThirtyTwo gn with
+          | Some n => (Size.to_Z tsz) * n
+          | None => 0
+        end = (Mem', mb).
 Proof.
-  intros.
-  unfold malloc in H.
-  destruct (GV2int TD Size.ThirtyTwo gn); try solve [inversion H; subst].
-  destruct (Coqlib.zlt 0 (Size.to_Z tsz * z)); inversion H; subst.
-  exists z.
-  destruct (Mem.alloc Mem0 0 (Size.to_Z tsz * z)).
-  repeat (split; auto).
+  intros. inv H. auto.
+Qed.
+
+Lemma alloca_inv : forall TD Mem0 tsz gn align0 Mem' mb,
+  alloca TD Mem0 tsz gn align0 = ret (Mem', mb) ->
+  exists z, (GV2int TD Size.ThirtyTwo gn) = Some z /\
+            let hi := (Size.to_Z tsz * z)%Z in
+            let (M', nb) := Mem.alloc Mem0 0 hi in
+            option_map (flip pair nb) (Mem.drop_perm M' nb 0 hi Writable) = ret (Mem', mb)
+.
+Proof.
+  intros. unfold alloca in *.
+  destruct (GV2int TD Size.ThirtyTwo gn) eqn:T; simpl in *; subst; eauto.
+  inv H.
 Qed.
 
 Lemma store_inv : forall TD Mem0 gvp t gv align Mem',
   mstore TD Mem0 gvp t gv align = Some Mem' ->
-  exists b, exists ofs,
+  exists b, exists ofs, exists mc,
     GV2ptr TD (getPointerSize TD) gvp = Some (Vptr b ofs) /\
-    mstore_aux Mem0 gv b (Int.signed 31 ofs) = Some Mem'.
+    flatten_typ TD t = Some mc /\
+    mstore_aux Mem0 mc gv b (Int.signed 31 ofs) = Some Mem'.
 Proof.
   intros TD Mem0 gvp t gv align Mem' H.
   unfold mstore in H.
   destruct (GV2ptr TD (getPointerSize TD) gvp); try solve [inversion H; subst].
   destruct v; try solve [inversion H; subst].
-  exists b. exists i0. split; auto.
+  exists b. exists i0.
+  destruct (flatten_typ TD t); inv H.
+  exists l0. split; auto.
 Qed.
 
-Lemma mstore_inversion : forall Mem2 t align0 TD gvp2 Mem2'
-  (gv2 : GenericValue)
-  (H21 : mstore TD Mem2 gvp2 t gv2 align0 = ret Mem2'),
-  exists b, exists ofs, exists cm,
+ Lemma mstore_inversion : forall Mem2 t align0 TD gvp2 Mem2'
+   (gv2 : GenericValue)
+   (H21 : mstore TD Mem2 gvp2 t gv2 align0 = ret Mem2'),
+  exists b, exists ofs, exists cm, exists mc,
     gvp2 = (Vptr b ofs,cm)::nil /\
-    mstore_aux Mem2 gv2 b (Int.signed 31 ofs) = ret Mem2'.
-Proof.
+    flatten_typ TD t = Some mc /\
+    mstore_aux Mem2 mc gv2 b (Int.signed 31 ofs) = ret Mem2'.
+ Proof.
   intros.
   unfold mstore in H21.
   remember (GV2ptr TD (getPointerSize TD) gvp2) as R.
@@ -2235,7 +2358,9 @@ Proof.
   destruct p.
   destruct v; try solve [inversion HeqR].
   destruct gvp2; inv HeqR.
-  exists b0. exists i1. exists m. eauto.
+  exists b0. exists i1. exists m.
+  destruct (flatten_typ TD t); inv H21.
+  exists l0. eauto.
 Qed.
 
 (* Properties of sizeMC *)
@@ -2487,4 +2612,3 @@ Proof.
 Qed.
 
 End LLVMgv.
-

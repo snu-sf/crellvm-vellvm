@@ -15,15 +15,22 @@ way to parse LLVM bitcode into a Vellvm AST.
 
 ## Dependencies
 
-- camlp4 (For equations plugin -- no longer included with OCaml as of 4.02)
-- Coq 8.4pl4, configured with `-usecamlp4` option
-- [ott 0.24](http://www.cl.cam.ac.uk/~pes20/ott/)
+- [OPAM](https://opam.ocaml.org/)
 
-## Building
+## Build
 
-1. In the top-level directory of the repo, run `scripts/fetch-libs.sh` to
-download all third-party sources into lib/src, extract, and apply patches.
-2. Run `make libs` to compile the Equations plugin and the metatheory
-library. If you get an error about grammar.cma, make sure your version of coq
-was compiled with the same version of OCaml in your path.
-3. Run `make` to compile the Vellvm theories.
+```
+opam switch 4.02.3
+opam install ott coq.8.5.0~camlp4
+
+make init
+make
+```
+
+## Interactive Theorem Proving
+
+It is recommended to use the following tools:
+
+- [Emacs](https://www.gnu.org/software/emacs/),
+- [ProofGeneral](http://proofgeneral.inf.ed.ac.uk/) and [Company-Coq](https://github.com/cpitclaudel/company-coq).  Here is a [installation manual](https://github.com/cpitclaudel/company-coq).
+- See `.dir-locals.el` for `coq-load-path` variable.

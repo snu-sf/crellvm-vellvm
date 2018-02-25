@@ -1,5 +1,6 @@
 Require Import Coqlib.
 Require Import Maps.
+Require Import maps_ext.
 Require Import syntax.
 Require Import infrastructure_props.
 Require Import Metatheory.
@@ -213,7 +214,7 @@ Proof.
       rewrite rev_unit.
       simpl. 
       case_eq (rev dts' ++ ch0 :: nil); auto.
-        intro J. contradict J. auto with datatypes v62.
+        intro J. contradict J. auto with datatypes.
     SCase "2.3".
       simpl. simpl_env.
       apply is_chain_edge_tail; simpl; auto.

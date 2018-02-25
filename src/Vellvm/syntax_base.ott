@@ -305,6 +305,8 @@ clattrs :: 'clattrs_'                                   ::=                     
   | tailc callconv attributes1 attributes2              ::   :: intro
 
 cmd {{ tex c }} :: 'insn_'				::=			{{ com commands }}
+%% Nop
+  | id = nop  ::   :: nop  {{ com nop }}
 %% Binary Operations and Bitwise Binary Operations
   | id = bop ( int sz ) value1 value2			::   :: bop		{{ com bop }}
   | id = fbop floating_point value1 value2		::   :: fbop		{{ com fbop }}
@@ -347,7 +349,7 @@ terminator {{ tex tmn }} :: 'insn_'			::=  			{{ com termniators }}
       {{ tex \ottkw{br}\, [[value]]\, [[l1]]\, [[l2]] }}
   | id = br l        	    	  			::   :: br_uncond       {{ com unconditional br }}
       {{ tex \ottkw{br}\, [[l]] }}
-  %| id = switch typ value , l </ [ constj , lj ] // j />	::   :: switch		{{ com switch }}
+  | id = switch typ value l </ [ constj , lj ] // j />	::   :: switch		{{ com switch }}
   %| indirectbr
   %| id = invoke typ0 id0 list_param to l1 unwind l2 	::   :: invoke		{{ com invoke }}
   %| unwind
@@ -394,7 +396,7 @@ block {{ tex b }} :: 'block_' 				::=  	                {{ com blocks }}
   | l stmts				                ::   :: intro           {{ coq ([[l]], [[stmts]]) }}
   | ( block )						:: S :: paren           {{ coq [[ block ]] }}
 
-opt_stmts :: 'opt_stmts_' 				::=			{{ com option stmt }}
+opt_stmts {{ tex \mathit{opt_{stmts} } }} :: 'opt_stmts_' 				::=			{{ com option stmts }} {{ coq option stmts }}
   |  none 						:: M :: none		{{ com none }} {{ coq None }}
   |  stmts						:: M :: some  		{{ com some }} {{ coq (Some [[stmts]]) }}
 
@@ -430,6 +432,8 @@ linkage :: 'linkage_'					::=  			{{ com linkage }}
   | External_weak					::   :: external_weak
   | Ghost						::   :: ghost
   | Common						::   :: common
+  | Link_once_odr_auto_hide :: :: link_once_odr_auto_hide
+  | Linker_private_weak  :: :: linker_private_weak
 
 fnattrs ::  'fnattrs_'                                  ::=                     {{ com function attributtes }}
   | linkage visibility callconv attributes1 attributes2 ::   :: intro

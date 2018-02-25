@@ -21,6 +21,7 @@ Require Import targetdata.
 Require Import Floats.
 Require Import AST.
 Require Import Maps.
+Require Import maps_ext.
 Require Import opsem.
 Require Import opsem_props.
 Require Import opsem_wf.
@@ -90,13 +91,13 @@ end.
 Fixpoint instantiate_ECs (ecs1 : @ECStack DGVs) (ecs2 : @ECStack NDGVs) : Prop :=
 match ecs1, ecs2 with
 | nil, nil => True
-| ec1::ecs1', ec2::ecs2' => instantiate_EC ec1 ec2 /\ instantiate_ECs ecs1' ecs2'
+| ec1'::ecs1', ec2'::ecs2' => instantiate_EC ec1' ec2' /\ instantiate_ECs ecs1' ecs2'
 | _, _ => False
 end.
 
 Definition instantiate_State (st1 : @State DGVs) (st2 : @State NDGVs) : Prop :=
 match st1, st2 with
-| mkState ecs1 M1, mkState ecs2 M2 => instantiate_ECs ecs1 ecs2 /\ M1 = M2
+| mkState ec1 ecs1 M1, mkState ec2 ecs2 M2 => instantiate_ECs ecs1 ecs2 /\ instantiate_EC ec1 ec2 /\ M1 = M2
 end.
 
 (* Properties of singleton sets. *)
@@ -580,18 +581,18 @@ Qed.
 
 Ltac simpl_nd_llvmds :=
   match goal with
-  | [Hsim : instantiate_State {| ECS := _::_::_ |} ?st2 |- _ ] =>
-     destruct st2 as [ECs' M'];
-     destruct Hsim as [Hsim eq6]; subst;
-     destruct ECs' as [|[f1' b1' cs1' tmn1' lc1' als1'] ECs'];
+  | [Hsim : instantiate_State {| EC := _; ECS := _::_; Mem := _|} ?st2 |- _ ] =>
+     destruct st2 as [EC0 ECs' M'];
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst;
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
        try solve [inversion Hsim];
-     simpl in Hsim; destruct Hsim as [Hsim1 Hsim2];
+     simpl in HsimEC;
      destruct ECs' as [|[f2' b2' cs2' tmn2' lc2' als2'] ECs'];
        try solve [inversion Hsim2];
-     destruct Hsim2 as [Hsim2 Hsim3];
-     destruct Hsim1 as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst;
-     destruct Hsim2 as [J1 [J2 [J3 [J4 [Hsim2 J6]]]]]; subst
-  | [Hsim : instantiate_State {| ECS := _::_|} ?st2 |- _ ] =>
+     simpl in HsimECs; destruct HsimECs as [Htmp Htmp2];
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst;
+     destruct Htmp as [J1 [J2 [J3 [J4 [Hsim2 J6]]]]]; subst
+  | [Hsim : instantiate_State {| ECS := _|} ?st2 |- _ ] =>
      destruct st2 as [ECs' M'];
      destruct Hsim as [Hsim eq6]; subst;
      destruct ECs' as [|[f1' b1' cs1' tmn1' lc1' als1'] ECs'];
@@ -608,111 +609,233 @@ Lemma instantiate_dsInsn : forall cfg st1 st2 st1' tr,
 Proof.
   intros cfg st1 st2 st1' tr Hsim Hop.
   (sInsn_cases (induction Hop) Case).
-Case "sReturn". simpl_nd_llvmds.
+Case "sReturn".
+       destruct st2 as [EC0 ECs' M'].
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst.
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
+       try solve [inversion Hsim].
+     simpl in HsimEC.
+      destruct ECs' as [|[f2' b2' cs2' tmn2' lc2' als2'] ECs'];
+       try solve [inversion HsimECs].
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst.
+     simpl in HsimECs.
+     destruct HsimECs as [Htmp Htmp2].
+     destruct Htmp as [J1 [J2 [J3 [J4 [Htmp3 J6]]]]]; subst.
   eapply instantiate_locals__returnUpdateLocals in H1; eauto.
   destruct H1 as [lc2'' [H1 H2]].
-  exists (mkState ((mkEC f2' b2' cs' tmn2' lc2'' als2')::ECs') Mem').
+  exists (mkState (mkEC f2' b2' cs' tmn2' lc2'' als2') ECs' Mem').
+  split; eauto.
+   repeat (split; auto).
+Case "sReturnVoid".
+       destruct st2 as [EC0 ECs' M'].
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst.
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
+       try solve [inversion Hsim].
+     simpl in HsimEC.
+      destruct ECs' as [|[f2' b2' cs2' tmn2' lc2' als2'] ECs'];
+       try solve [inversion HsimECs].
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst.
+     simpl in HsimECs.
+     destruct HsimECs as [Htmp Htmp2].
+     destruct Htmp as [J1 [J2 [J3 [J4 [Htmp3 J6]]]]]; subst.
+
+  exists (mkState (mkEC f2' b2' cs' tmn2' lc2' als2') ECs' Mem').
   split; eauto.
     repeat (split; auto).
-Case "sReturnVoid". simpl_nd_llvmds.
-  exists (mkState ((mkEC f2' b2' cs' tmn2' lc2' als2')::ECs') Mem').
-  split; eauto.
-    repeat (split; auto).
-Case "sBranch". simpl_nd_llvmds.
+Case "sBranch".
+     destruct st2 as [EC0 ECs' M'].
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst.
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
+       try solve [inversion Hsim].
+     simpl in HsimEC.
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst.
+     simpl in HsimECs.
+
   eapply instantiate_locals__switchToNewBasicBlock in H2; eauto.
   eapply instantiate_locals__getOperandValue in H; eauto.
   destruct H as [gvs2 [J1 J2]].
   destruct H2 as [lc2' [J3 J4]].
-  exists (mkState ((mkEC f1' (if isGVZero TD c then l2 else l1,
+  exists (mkState
+            (mkEC f1' (if isGVZero TD c then l2 else l1,
                               stmts_intro ps' cs' tmn') cs' tmn' lc2' als1')
-      ::ECs') M').
+      ECs' M').
   split; eauto using element_of__incl.
     repeat (split; auto).
-Case "sBranch_uncond". simpl_nd_llvmds.
+Case "sBranch_uncond".
+     destruct st2 as [EC0 ECs' M'].
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst.
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
+       try solve [inversion Hsim].
+     simpl in HsimEC.
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst.
+     simpl in HsimECs.
+
+
   eapply instantiate_locals__switchToNewBasicBlock in H0; eauto.
   destruct H0 as [lc2' [J1 J2]].
-  exists (mkState ((mkEC f1' (l0, stmts_intro ps' cs' tmn') cs' tmn' lc2' als1')
-      ::ECs') M').
+  exists (mkState (mkEC f1' (l0, stmts_intro ps' cs' tmn') cs' tmn' lc2' als1')
+      ECs' M').
   split; eauto.
     repeat (split; auto).
-Case "sBop". simpl_nd_llvmds.
+Case "sBop".
+     destruct st2 as [EC0 ECs' M'].
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst.
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
+       try solve [inversion Hsim].
+     simpl in HsimEC.
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst.
+     simpl in HsimECs.
+
   eapply instantiate_locals__BOP in H; eauto.
   destruct H as [gvs3' [J1 J2]].
-  exists (mkState ((mkEC f1' b1' cs tmn1' (updateAddAL _ lc1' id0 gvs3') als1')
-      ::ECs') M').
+  exists (mkState (mkEC f1' b1' cs tmn1' (updateAddAL _ lc1' id0 gvs3') als1')
+      ECs' M').
   split; eauto.
     repeat (split; auto using instantiate_locals__updateAddAL).
-Case "sFBop". simpl_nd_llvmds.
+Case "sFBop".
+     destruct st2 as [EC0 ECs' M'].
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst.
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
+       try solve [inversion Hsim].
+     simpl in HsimEC.
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst.
+     simpl in HsimECs.
+
   eapply instantiate_locals__FBOP in H; eauto.
   destruct H as [gvs3' [J1 J2]].
-  exists (mkState ((mkEC f1' b1' cs tmn1' (updateAddAL _ lc1' id0 gvs3') als1')
-      ::ECs') M').
+  exists (mkState (mkEC f1' b1' cs tmn1' (updateAddAL _ lc1' id0 gvs3') als1')
+      ECs' M').
   split; eauto.
     repeat (split; auto using instantiate_locals__updateAddAL).
-Case "sExtractValue". simpl_nd_llvmds.
+Case "sExtractValue".
+     destruct st2 as [EC0 ECs' M'].
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst.
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
+       try solve [inversion Hsim].
+     simpl in HsimEC.
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst.
+     simpl in HsimECs.
+
   eapply instantiate_locals__getOperandValue in H; eauto.
   destruct H as [gvs2 [J1 J2]].
   eapply instantiate_locals__extractGenericValue in H0; eauto.
   destruct H0 as [gvs2' [J3 J4]].
-  exists (mkState ((mkEC f1' b1' cs tmn1' (updateAddAL _ lc1' id0 gvs2') als1')
-      ::ECs') M').
+  exists (mkState (mkEC f1' b1' cs tmn1' (updateAddAL _ lc1' id0 gvs2') als1')
+      ECs' M').
   split; eauto.
     repeat (split; auto using instantiate_locals__updateAddAL).
-Case "sInsertValue". simpl_nd_llvmds.
+Case "sInsertValue".
+(*simpl_nd_llvmds.*)
+     destruct st2 as [EC0 ECs' M'].
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst.
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
+       try solve [inversion Hsim].
+     simpl in HsimEC.
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst.
+     simpl in HsimECs.
+
   eapply instantiate_locals__getOperandValue in H; eauto.
   destruct H as [gvs2 [J1 J2]].
   eapply instantiate_locals__getOperandValue in H0; eauto.
   destruct H0 as [gvs2' [J1' J2']].
   eapply instantiate_locals__insertGenericValue in H1; eauto.
   destruct H1 as [gvs2'' [J3 J4]].
-  exists (mkState((mkEC f1' b1' cs tmn1' (updateAddAL _ lc1' id0 gvs2'') als1')
-      ::ECs') M').
+  exists (mkState(mkEC f1' b1' cs tmn1' (updateAddAL _ lc1' id0 gvs2'') als1')
+      ECs' M').
   split; eauto.
     repeat (split; auto using instantiate_locals__updateAddAL).
-Case "sMalloc". simpl_nd_llvmds.
+Case "sMalloc".
+     destruct st2 as [EC0 ECs' M'].
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst.
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
+       try solve [inversion Hsim].
+     simpl in HsimEC.
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst.
+     simpl in HsimECs.
+
   eapply instantiate_locals__getOperandValue in H0; eauto.
   destruct H0 as [gns2 [J1 J2]].
   exists (mkState
-    ((mkEC f1' b1' cs tmn1'
+    (mkEC f1' b1' cs tmn1'
       (updateAddAL _ lc1' id0 (NDGVs.(gv2gvs) (blk2GV TD mb) (typ_pointer t)))
-    als1')::ECs') Mem').
+    als1') ECs' Mem').
   split; eauto using element_of__incl.
     repeat (split; auto using instantiate_locals__updateAddAL,
                               element_of__gv2gvs).
-Case "sFree". simpl_nd_llvmds.
+Case "sFree".
+     destruct st2 as [EC0 ECs' M'].
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst.
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
+       try solve [inversion Hsim].
+     simpl in HsimEC.
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst.
+     simpl in HsimECs.
+
   eapply instantiate_locals__getOperandValue in H; eauto.
   destruct H as [gvs [J1 J2]].
-  exists (mkState ((mkEC f1' b1' cs tmn1' lc1' als1')::ECs') Mem').
+  exists (mkState (mkEC f1' b1' cs tmn1' lc1' als1') ECs' Mem').
   split; eauto using element_of__incl.
     repeat (split; auto).
-Case "sAlloca". simpl_nd_llvmds.
+Case "sAlloca".
+     destruct st2 as [EC0 ECs' M'].
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst.
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
+       try solve [inversion Hsim].
+     simpl in HsimEC.
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst.
+     simpl in HsimECs.
+
   eapply instantiate_locals__getOperandValue in H0; eauto.
   destruct H0 as [gns2 [J1 J2]].
   exists (mkState
-    ((mkEC f1' b1' cs tmn1'
+    (mkEC f1' b1' cs tmn1'
       (updateAddAL _ lc1' id0 (NDGVs.(gv2gvs)  (blk2GV TD mb) (typ_pointer t)))
-    (mb::als1'))::ECs') Mem').
+    (mb::als1')) ECs' Mem').
   split; eauto using element_of__incl.
     repeat (split; auto using instantiate_locals__updateAddAL,
                               element_of__gv2gvs).
-Case "sLoad". simpl_nd_llvmds.
+Case "sLoad".
+     destruct st2 as [EC0 ECs' M'].
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst.
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
+       try solve [inversion Hsim].
+     simpl in HsimEC.
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst.
+     simpl in HsimECs.
+
   eapply instantiate_locals__getOperandValue in H; eauto.
   destruct H as [gvs2 [J1 J2]].
   exists (mkState
-    ((mkEC f1' b1' cs tmn1' (updateAddAL _ lc1' id0 (NDGVs.(gv2gvs) gv t))
-    als1')::ECs') M').
+    (mkEC f1' b1' cs tmn1' (updateAddAL _ lc1' id0 (NDGVs.(gv2gvs) gv t))
+    als1') ECs' M').
   split; eauto using element_of__incl.
     repeat (split; auto using instantiate_locals__updateAddAL,
                               element_of__gv2gvs).
-Case "sStore". simpl_nd_llvmds.
+Case "sStore".
+     destruct st2 as [EC0 ECs' M'].
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst.
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
+       try solve [inversion Hsim].
+     simpl in HsimEC.
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst.
+     simpl in HsimECs.
+
   eapply instantiate_locals__getOperandValue in H; eauto.
   destruct H as [gvs2 [J1 J2]].
   eapply instantiate_locals__getOperandValue in H0; eauto.
   destruct H0 as [mps2' [J3 J4]].
-  exists (mkState ((mkEC f1' b1' cs tmn1' lc1' als1')::ECs') Mem').
+  exists (mkState (mkEC f1' b1' cs tmn1' lc1' als1') ECs' Mem').
   split; eauto using element_of__incl.
     repeat (split; auto).
-Case "sGEP". simpl_nd_llvmds.
+Case "sGEP".
+     destruct st2 as [EC0 ECs' M'].
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst.
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
+       try solve [inversion Hsim].
+     simpl in HsimEC.
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst.
+     simpl in HsimECs.
+
   eapply instantiate_locals__getOperandValue in H; eauto.
   destruct H as [mps [J1 J2]].
   eapply instantiate_locals__values2GVs in H0; eauto.
@@ -720,51 +843,101 @@ Case "sGEP". simpl_nd_llvmds.
   eapply instantiate_locals__GEP in H1; eauto.
   destruct H1 as [vidxs2 [mps2' [J5 [J6 J7]]]].
   exists (mkState
-    ((mkEC f1' b1' cs tmn1' (updateAddAL _ lc1' id0 mps2') als1')
-      ::ECs') M').
+    (mkEC f1' b1' cs tmn1' (updateAddAL _ lc1' id0 mps2') als1')
+      ECs' M').
   split; eauto using element_of__incl.
     repeat (split; auto using instantiate_locals__updateAddAL).
-Case "sTrunc". simpl_nd_llvmds.
+Case "sTrunc".
+     destruct st2 as [EC0 ECs' M'].
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst.
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
+       try solve [inversion Hsim].
+     simpl in HsimEC.
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst.
+     simpl in HsimECs.
+
+(*simpl_nd_llvmds.*)
   eapply instantiate_locals__TRUNC in H; eauto.
   destruct H as [gvs2' [J1 J2]].
   exists (mkState
-    ((mkEC f1' b1' cs tmn1' (updateAddAL _ lc1' id0 gvs2') als1')
-      ::ECs') M').
+    (mkEC f1' b1' cs tmn1' (updateAddAL _ lc1' id0 gvs2') als1')
+      ECs' M').
   split; eauto using element_of__incl.
     repeat (split; auto using instantiate_locals__updateAddAL).
-Case "sExt". simpl_nd_llvmds.
+Case "sExt".
+(* simpl_nd_llvmds. *)
+     destruct st2 as [EC0 ECs' M'].
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst.
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
+       try solve [inversion Hsim].
+     simpl in HsimEC.
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst.
+     simpl in HsimECs.
+
   eapply instantiate_locals__EXT in H; eauto.
   destruct H as [gvs2' [J1 J2]].
   exists (mkState
-    ((mkEC f1' b1' cs tmn1' (updateAddAL _ lc1' id0 gvs2') als1')
-      ::ECs') M').
+    (mkEC f1' b1' cs tmn1' (updateAddAL _ lc1' id0 gvs2') als1')
+      ECs' M').
   split; eauto using element_of__incl.
     repeat (split; auto using instantiate_locals__updateAddAL).
-Case "sCast". simpl_nd_llvmds.
+Case "sCast". (* simpl_nd_llvmds.*)
+     destruct st2 as [EC0 ECs' M'].
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst.
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
+       try solve [inversion Hsim].
+     simpl in HsimEC.
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst.
+     simpl in HsimECs.
+
   eapply instantiate_locals__CAST in H; eauto.
   destruct H as [gvs2' [J1 J2]].
   exists (mkState
-    ((mkEC f1' b1' cs tmn1' (updateAddAL _ lc1' id0 gvs2') als1')
-      ::ECs') M').
+    (mkEC f1' b1' cs tmn1' (updateAddAL _ lc1' id0 gvs2') als1')
+      ECs' M').
   split; eauto using element_of__incl.
     repeat (split; auto using instantiate_locals__updateAddAL).
-Case "sIcmp". simpl_nd_llvmds.
+Case "sIcmp". (* simpl_nd_llvmds. *)
+     destruct st2 as [EC0 ECs' M'].
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst.
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
+       try solve [inversion Hsim].
+     simpl in HsimEC.
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst.
+     simpl in HsimECs.
+
   eapply instantiate_locals__ICMP in H; eauto.
   destruct H as [gvs3' [J1 J2]].
   exists (mkState
-    ((mkEC f1' b1' cs tmn1' (updateAddAL _ lc1' id0 gvs3') als1')
-      ::ECs') M').
+    (mkEC f1' b1' cs tmn1' (updateAddAL _ lc1' id0 gvs3') als1')
+      ECs' M').
   split; eauto using element_of__incl.
     repeat (split; auto using instantiate_locals__updateAddAL).
-Case "sFcmp". simpl_nd_llvmds.
+Case "sFcmp". (*simpl_nd_llvmds.*)
+     destruct st2 as [EC0 ECs' M'].
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst.
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
+       try solve [inversion Hsim].
+     simpl in HsimEC.
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst.
+     simpl in HsimECs.
+
   eapply instantiate_locals__FCMP in H; eauto.
   destruct H as [gvs3' [J1 J2]].
   exists (mkState
-    ((mkEC f1' b1' cs tmn1' (updateAddAL _ lc1' id0 gvs3') als1')
-      ::ECs') M').
+    (mkEC f1' b1' cs tmn1' (updateAddAL _ lc1' id0 gvs3') als1')
+      ECs' M').
   split; eauto using element_of__incl.
     repeat (split; auto using instantiate_locals__updateAddAL).
-Case "sSelect". simpl_nd_llvmds.
+Case "sSelect". (*simpl_nd_llvmds.*)
+     destruct st2 as [EC0 ECs' M'].
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst.
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
+       try solve [inversion Hsim].
+     simpl in HsimEC.
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst.
+     simpl in HsimECs.
+
   eapply instantiate_locals__getOperandValue in H; eauto.
   destruct H as [gvs0' [J1 J2]].
   eapply instantiate_locals__getOperandValue in H0; eauto.
@@ -772,14 +945,22 @@ Case "sSelect". simpl_nd_llvmds.
   eapply instantiate_locals__getOperandValue in H1; eauto.
   destruct H1 as [gvs2' [J5 J6]].
   exists (mkState
-    ((mkEC f1' b1' cs tmn1' (if isGVZero TD c
+    (mkEC f1' b1' cs tmn1' (if isGVZero TD c
                              then updateAddAL _ lc1' id0 gvs2'
                              else updateAddAL _ lc1' id0 gvs1') als1')
-      ::ECs') M').
+      ECs' M').
   split; eauto using element_of__incl.
     repeat (split; auto).
       destruct (isGVZero TD c); auto using instantiate_locals__updateAddAL.
-Case "sCall". simpl_nd_llvmds.
+Case "sCall". (*simpl_nd_llvmds.*)
+     destruct st2 as [EC0 ECs' M'].
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst.
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
+       try solve [inversion Hsim].
+     simpl in HsimEC.
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst.
+     simpl in HsimECs.
+
   eapply instantiate_locals__getOperandValue in H; eauto.
   destruct H as [gvs2 [J11 J12]].
   eapply instantiate_locals__params2GVs in H3; eauto.
@@ -787,15 +968,24 @@ Case "sCall". simpl_nd_llvmds.
   eapply instantiate_locals__initLocals in H4; eauto.
   destruct H4 as [lc2' [H21 H22]].
   exists (mkState
-    ((mkEC (fdef_intro (fheader_intro fa rt fid la va) lb)
+    (mkEC (fdef_intro (fheader_intro fa rt fid la va) lb)
                        (l', stmts_intro ps' cs' tmn') cs' tmn' lc2'
-                       nil)::
-     (mkEC f1' b1' (insn_call rid noret0 ca rt1 va1 fv lp :: cs) tmn1'
-      lc1' als1') ::ECs') M').
+                       nil)
+    
+     ((mkEC f1' b1' (insn_call rid noret0 ca rt1 va1 fv lp :: cs) tmn1'
+      lc1' als1')::ECs') M').
   split; eauto using element_of__incl.
     repeat (split; auto).
-Case "sExCall". simpl_nd_llvmds.
-  match goal with
+Case "sExCall".
+     destruct st2 as [EC0 ECs' M'].
+     destruct Hsim as [HsimECs [HsimEC eq6]]; subst.
+     destruct EC0 as [f1' b1' cs1' tmn1' lc1' als1'];
+       try solve [inversion Hsim].
+     simpl in HsimEC.
+     destruct HsimEC as [J1 [J2 [J3 [J4 [Hsim1 J6]]]]]; subst.
+     simpl in HsimECs.
+
+match goal with
   | H5: exCallUpdateLocals _ _ _ _ _ _ = _,
     H: getOperandValue _ _ _ _ = _,
     H2: params2GVs _ _ _ _ = _ |- _ =>
@@ -806,7 +996,7 @@ Case "sExCall". simpl_nd_llvmds.
     eapply instantiate_locals__exCallUpdateLocals in H5; eauto;
     destruct H5 as [lc2' [H21 H22]]
   end.
-  exists (mkState ((mkEC f1' b1' cs tmn1' lc2' als1') ::ECs') Mem').
+  exists (mkState (mkEC f1' b1' cs tmn1' lc2' als1') ECs' Mem').
   split.
     eapply sExCall; eauto using element_of__incl,
                                 instantiate_list_gvs__incl,

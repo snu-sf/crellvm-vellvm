@@ -1,6 +1,7 @@
 Require Import Coqlib.
 Require Import Metatheory.
 Require Import Maps.
+Require Import maps_ext.
 Require Import infrastructure_props.
 Require Import Program.Tactics.
 Require Import Program.Equality.
@@ -89,7 +90,7 @@ Module PNodeSetMax <: PNODE_SET.
     intros. rewrite PTree.gempty in H. congruence.
     (* inductive case *)
     intros. rewrite PTree.gsspec in H2. apply add_spec.
-    destruct (peq n k). auto. eauto.
+    destruct (Coqlib.peq n k). auto. eauto.
   Qed.
 
   Lemma pick_in:
@@ -140,7 +141,7 @@ Module PNodeSetMax <: PNODE_SET.
     intros. apply PositiveSet.empty_1 in H. tauto.
     (* inductive case *)
     intros. rewrite PTree.gsspec. apply add_spec in H2.
-    destruct (peq n k); eauto.
+    destruct (Coqlib.peq n k); eauto.
       destruct H2 as [H2 | H2]; subst.
         congruence.
         eauto.
@@ -202,7 +203,7 @@ Module PNodeSetMin <: PNODE_SET.
     intros. rewrite PTree.gempty in H. congruence.
     (* inductive case *)
     intros. rewrite PTree.gsspec in H2. apply add_spec.
-    destruct (peq n k). auto. eauto.
+    destruct (Coqlib.peq n k). auto. eauto.
   Qed.
 End PNodeSetMin.
 
@@ -357,7 +358,7 @@ Module MergeLt <: MERGE.
   
       uniq_result.
       revert Hmerge. unfold_merge_aux.
-      remember (Pos.compare_cont Xd Yd Eq) as Cmp.
+      remember (Pos.compare_cont Eq Xd Yd) as Cmp.
       intro.
       destruct Cmp; subst.
         apply Hrec with (y:=(length Xsdms + length Ysdms)%nat) in Hmerge; 
@@ -446,7 +447,7 @@ Module MergeLt <: MERGE.
   
       revert Hmerge. unfold_merge_aux. intro.
       revert Hmerge'. unfold_merge_aux. intro.
-      remember (Pos.compare_cont Xd Yd Eq) as Cmp.
+      remember (Pos.compare_cont Eq Xd Yd) as Cmp.
       destruct Cmp; subst.
         uniq_result'.
         symmetry in HeqCmp. apply Pcompare_Eq_eq in HeqCmp. subst Yd.
@@ -519,7 +520,7 @@ Module MergeLt <: MERGE.
       compute. auto.
 
       unfold merge. unfold_merge_aux.
-      replace (Pos.compare_cont x p Eq) with Gt.
+      replace (Pos.compare_cont Eq x p) with Gt.
       erewrite merge_aux_refl_aux; eauto.
       simpl_env.
       rewrite rev_involutive. auto.
@@ -552,7 +553,7 @@ Module MergeLt <: MERGE.
 
       inv Hsortx. inv Hsorty.
       revert Hmerge. unfold_merge_aux. intro.
-      remember (Pos.compare_cont Xd Yd Eq) as Cmp.
+      remember (Pos.compare_cont Eq Xd Yd) as Cmp.
       destruct Cmp; subst; symmetry in HeqCmp.
       Case "1".
         uniq_result'.
@@ -731,7 +732,7 @@ End LATTICEELT.
 Module LATTICEELT_MAP (L: LATTICEELT).
 
 Definition in_incr (in1 in2: PMap.t L.t) : Prop :=
-  forall n, L.ge in2??n in1??n.
+  forall n, L.ge in2 ?? n in1 ?? n.
 
 Lemma in_incr_refl:
   forall in1, in_incr in1 in1.
@@ -742,11 +743,11 @@ Qed.
 Lemma in_incr_trans:
   forall in1 in2 in3, in_incr in1 in2 -> in_incr in2 in3 -> in_incr in1 in3.
 Proof.
-  unfold in_incr; intros. apply L.ge_trans with in2??n; auto.
+  unfold in_incr; intros. apply L.ge_trans with in2 ?? n; auto.
 Qed.
 
 Definition eq bd (in1 in2: PMap.t L.t) : Prop :=
-  forall n (Hin: In n bd), L.eq in2??n in1??n.
+  forall n (Hin: In n bd), L.eq in2 ?? n in1 ?? n.
 
 End LATTICEELT_MAP.
 

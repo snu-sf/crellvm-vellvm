@@ -1,31 +1,60 @@
 OTT ?= ott
 
-COQLIBS=-I src/Vellvm -I src/Vellvm/ott -I src/Vellvm/Dominators \
-	-I lib/GraphBasics -I lib/compcert-1.9 -I lib/cpdtlib -I lib/metalib-20090714 \
-	-R lib/Coq-Equations-8.4/theories Equations -I lib/Coq-Equations-8.4/src
-MAKECOQ=make -f Makefile.coq COQLIBS="$(COQLIBS)"
+COQMODULE    := Vellvm
+COQTHEORIES  := $(shell ls \
+  src/GraphBasics/*.v \
+  src/Vellvm/Dominators/*.v \
+  src/Vellvm/ott/*.v) \
+  src/Vellvm/analysis.v src/Vellvm/datatype_base.v src/Vellvm/dopsem.v src/Vellvm/events.v src/Vellvm/external_intrinsics.v src/Vellvm/genericvalues_inject.v src/Vellvm/genericvalues_props.v src/Vellvm/genericvalues.v src/Vellvm/infrastructure.v src/Vellvm/infrastructure_props.v \
+	src/Vellvm/memory_sim.v src/Vellvm/opsem_props.v src/Vellvm/opsem.v src/Vellvm/opsem_wf.v src/Vellvm/ott_list_core.v src/Vellvm/ott_list_eq_dec.v \
+	src/Vellvm/static.v src/Vellvm/syntax.v src/Vellvm/monad.v src/Vellvm/syntax_base.v src/Vellvm/tactics.v src/Vellvm/targetdata.v src/Vellvm/targetdata_props.v src/Vellvm/trace.v \
+	src/Vellvm/typing_rules.v src/Vellvm/typings_props.v src/Vellvm/typings.v src/Vellvm/vellvm.v src/Vellvm/vellvm_tactics.v src/Vellvm/memory_props.v src/Vellvm/program_sim.v src/Vellvm/util.v src/Vellvm/maps_ext.v
 
-all: theories
+COQEXTRACT	:= src/Extraction/extraction_dom.v src/Extraction/extraction_core.v 
 
-libs: lib/Coq-Equations-8.4 lib/metalib-20090714
-	make -C lib/Coq-Equations-8.4
-	make -C lib/metalib-20090714
+.PHONY: all sflib metalib cpdtlib theories clean
 
-depend: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
-	+$(MAKECOQ) depend
+all: theories extract
 
-theories: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
-	+$(MAKECOQ)
+quick: theories-quick
 
-Makefile.coq: Make
-	coq_makefile -f Make -o Makefile.coq
+init:
+	git clone git@github.com:snu-sf/cpdtlib.git lib/cpdtlib
+	git clone git@github.com:snu-sf/metalib.git lib/metalib
+	git clone git@github.com:snu-sf/sflib.git lib/sflib
 
-%.vo: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
-	+$(MAKECOQ) "$@"
+Makefile.coq: Makefile $(COQTHEORIES)
+	(echo "-R src $(COQMODULE)"; \
+   echo "-R lib/sflib sflib";\
+   echo "-R lib/metalib metalib"; \
+   echo "-R lib/cpdtlib Cpdt"; \
+   echo "-R lib/compcert-2.4 compcert"; \
+   echo $(COQTHEORIES)) > _CoqProject
+	coq_makefile -f _CoqProject -o Makefile.coq
 
-clean:
-	rm -f src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v 
-	make -f Makefile.coq clean
+sflib: lib/sflib
+	$(MAKE) -C lib/sflib
+
+sflib-quick: lib/sflib
+	$(MAKE) -C lib/sflib quick
+
+metalib: lib/metalib
+	$(MAKE) -C lib/metalib
+
+metalib-quick: lib/metalib
+	$(MAKE) -C lib/metalib quick
+
+cpdtlib: lib/cpdtlib
+	$(MAKE) -C lib/cpdtlib
+
+cpdtlib-quick: lib/cpdtlib
+	$(MAKE) -C lib/cpdtlib quick
+
+compcert: lib/compcert-2.4 metalib
+	$(MAKE) -C lib/compcert-2.4
+
+compcert-quick: lib/compcert-2.4 metalib-quick
+	$(MAKE) -C lib/compcert-2.4 quick
 
 src/Vellvm/syntax_base.v: src/Vellvm/syntax_base.ott
 	cd src/Vellvm && \
@@ -38,4 +67,28 @@ src/Vellvm/typing_rules.v: src/Vellvm/syntax_base.ott src/Vellvm/typing_rules.ot
 	    -i typing_rules.ott -o typing_rules.v && \
 	rm _tmp_syntax_base.v
 
-.PHONY: all clean theories libs
+theories: sflib metalib cpdtlib compcert Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
+	$(MAKE) -f Makefile.coq
+
+theories-quick: sflib-quick metalib-quick cpdtlib-quick compcert-quick Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
+	$(MAKE) -f Makefile.coq quick
+
+extract: theories $(COQEXTRACT)
+	$(MAKE) -C src/Extraction
+	cd src/Extraction; ./fixextract.py
+
+%.vo: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
+	$(MAKE) -f Makefile.coq "$@"
+
+%.vio: Makefile.coq src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v
+	$(MAKE) -f Makefile.coq "$@"
+
+clean: Makefile.coq
+	rm -f src/Vellvm/syntax_base.v src/Vellvm/typing_rules.v 
+	$(MAKE) -f Makefile.coq clean
+	rm -f Makefile.coq
+	$(MAKE) -C src/Extraction clean
+	$(MAKE) -C lib/sflib clean
+	$(MAKE) -C lib/metalib clean
+	$(MAKE) -C lib/cpdtlib clean
+	$(MAKE) -C lib/compcert-2.4 clean

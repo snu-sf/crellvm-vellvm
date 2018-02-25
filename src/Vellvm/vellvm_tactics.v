@@ -355,3 +355,14 @@ Ltac guess_hyp converter :=
     | [ H : _ |- _ ] =>
       apply_and_clean H; converter; solve_forall_like_ind
   end.
+
+(* Use hypothesis H, cleaning it afterwards *)
+Ltac apply_and_clean2 H :=
+  intros; eapply H; eauto; try subst; trivial;
+  clear H.
+
+Ltac guess_hyp2 converter :=
+  match goal with
+    | [ H : _ |- _ ] =>
+      apply_and_clean2 H; converter; solve_forall_like_ind
+  end.

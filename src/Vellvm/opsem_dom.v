@@ -22,6 +22,7 @@ Require Import Lattice.
 Require Import Floats.
 Require Import AST.
 Require Import Maps.
+Require Import maps_ext.
 Require Import opsem.
 Require Import opsem_props.
 Require Import opsem_wf.
@@ -123,8 +124,8 @@ end.
 
 Definition wf_State (cfg:Config) (S:State) : Prop :=
 let '(mkCfg s (los, nts) ps gl _ ) := cfg in
-let '(mkState ecs _) := S in
-wf_ECStack (los,nts) gl ps ecs.
+let '(mkState ec ecs _) := S in
+wf_ECStack (los,nts) gl ps (ec::ecs).
 
 (* Properties of eval_rhs *)
 Require Import Maps.
@@ -863,8 +864,8 @@ match goal with
 | Hwfcfg: OpsemPP.wf_Config ?cfg, Hwfpp1: OpsemPP.wf_State ?cfg _ |- _ =>
   destruct Hwfcfg as [_ [_ [HwfSystem HmInS]]];
   destruct Hwfpp1 as
-    [_ [[Hreach1 [HBinF1 [HFinPs1 [_ [_ [l3 [ps3 [cs3' Heq1]]]]]]]]
-     [_ HwfCall]]]; subst
+    [[Hreach1 [HBinF1 [HFinPs1 [_ [_ [l3 [ps3 [cs3' Heq1]]]]]]]]
+     [_ HwfCall]]; subst
 end.
 
 Lemma preservation_pure_cmd_updated_case : forall
@@ -882,24 +883,26 @@ Lemma preservation_pure_cmd_updated_case : forall
                 CurProducts := Ps;
                 Globals := gl;
                 FunTable := fs |})
-  (Hst: St = {| ECS := {| CurFunction := F;
+  (Hst: St = {| EC := {| CurFunction := F;
                             CurBB := B;
                             CurCmds := c0 :: cs;
                             Terminator := tmn;
                             Locals := lc;
-                            Allocas := als |} :: EC;
+                            Allocas := als |};
+                ECS := EC;
                   Mem := Mem0 |})
    (Hwfcfg : OpsemPP.wf_Config Cfg) (Hwfpp1 : OpsemPP.wf_State Cfg St)
    (HwfS1 : wf_State Cfg St),
    wf_State Cfg
      {|
-     ECS := {|
+     EC := {|
             CurFunction := F;
             CurBB := B;
             CurCmds := cs;
             Terminator := tmn;
             Locals := updateAddAL GVs lc id0 gv3;
-            Allocas := als |} :: EC;
+            Allocas := als |};
+     ECS := EC;
      Mem := Mem0 |}.
 Proof.
   intros. subst. destruct_wf.
@@ -973,24 +976,26 @@ Lemma preservation_cmd_non_updated_case : forall
                 CurProducts := Ps;
                 Globals := gl;
                 FunTable := fs |})
-  (Hst: St = {| ECS := {| CurFunction := F;
+  (Hst: St = {| EC := {| CurFunction := F;
                             CurBB := B;
                             CurCmds := c0 :: cs;
                             Terminator := tmn;
                             Locals := lc;
-                            Allocas := als |} :: EC;
+                            Allocas := als |};
+                ECS := EC;
                   Mem := Mem0 |})
   (Hwfcfg : OpsemPP.wf_Config Cfg) (Hwfpp1 : OpsemPP.wf_State Cfg St)
   (HwfS1 : wf_State Cfg St),
   wf_State Cfg
      {|
-     ECS := {|
+     EC := {|
             CurFunction := F;
             CurBB := B;
             CurCmds := cs;
             Terminator := tmn;
             Locals := lc;
-            Allocas := als |} :: EC;
+            Allocas := als |};
+     ECS := EC;
      Mem := Mem0 |}.
 Proof.
   intros. subst. destruct_wf.
@@ -1063,24 +1068,26 @@ Lemma preservation_impure_cmd_updated_case : forall
                 CurProducts := Ps;
                 Globals := gl;
                 FunTable := fs |})
-  (Hst: St = {| ECS := {| CurFunction := F;
+  (Hst: St = {| EC := {| CurFunction := F;
                             CurBB := B;
                             CurCmds := c0 :: cs;
                             Terminator := tmn;
                             Locals := lc;
-                            Allocas := als |} :: EC;
+                            Allocas := als |};
+                ECS := EC;
                   Mem := Mem0 |})
   (Hwfcfg : OpsemPP.wf_Config Cfg) (Hwfpp1 : OpsemPP.wf_State Cfg St)
   (HwfS1 : wf_State Cfg St),
    wf_State Cfg
      {|
-     ECS := {|
+     EC := {|
             CurFunction := F;
             CurBB := B;
             CurCmds := cs;
             Terminator := tmn;
             Locals := updateAddAL GVs lc id0 gv3;
-            Allocas := als |} :: EC;
+            Allocas := als |};
+     ECS := EC;
      Mem := Mem0 |}.
 Proof.
   intros. subst. destruct_wf.
@@ -1193,7 +1200,7 @@ Focus.
 Case "sReturn".
   destruct Hwfcfg as [Hwftd [Hwfg [HwfSystem HmInS]]].
   destruct Hwfpp1 as
-    [Hnonempty [
+    [
      [Hreach1 [HBinF1 [HFinPs1 [Hwflc1 [_ [l1 [ps1 [cs1' Heq1]]]]]]]]
      [
        [
@@ -1202,7 +1209,7 @@ Case "sReturn".
        ]
        HwfCall'
      ]
-    ]]; subst.
+    ]; subst.
   destruct HwfS1 as [Hinscope1 [Hinscope2 HwfEC]]; subst.
   unfold wf_ExecutionContext in *.
   remember (inscope_of_cmd F' (l2, stmts_intro ps2 (cs2' ++ c' :: cs') tmn') c')
@@ -1307,7 +1314,7 @@ Focus.
 Case "sReturnVoid".
   destruct Hwfcfg as [Hwftd [Hwfg [HwfSystem HmInS]]].
   destruct Hwfpp1 as
-    [Hnonempty [
+    [
      [Hreach1 [HBinF1 [HFinPs1 [Hwflc1 [_ [l1 [ps1 [cs1' Heq1]]]]]]]]
      [
        [
@@ -1316,7 +1323,7 @@ Case "sReturnVoid".
        ]
        HwfCall'
      ]
-    ]]; subst.
+    ]; subst.
   destruct HwfS1 as [Hinscope1 [Hinscope2 HwfEC]]; subst.
   unfold wf_ExecutionContext in *.
   remember (inscope_of_cmd F' (l2, stmts_intro ps2 (cs2' ++ c' :: cs') tmn') c')
@@ -1361,8 +1368,8 @@ Case "sReturnVoid".
 Case "sBranch".
   destruct Hwfcfg as [_ [_ [HwfSystem HmInS]]].
   destruct Hwfpp1 as
-    [_ [[Hreach1 [HBinF1 [HFinPs1 [_ [_ [l3 [ps3 [cs3' Heq1]]]]]]]]
-     [_ HwfCall]]]; subst.
+    [[Hreach1 [HBinF1 [HFinPs1 [_ [_ [l3 [ps3 [cs3' Heq1]]]]]]]]
+     [_ HwfCall]]; subst.
   destruct HwfS1 as [Hinscope1 HwfEC]; subst. 
   unfold wf_ExecutionContext in *.
   remember (inscope_of_tmn F
@@ -1384,8 +1391,8 @@ Focus.
 Case "sBranch_uncond".
   destruct Hwfcfg as [_ [_ [HwfSystem HmInS]]].
   destruct Hwfpp1 as
-    [_ [[Hreach1 [HBinF1 [HFinPs1 [_ [_ [l3 [ps3 [cs3' Heq1]]]]]]]]
-     [_ HwfCall]]]; subst.
+    [[Hreach1 [HBinF1 [HFinPs1 [_ [_ [l3 [ps3 [cs3' Heq1]]]]]]]]
+     [_ HwfCall]]; subst.
   destruct HwfS1 as [Hinscope1 HwfEC]; subst. 
   unfold wf_ExecutionContext in *.
   remember (inscope_of_tmn F
@@ -1417,8 +1424,36 @@ Case "sInsertValue". preservation_pure_case_tac.
 Case "sMalloc".  abstract preservation_impure_case_tac.
 Case "sFree". eapply preservation_cmd_non_updated_case in HwfS1; simpl; eauto.
     simpl; auto.
-Case "sAlloca". abstract preservation_impure_case_tac.
-Case "sLoad".  abstract preservation_impure_case_tac.
+Case "sAlloca".
+  eapply preservation_impure_cmd_updated_case; simpl; eauto.
+  
+    instantiate (1 := (insn_alloca id0 t v align0)). 
+    simpl; auto; destruct_wf.
+   simpl; auto; destruct_wf.
+   simpl; auto; destruct_wf.
+    assert (HuniqF := HwfSystem).
+    eapply wf_system__uniqFdef in HuniqF; eauto;
+    intros c0 Hlkc0 b1 J; eapply wf_system__uniqFdef in HFinPs1; eauto;
+    eapply isReachableFromEntry_helper; eauto.
+   inversion H2 as [Htmp]; subst.
+    simpl; auto; destruct_wf.
+   auto.
+Case "sLoad".
+(* abstract preservation_impure_case_tac. *)
+  eapply preservation_impure_cmd_updated_case; simpl; eauto.
+  
+    instantiate (1 := (insn_load id0 t v align0)). 
+    simpl; auto; destruct_wf.
+   simpl; auto; destruct_wf.
+   simpl; auto; destruct_wf.
+    assert (HuniqF := HwfSystem).
+    eapply wf_system__uniqFdef in HuniqF; eauto;
+    intros c0 Hlkc0 b1 J; eapply wf_system__uniqFdef in HFinPs1; eauto;
+    eapply isReachableFromEntry_helper; eauto.
+   inversion H1 as [Htmp]; subst.
+    simpl; auto; destruct_wf.
+   auto.
+
 Case "sStore". eapply preservation_cmd_non_updated_case in HwfS1; simpl; eauto;
     simpl; auto.
 Case "sGEP".

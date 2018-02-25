@@ -1,6 +1,7 @@
 Require Import ZArith.
 Require Import Coqlib.
 Require Import Floats.
+Require Import Coq.Structures.OrdersAlt.
 
 (* This file defines the data types for defining syntax. *) 
 
@@ -66,10 +67,16 @@ Definition of_Z (bitwidth:Z) (v:Z) (is_signed:bool) : t := v.
 
 End INTEGER.
 
-Module FLOAT.
+Module FLOAT <: OrdersAlt.OrderedTypeAlt.
 
 Definition t := float.
 Definition dec : forall x y : t, {x=y} + {x<>y} := Float.eq_dec.
 (* Definition Zero : t := Float.zero. *)
+
+Parameter compare: t -> t -> comparison.
+Parameter compare_sym: forall x y : t, compare y x = CompOpp (compare x y).
+Parameter compare_trans:
+  forall (c : comparison) (x y z : t), compare x y = c -> compare y z = c -> compare x z = c.
+Parameter compare_leibniz: forall x y, compare x y = Eq -> x = y.
 
 End FLOAT.

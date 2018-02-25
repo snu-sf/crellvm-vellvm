@@ -13,8 +13,8 @@ Require Import alist.
 Require Import Integers.
 Require Import Coqlib.
 Require Import Maps.
+Require Import maps_ext.
 Require Import Memory.
-Require Import Kildall.
 Require Import Lattice.
 Require Import targetdata.
 Require Import util.
@@ -59,6 +59,7 @@ Definition noret_dec : forall x y : noret, {x=y} + {x<>y} := bool_dec.
 
   Definition getCmdLoc (i:cmd) : id :=
   match i with
+  | insn_nop id => id
   | insn_bop id _ sz v1 v2 => id
   | insn_fbop id _ _ _ _ => id
   (* | insn_extractelement id typ0 id0 c1 => id *)
@@ -86,7 +87,7 @@ Definition noret_dec : forall x y : noret, {x=y} + {x<>y} := bool_dec.
   | insn_return_void id => id
   | insn_br id v l1 l2 => id
   | insn_br_uncond id l => id
-  (* | insn_switch id t v l _ => id *)
+  | insn_switch id t v l _ => id
   (* | insn_invoke id typ id0 paraml l1 l2 => id *)
   | insn_unreachable id => id
   end.
@@ -121,6 +122,7 @@ Definition noret_dec : forall x y : noret, {x=y} + {x<>y} := bool_dec.
 
   Definition getCmdID (i:cmd) : option id :=
   match i with
+  | insn_nop id => None
   | insn_bop id _ sz v1 v2 => Some id
   | insn_fbop id _ _ _ _ => Some id
   (* | insn_extractelement id typ0 id0 c1 => id *)
@@ -305,6 +307,7 @@ end.
 
 Definition getCmdTyp (i:cmd) : option typ :=
 match i with
+| insn_nop _ => Some typ_void
 | insn_bop _ _ sz _ _ => Some (typ_int sz)
 | insn_fbop _ _ ft _ _ => Some (typ_floatpoint ft)
 (*
@@ -334,7 +337,7 @@ match i with
 | insn_return_void _ => typ_void
 | insn_br _ _ _ _ => typ_void
 | insn_br_uncond _ _ => typ_void
-(* | insn_switch _ typ _ _ _ => typ_void *)
+| insn_switch _ typ _ _ _ => typ_void
 (* | insn_invoke _ typ _ _ _ _ => typ *)
 | insn_unreachable _ => typ_void
 end.
@@ -387,6 +390,7 @@ end.
 
 Definition getCmdOperands (i:cmd) : ids :=
 match i with
+| insn_nop _ => nil
 | insn_bop _ _ _ v1 v2 => getValueIDs v1 ++ getValueIDs v2
 | insn_fbop _ _ _ v1 v2 => getValueIDs v1 ++ getValueIDs v2
 (* | insn_extractelement _ _ v _ => getValueIDs v
@@ -418,6 +422,7 @@ let '(_, vs) := split lp in In v0 vs.
 
 Definition valueInCmdOperands (v0:value) (i:cmd) : Prop :=
 match i with
+| insn_nop _ => False
 | insn_bop _ _ _ v1 v2 => v0 = v1 \/ v0 = v2
 | insn_fbop _ _ _ v1 v2 => v0 = v1 \/ v0 = v2
 | insn_extractvalue _ _ v _ _ => v0 = v
@@ -443,6 +448,7 @@ match i with
 | insn_return_void _ => False
 | insn_br _ v _ _ => v = v0
 | insn_br_uncond _ _ => False
+| insn_switch _ _ v _ _ => v = v0
 | insn_unreachable _ => False
 end.
 
@@ -460,7 +466,7 @@ match i with
 | insn_return_void _ => nil
 | insn_br _ v _ _ => getValueIDs v
 | insn_br_uncond _ _ => nil
-(* | insn_switch _ _ value _ _ => getValueIDs value *)
+| insn_switch _ _ value _ _ => getValueIDs value
 (* | insn_invoke _ _ _ lp _ _ => getParamsOperand lp *)
 | insn_unreachable _ => nil
 end.
@@ -479,6 +485,7 @@ end.
 
 Definition getCmdLabels (i:cmd) : ls :=
 match i with
+| insn_nop _ => nil
 | insn_bop _ _ _ _ _ => nil
 | insn_fbop _ _ _ _ _ => nil
 (* | insn_extractelement _ _ _ _ => nil
@@ -507,7 +514,7 @@ match i with
 | insn_return_void _ => nil
 | insn_br _ _ l1 l2 => l1::l2::nil
 | insn_br_uncond _ l => l::nil
-(* | insn_switch _ _ _ l ls => l::list_prj2 _ _ ls *)
+| insn_switch _ _ _ l ls => l::list_prj2 _ _ ls
 (* | insn_invoke _ _ _ _ l1 l2 => l1::l2::nil *)
 | insn_unreachable _ => nil
 end.
@@ -983,10 +990,10 @@ end.
 
 Definition lookupTypViaGIDFromProduct (p:product) (id0:id) : option typ :=
 match p with
-| product_fdef fd => Some (getFdefTyp fd)
+| product_fdef fd => if id0==(getFdefID fd) then Some (getFdefTyp fd) else None
 | product_gvar (gvar_intro id1 _ spec t _ _) => if id0==id1 then Some t else None
 | product_gvar (gvar_external id1 spec t) => if id0==id1 then Some t else None
-| product_fdec fc => Some (getFdecTyp fc)
+| product_fdec fc => if id0==(getFdecID fc) then Some (getFdecTyp fc) else None
 end.
 
 Fixpoint lookupTypViaGIDFromProducts (lp:products) (id0:id) : option typ :=
@@ -1071,6 +1078,7 @@ lookupTypViaTIDFromModules s id0.
   | insn_return_void _ => nil
   | insn_br _ _ l1 l2 => l1::l2::nil
   | insn_br_uncond _ l1 => l1::nil
+  | insn_switch _ _ _ l ls => nodup eq_atom_dec (l::list_prj2 _ _ ls)
   | insn_unreachable _ => nil
   end.
 
@@ -1081,6 +1089,8 @@ lookupTypViaTIDFromModules s id0.
   | insn_br id1 _ l11 l12, insn_br id2 _ l21 l22 => 
       id1 = id2 /\ l11 = l21 /\ l12 = l22
   | insn_br_uncond id1 l1, insn_br_uncond id2 l2 => id1 = id2 /\ l1 = l2
+  | insn_switch id1 _ v1 l1 ls1, insn_switch id2 _ v2 l2 ls2 => id1 = id2 /\ v1 = v2 /\
+                                                                l1 = l2 /\ ls1 = ls2
   | insn_unreachable i1, insn_unreachable i2 => i1 = i2
   | _, _ => False
   end.
@@ -1611,6 +1621,13 @@ Proof.
   destruct const_mutrec_dec; auto.
 Qed.
 
+Lemma list_const_l_dec : forall (l1 l2:list (const * l)), {l1=l2} + {~l1=l2}.
+Proof.
+  decide equality.
+  decide equality.
+  apply const_dec.
+Qed.
+
 Lemma value_dec : forall (v1 v2:value), {v1=v2}+{~v1=v2}.
 Proof.
   decide equality. apply const_dec.
@@ -1668,6 +1685,7 @@ match type of a1 with
 | value => destruct (@value_dec a1 a2)
 | const => destruct (@const_dec a1 a2)
 | list const => destruct (@list_const_dec a1 a2)
+| list (const * l) => destruct (@list_const_l_dec a1 a2)
 | attribute => destruct (@attribute_dec a1 a2)
 | attributes => destruct (@attributes_dec a1 a2)
 | params => destruct (@params_dec a1 a2)
@@ -3005,15 +3023,15 @@ Module ArrayType <: SigArrayType.
 
 End ArrayType.
 
-Definition typ2memory_chunk (t:typ) : option AST.memory_chunk :=
-  match t with
-  | typ_int bsz => Some (AST.Mint (Size.to_nat bsz -1))
-  | typ_floatpoint fp_float => Some AST.Mfloat32
-  | typ_floatpoint fp_double => Some AST.Mfloat64
-  | typ_floatpoint _ => None
-  | typ_pointer _ => Some (AST.Mint 31)
-  | _ => None
-  end.
+(* Definition typ2memory_chunk (t:typ) : option AST.memory_chunk := *)
+(*   match t with *)
+(*   | typ_int bsz => Some (AST.Mint (Size.to_nat bsz -1)) *)
+(*   | typ_floatpoint fp_float => Some AST.Mfloat32 *)
+(*   | typ_floatpoint fp_double => Some AST.Mfloat64 *)
+(*   | typ_floatpoint _ => None *)
+(*   | typ_pointer _ => Some (AST.Mint 31) *)
+(*   | _ => None *)
+(*   end. *)
 
 Definition wf_alignment (TD:LLVMtd.TargetData) (t:typ) : Prop :=
 forall s a (abi_or_pref:bool),

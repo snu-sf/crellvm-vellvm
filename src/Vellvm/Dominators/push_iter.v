@@ -1,6 +1,7 @@
 Require Import Coqlib.
 Require Import Iteration.
 Require Import Maps.
+Require Import maps_ext.
 Require Import syntax.
 Require Import infrastructure_props.
 Require Import Metatheory.
@@ -660,8 +661,8 @@ Proof.
     eapply DomMap_eq_incr_incr__eq_eq in H; eauto.
     destruct H.
     transitivity (DomDS.st_wrk (DomDS.propagate_succ st out a)).
-      eapply propagate_succ_records_unchanges; eauto with datatypes v62.
-      apply IHscs; eauto with datatypes v62.
+      eapply propagate_succ_records_unchanges; eauto with datatypes.
+      apply IHscs; eauto with datatypes.
 Qed.
 
 End Mono. End Mono.
@@ -2006,10 +2007,10 @@ Proof.
 
     assert (incl l (List.remove Hdec x ls2)) as Hinc.
       apply remove_notin_incl; auto.
-        eauto with datatypes v62.
+        eauto with datatypes.
     apply IHHnp1 in Hinc; auto.
       assert (In x ls2) as Hin. 
-        eauto with datatypes v62.
+        eauto with datatypes.
       apply remove_in_length with (Hdec:=Hdec) in Hin.
       omega. 
 
@@ -3134,7 +3135,7 @@ Proof.
     apply DomsInParents.fixpoint_wf in Heq.
     assert (J:=Heq n). rewrite Hdom in J.
     simpl in J.
-    eauto with datatypes v62.
+    eauto with datatypes.
 
     intros Heq.
     rewrite Heq in Hdom.
@@ -3305,10 +3306,10 @@ Proof.
               PCfg.strict_domination successors entrypoint x a) as Horder.
         assert (PCfg.strict_domination successors entrypoint a n) 
           as Hsdom_an.
-          apply Hpn; auto with datatypes v62.
+          apply Hpn; auto with datatypes.
         assert (PCfg.strict_domination successors entrypoint x n) 
           as Hsdom_xn.
-          apply Hpn; auto with datatypes v62.
+          apply Hpn; auto with datatypes.
         eapply PCfg.sdom_ordered; eauto using positive_eq_dec with positive.
       destruct Horder as [Hsdom_ax | Hsdom_xa]; auto.
       elimtype False.
@@ -3384,7 +3385,7 @@ Proof.
         apply DomSound.sadom_is_sound with (ni:=ni); auto.
           apply DomsInParents.fixpoint_wf in Hfix.
             assert (J:=Hfix n). rewrite Hdom in J. simpl in J.
-            left. eauto with datatypes v62.
+            left. eauto with datatypes.
 
           unfold strict_adomination, pdom_analyze. rewrite Hfix.
           rewrite Hdom. auto.
@@ -3393,7 +3394,7 @@ Proof.
         eapply PCfg.sdom_reachable; eauto using positive_eq_dec.
         apply DomsInParents.fixpoint_wf in Hfix.
           assert (J:=Hfix n). rewrite Hdom in J. simpl in J.
-          left. eauto with datatypes v62.
+          left. eauto with datatypes.
 
     assert (Hsort:=Hfix).
     apply SortedDoms.fixpoint_wf in Hsort; auto.
@@ -3474,7 +3475,7 @@ Proof.
           assert (PCfg.strict_domination successors entrypoint l0 n) as Hsdom'.
             rewrite_env ((dts0++a::(b::dts)) ++ [n]) in Hsdsort.
             apply StronglySorted__R_front_back with (a1:=b)(a2:=n) in Hsdsort; 
-              simpl; auto with datatypes v62.
+              simpl; auto with datatypes.
             eapply PCfg.sdom_tran; 
               eauto using positive_eq_dec, XPTree.no_preds__notin_succs.
           apply Hcomplete in Hsdom'.
@@ -3492,7 +3493,7 @@ Proof.
               SSSSSCase "2.2.2.1".
                 eapply PCfg.sdom_isnt_refl in Hsdom; eauto using positive_eq_dec.
                   congruence.
-                  apply Hsound; auto with datatypes v62.
+                  apply Hsound; auto with datatypes.
               SSSSSCase "2.2.2.2".
                 assert (PCfg.strict_domination successors entrypoint b l0) 
                   as Hsdom''.
@@ -3507,7 +3508,7 @@ Proof.
                     eauto using positive_eq_dec, XPTree.no_preds__notin_succs.
                 eapply PCfg.sdom_isnt_refl in Hsdom0; eauto using positive_eq_dec.
                   congruence.
-                  apply Hsound; auto with datatypes v62.
+                  apply Hsound; auto with datatypes.
 Qed.
 
 Lemma dom__imm_sorted: forall n dts
@@ -3537,7 +3538,7 @@ Proof.
     SCase "1.2".
       intros dt Hin. apply in_rev in Hin.
       eapply PDomProps.in_dom__reachable with (dts:=dts); 
-         try solve [congruence | eauto with datatypes v62].
+         try solve [congruence | eauto with datatypes].
         unfold pdom_analyze. rewrite Hfix. eauto.
 
   Case "2".
@@ -3572,15 +3573,15 @@ Proof.
     simpl in Hsort. 
     assert (J:=Hsort).
     apply StronglySorted__R_front_back with (a1:=a)(a2:=n) in J; 
-      simpl; auto with datatypes v62.
+      simpl; auto with datatypes.
     simpl_env in Hsort.
     apply in_rev in Hsdom.
     apply StronglySorted__R_front_back with (a1:=im)(a2:=a) in Hsort; 
-      simpl; auto with datatypes v62.
+      simpl; auto with datatypes.
     apply Hmin in J.
     assert (PCfg.reachable successors entrypoint a) as Hreacha.
       eapply PDomProps.in_dom__reachable with (dts:=a::dts)(ni:=ni); 
-         try solve [congruence | eauto with datatypes v62].
+         try solve [congruence | eauto with datatypes].
       unfold pdom_analyze. rewrite Hfix_tmn. eauto.
     eapply PCfg.dom_acyclic in Hsort;
       eauto using positive_eq_dec, XPTree.no_preds__notin_succs.
@@ -3611,7 +3612,7 @@ Proof.
   destruct_in J. 
     apply in_rev in J.
     apply StronglySorted__R_front_back with (a1:=last)(a2:=entrypoint) in Hsort; 
-      simpl; auto with datatypes v62.
+      simpl; auto with datatypes.
       apply PCfg.noone_sdom_entry in Hsort; auto.
     destruct_in J.
 Qed.

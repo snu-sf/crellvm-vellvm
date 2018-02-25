@@ -7,6 +7,8 @@ Require Import Coqlib.
 Require Import alist.
 Require Import vellvm_tactics.
 
+(*Require Import Coqlib_old.*)
+
 (* This file defines data layouts. *)
 
 Module LLVMtd.

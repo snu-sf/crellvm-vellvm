@@ -1,5 +1,6 @@
 Require Import Coqlib.
 Require Import Maps.
+Require Import maps_ext.
 Require Import syntax.
 Require Import infrastructure_props.
 Require Import Metatheory.
@@ -7,7 +8,6 @@ Require Import Program.Tactics.
 Require Import dom_libs.
 Require Import cfg.
 Require Import Dipaths.
-Require Import util.
 
 (* This file defines DFS. *)
 
@@ -174,13 +174,13 @@ Proof.
       destruct Hfind as [scs0 Hfind].
       destruct_pairs. subst.
       exists (sc::scs0). 
-      repeat (split; eauto with datatypes v62).
+      repeat (split; eauto with datatypes).
         intros sc1 Hin. 
         destruct_in Hin; eauto.
           congruence.
         
       uniq_result.
-      exists nil. repeat (split; eauto with datatypes v62).
+      exists nil. repeat (split; eauto with datatypes).
 Qed.
 
 Lemma find_next_visit_in_scs_spec: forall visited scs sc scs'
@@ -190,7 +190,7 @@ Proof.
   intros.
   apply find_next_visit_in_scs_spec' in Hfind.
   destruct_conjs. subst.
-  split; eauto 2 with datatypes v62.
+  split; eauto 2 with datatypes.
 Qed.
 
 Lemma find_next_visit_in_scs_none_spec: forall visited sc scs 
@@ -242,7 +242,7 @@ Proof.
         simpl. apply XATree.children_in_children_of_tree.
         constructor; auto.
           simpl in *.
-          eauto with datatypes v62.
+          eauto with datatypes.
 Qed.
 
 Lemma find_next_visit_in_stk_spec3_helper: forall 
@@ -318,7 +318,7 @@ Proof.
       apply ATree.elements_complete in Hin. 
       rewrite ATree.gsspec in Hin.
       destruct_if.
-        eauto with datatypes v62.
+        eauto with datatypes.
            
         apply ATree.elements_correct in H2. 
         apply Hinc.

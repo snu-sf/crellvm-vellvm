@@ -7,6 +7,7 @@ Require Import alist.
 Require Import Coqlib.
 Require Import Kildall.
 Require Import Maps.
+Require Import maps_ext.
 Require Import targetdata.
 Require Export vellvm_tactics.
 Require Export util.
@@ -3310,6 +3311,7 @@ Proof.
     apply in_app_or in H;
       destruct H as [H | H]; apply InGetValueIDs__eq in H; auto |
     apply InGetValueIDs__eq in H; auto].
+  inversion H.
 
     apply in_app_or in H.
     destruct H as [H | H].

@@ -1,0 +1,11 @@
+coq_makefile \
+*.v \
+-I ../lib/ \
+-I ../ia32/ \
+-I ../flocq/Prop \
+-I ../flocq/Appli \
+-I ../flocq/Calc \
+-I ../flocq/Core \
+-I ../flocq/ \
+-I ../../metalib-20090714/ \
+> Makefile

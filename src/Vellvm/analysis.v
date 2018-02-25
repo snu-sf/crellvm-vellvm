@@ -8,11 +8,12 @@ Require Import Memory.
 Require Import Integers.
 Require Import Coqlib.
 Require Import Maps.
+Require Import maps_ext.
 Require Import Lattice.
 Require Import Iteration.
-Require Import Kildall.
 Require Import ListSet.
 Require Import dom_list.
+Require Import util. (* for NodeSet *)
 
 (**********************************)
 (* This file defines analysis used by Vellvm. *)
@@ -1464,7 +1465,7 @@ Proof.
     left.
     assert ((l1, stmts_intro p c t) = (l1, stmts_intro p0 c0 t0)) as EQ.
       apply lookupBlockViaIDFromFdef__blockInFdefB in H0.
-      eapply blockInFdefB_uniq in H2; eauto.
+      eapply blockInFdefB_uniq in H0; eauto.
       congruence.
     inv EQ.
     eapply idDominates_insnDominates__insnDominates in H0; eauto.

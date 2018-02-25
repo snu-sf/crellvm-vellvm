@@ -49,8 +49,7 @@ Hint Unfold instantiate_gvs inhabited.
 Definition cundef_gvs gv ty : t :=
 match ty with
 | typ_int sz => fun gv => exists z, gv = (Vint (sz-1) z, Mint (sz - 1))::nil
-| typ_floatpoint fp_float => 
-    fun gv => exists f, gv = (Val.singleoffloat (Vfloat f), Mfloat32)::nil
+| typ_floatpoint fp_float => fun gv => exists f, gv = (Vsingle f, Mfloat32)::nil
 | typ_floatpoint fp_double => fun gv => exists f, gv = (Vfloat f, Mfloat64)::nil
 | typ_pointer _ =>
     fun gv => exists b, exists ofs, gv = (Vptr b ofs, AST.Mint 31)::nil
@@ -64,7 +63,7 @@ match ty with
       (fun gv => exists z, gv = (Vint (sz-1) z, Mint (sz-1))::nil)
 | typ_floatpoint fp_float =>
     Ensembles.Union _ (Singleton _ gv)
-      (fun gv => exists f, gv = (Val.singleoffloat (Vfloat f), Mfloat32)::nil)
+      (fun gv => exists f, gv = (Vsingle f, Mfloat32)::nil)
 | typ_floatpoint fp_double =>
     Ensembles.Union _ (Singleton _ gv)
       (fun gv => exists f, gv = (Vfloat f, Mfloat64)::nil)
@@ -126,7 +125,7 @@ Proof.
 
     destruct f; uniq_result; inv Heq1; inv Hin; eauto.
       constructor; auto.
-      split; auto. simpl. rewrite Float.singleoffloat_idem. auto.
+      split; auto. simpl. auto.
 
       constructor; auto.
       split; auto. simpl. auto.
@@ -145,6 +144,7 @@ Proof.
 
     destruct f; try solve [
       eapply Ensembles.Inhabited_intro; exists Float.zero; auto |
+      eapply Ensembles.Inhabited_intro; exists Float32.zero; auto |
       eapply Ensembles.Inhabited_intro; constructor].
 
     eapply Ensembles.Inhabited_intro.
@@ -201,7 +201,7 @@ Proof.
       inv Heq1; inv Hin; inv H.
       constructor; auto.
       constructor; auto.
-        split; auto. simpl. rewrite Float.singleoffloat_idem. auto.
+        split; auto. simpl. auto.
 
       inv Heq1; inv Hin; inv H.
       constructor; auto.

@@ -7,12 +7,12 @@ Require Import Relations.Relation_Operators.
 (* This file defines dominator trees with properties. *)
 Section DTree.
 
-Variable A:Set.
+Variable A:Type.
 Hypothesis Hdec: forall x y:A, {x = y} + {x <> y}.
 (* A rose tree. *)
-Inductive DTree : Set :=
+Inductive DTree : Type :=
 | DT_node : A -> DTrees -> DTree
-with DTrees : Set :=
+with DTrees : Type :=
 | DT_nil : DTrees
 | DT_cons : DTree -> DTrees -> DTrees
 .
@@ -142,7 +142,7 @@ Lemma is_dtrees_edge_cons_intro: forall dt1 dts2 p ch
   is_dtrees_edge (DT_cons dt1 dts2) p ch = true.
 Proof.
   simpl.
-  intros. auto with datatypes v62.
+  intros. intuition.
 Qed.
 
 Lemma DT_nil_has_no_dtree_edges: forall p ch,
@@ -365,7 +365,7 @@ Proof.
             destruct J as [J1 |[J2 J3]]; auto.
               rewrite J1. auto.
           SSSSCase "1.2".
-            left. rewrite J. auto with datatypes v62.
+            left. rewrite J. intuition.
         SSSCase "2".
           apply is_dtrees_edge_cons_intro.
           destruct J as [J | [[J1 J2] | J]]; subst.
@@ -799,9 +799,9 @@ Proof.
       destruct_if.
   
       rewrite H1.
-      destruct_if; auto with datatypes v62.
+      destruct_if; intuition.
   
-    rewrite H0. auto with datatypes v62.
+    rewrite H0. intuition.
 Qed.
 
 Lemma DT_cons_hd_extends_dvertexes: forall l1 d dts (x : Vertex)
@@ -1020,7 +1020,7 @@ Proof.
       repeat destruct_if.
 
       repeat destruct_if;
-        rewrite IHdts; auto with datatypes v62.
+        rewrite IHdts; intuition.
 Qed.
 
 
@@ -1101,7 +1101,7 @@ Proof.
  
       apply IHdts; auto.
         intros p0 ch0 Hedge0.
-        apply H. rewrite Hedge0. auto with datatypes v62.
+        apply H. rewrite Hedge0. intuition.
 Qed.
 
 Lemma dtree_walk__clos_refl_trans_idom: forall idom dt l1 (Hwk: dtree_walk dt l1)
@@ -1175,9 +1175,10 @@ Implicit Arguments create_dtree_from_chains [A].
 Implicit Arguments create_dtree_from_chains__is_dtree_edge__is_chain_edge [A].
 
 Require Import Maps.
+Require Import maps_ext.
 
 (* create_dtree constructs a well-formed dom-tree. *)
-Module DTreeProps (T:TREE).
+Module DTreeProps (T:TREE0).
 
 Module TCfg := Cfg(T).
 
@@ -1314,7 +1315,7 @@ Proof.
     inv Hrd.
     constructor; auto.
       apply H; auto.
-        intros x Hinx. apply Hrd'. auto with datatypes v62.
+        intros x Hinx. apply Hrd'. auto with datatypes.
   Case "DT_nil".
     constructor; auto using list2tree__reachable_dtree.
   Case "DT_cons".
