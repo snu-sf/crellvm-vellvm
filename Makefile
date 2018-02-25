@@ -19,9 +19,9 @@ all: theories extract
 quick: theories-quick
 
 init:
-	git clone git@github.com:snu-sf/cpdtlib.git lib/cpdtlib
-	git clone git@github.com:snu-sf/metalib.git lib/metalib
-	git clone git@github.com:snu-sf/sflib.git lib/sflib
+	git clone https://github.com/snu-sf/cpdtlib.git lib/cpdtlib
+	git clone https://github.com/snu-sf/metalib.git lib/metalib
+	git clone https://github.com/snu-sf/sflib.git lib/sflib
 
 Makefile.coq: Makefile $(COQTHEORIES)
 	(echo "-R src $(COQMODULE)"; \
